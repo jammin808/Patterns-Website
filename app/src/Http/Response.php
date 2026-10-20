@@ -107,7 +107,9 @@ final class Response
             }
         }
         if ($this->stream !== null) {
-            ($this->stream)();
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'HEAD') {
+                ($this->stream)();
+            }
             return;
         }
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'HEAD') {

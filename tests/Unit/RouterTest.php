@@ -36,6 +36,18 @@ final class RouterTest extends TestCase
         self::assertNull($r->match('GET', '/sitemap.xml'));
     }
 
+    public function testPlaceholderPatternsMayUseQuantifierBraces(): void
+    {
+        $r = new Router();
+        $r->get('/portal/admin/chats/{id:[a-f0-9]{32}}/', 'chat', [], 'chat');
+        $id = str_repeat('ab', 16);
+        $m = $r->match('GET', '/portal/admin/chats/' . $id . '/');
+        self::assertSame('chat', $m['route']['handler']);
+        self::assertSame(['id' => $id], $m['params']);
+        self::assertNull($r->match('GET', '/portal/admin/chats/' . substr($id, 1) . '/'));
+        self::assertSame('/portal/admin/chats/' . $id . '/', $r->urlFor('chat', ['id' => $id]));
+    }
+
     public function testPatternsAreQuotedLiterally(): void
     {
         $r = new Router();

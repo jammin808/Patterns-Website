@@ -86,7 +86,9 @@ final class ChatController extends Controller
         $timeout = $cfg->int('chat.timeout_seconds', 60);
 
         $writer = static function () use ($service, $id, $message, $page, $turns, $maxTurns, $timeout): void {
-            @set_time_limit($timeout + 30);
+            if (PHP_SAPI !== 'cli') {
+                @set_time_limit($timeout + 30);
+            }
             ignore_user_abort(true);
             @ini_set('zlib.output_compression', '0');
             @ini_set('output_buffering', '0');

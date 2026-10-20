@@ -79,7 +79,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      * @param array<string, mixed> $post
      * @param array<string, string> $headers
      */
-    protected function request(string $method, string $uri, array $post = [], array $headers = [], ?string $json = null, bool $https = true, array $files = []): Response
+    protected function request(string $method, string $uri, array $post = [], array $headers = [], ?string $json = null, bool $https = true, array $files = [], array $server = []): Response
     {
         $path = (string) (parse_url($uri, PHP_URL_PATH) ?? '/');
         parse_str((string) (parse_url($uri, PHP_URL_QUERY) ?? ''), $query);
@@ -97,7 +97,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'QUERY_STRING' => (string) (parse_url($uri, PHP_URL_QUERY) ?? ''),
             'REMOTE_ADDR' => '203.0.113.7',
             'HTTPS' => $https ? 'on' : '',
-        ];
+        ] + $server;
         $request = new Request($method, Request::normalisePath($path), $query, $post, $lower, $this->jar, $files, $server, $json ?? '');
         // Each request gets fresh per-request services (as a new PHP process would), sharing database and session.
         $config = $this->app->config;

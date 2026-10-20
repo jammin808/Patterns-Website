@@ -92,7 +92,7 @@ final class Router
     {
         foreach ($this->routes as $r) {
             if ($r['name'] === $name) {
-                return (string) preg_replace_callback('/\{(\w+)(?::[^}]+)?\}/', static fn (array $m): string => rawurlencode((string) ($params[$m[1]] ?? '')), $r['pattern']);
+                return (string) preg_replace_callback('/\{(\w+)(?::(?:[^{}]|\{[^{}]*\})+)?\}/', static fn (array $m): string => rawurlencode((string) ($params[$m[1]] ?? '')), $r['pattern']);
             }
         }
         throw new \InvalidArgumentException("No route named {$name}");
@@ -100,10 +100,11 @@ final class Router
 
     private static function compile(string $pattern): string
     {
-        $parts = preg_split('/(\{\w+(?::[^}]+)?\})/', $pattern, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$pattern];
+        // A placeholder's own pattern may contain one level of braces, e.g. {id:[a-f0-9]{32}}.
+        $parts = preg_split('/(\{\w+(?::(?:[^{}]|\{[^{}]*\})+)?\})/', $pattern, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$pattern];
         $regex = '';
         foreach ($parts as $part) {
-            if (preg_match('/^\{(\w+)(?::([^}]+))?\}$/', $part, $m)) {
+            if (preg_match('/^\{(\w+)(?::((?:[^{}]|\{[^{}]*\})+))?\}$/', $part, $m)) {
                 $regex .= '(?P<' . $m[1] . '>' . (($m[2] ?? '') !== '' ? $m[2] : '[^/]+') . ')';
             } else {
                 $regex .= preg_quote($part, '#');

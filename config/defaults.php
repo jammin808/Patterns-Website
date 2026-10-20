@@ -87,6 +87,8 @@ return [
 
     'downloads' => [
         'max_upload_mb' => 512,
+        'vault_path' => '',               // empty: <app root>/downloads-vault
+        'vault_url' => '/downloads-vault/', // the URL LiteSpeed serves the vault at (X-LiteSpeed-Location); empty: PHP streams
     ],
 
     'uploads' => [

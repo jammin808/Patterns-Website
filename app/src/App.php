@@ -36,6 +36,8 @@ final class App
     private ?Request $request = null;
     /** @var array<string, array{string, array<string, mixed>}> cookies set by services during this request */
     private array $cookieQueue = [];
+    /** @var list<callable(): void> work to run after the response has gone (email delivery) */
+    private array $deferred = [];
     public readonly Router $router;
     public readonly Logger $log;
     public readonly Storage $storage;
@@ -127,7 +129,34 @@ final class App
 
     public function mailer(): Mailer
     {
-        return $this->mailer ??= Mailer::fromConfig($this->config, $this->storage, $this->log, $this->view());
+        $defer = PHP_SAPI === 'cli' ? null : function (callable $job): void {
+            $this->deferred[] = $job;
+        };
+        return $this->mailer ??= Mailer::fromConfig($this->config, $this->storage, $this->log, $this->view(), $defer);
+    }
+
+    /** Ends the HTTP response, then runs the deferred work (index.php calls this after send()). */
+    public function finish(): void
+    {
+        if ($this->deferred === []) {
+            return;
+        }
+        if (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+        } elseif (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            @flush();
+        }
+        ignore_user_abort(true);
+        foreach ($this->deferred as $job) {
+            try {
+                $job();
+            } catch (\Throwable $e) {
+                $this->log->exception($e, 'deferred');
+            }
+        }
+        $this->deferred = [];
     }
 
     public function useMailer(Mailer $mailer): void

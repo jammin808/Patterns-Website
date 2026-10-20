@@ -31,10 +31,15 @@ final class Mailer
         private readonly View $view,
         private readonly string $siteName,
         private readonly string $baseUrl,
+        private readonly ?\Closure $defer = null,
     ) {
     }
 
-    public static function fromConfig(Config $config, Storage $storage, Logger $log, View $view): self
+    /**
+     * @param (\Closure(callable(): void): void)|null $defer runs the delivery after the response has been sent, so
+     *        a slow mail server never shows in how long a page takes (which would reveal whether an email exists)
+     */
+    public static function fromConfig(Config $config, Storage $storage, Logger $log, View $view, ?\Closure $defer = null): self
     {
         $smtp = $config->get('mail.smtp', []);
         return new self(
@@ -47,6 +52,7 @@ final class Mailer
             $view,
             $config->string('app.name', 'Patterns Show Control'),
             rtrim($config->string('app.url'), '/'),
+            $defer,
         );
     }
 
@@ -66,6 +72,18 @@ final class Mailer
         }
         $this->sent[] = ['to' => $to, 'subject' => $subject, 'template' => $template, 'data' => $data, 'html' => $html];
         $message = $this->compose($to, $subject, $html, self::toText($html), $replyTo);
+        if ($this->defer !== null) {
+            ($this->defer)(function () use ($to, $subject, $template, $message): void {
+                $this->deliver($to, $subject, $template, $message);
+            });
+            return true;
+        }
+        return $this->deliver($to, $subject, $template, $message);
+    }
+
+    /** @param array{headers: string, body: string, raw: string} $message */
+    private function deliver(string $to, string $subject, string $template, array $message): bool
+    {
         try {
             $ok = match ($this->driver) {
                 'smtp' => $this->sendSmtp($to, $message),

@@ -56,8 +56,8 @@ final class Uploads
         }
         $out = [];
         foreach ($entry['name'] as $i => $name) {
-            if ((int) ($entry['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-                continue;
+            if (!is_scalar($name) || (int) ($entry['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                continue; // nested arrays (field[a][]) are not accepted
             }
             $out[] = [
                 'name' => (string) $name,
@@ -119,7 +119,8 @@ final class Uploads
     public static function cleanName(string $name): string
     {
         $name = basename(str_replace('\\', '/', $name));
-        $name = (string) preg_replace('/[\x00-\x1F\x7F"<>:|?*]+/u', '', $name);
+        // Control characters, bidi overrides and zero-width characters cannot disguise an extension.
+        $name = (string) preg_replace('/[\x00-\x1F\x7F"<>:|?*\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}]+/u', '', $name);
         $name = trim($name, " .\t");
         if ($name === '') {
             $name = 'file';

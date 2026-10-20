@@ -177,7 +177,7 @@ if (!function_exists('e')) {
         $s = (string) preg_replace('/(?<![*\w])\*([^*]+)\*(?!\w)/', '<em>$1</em>', $s);
         $s = (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m): string {
             $href = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
-            if (!preg_match('#^(https?://|/(?!/))#', $href)) {
+            if (!preg_match('#^(https?://|/(?![/\\\\]))#', $href) || str_contains($href, '\\')) {
                 return $m[1];
             }
             $external = str_starts_with($href, 'http') && !str_starts_with($href, App::get()->baseUrl());
