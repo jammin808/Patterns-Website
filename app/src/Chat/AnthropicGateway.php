@@ -25,16 +25,18 @@ final class AnthropicGateway implements ModelGateway
 
     private Client $client;
 
+    /** @param array<string, mixed> $requestOptions extra SDK request options (tests pass a transporter) */
     public function __construct(
         string $apiKey,
         private readonly string $model,
         private readonly string $gateModel,
         private readonly int $maxTokens,
         float $timeoutSeconds,
+        array $requestOptions = [],
     ) {
         $this->client = new Client(
             apiKey: $apiKey,
-            requestOptions: ['timeout' => $timeoutSeconds, 'maxRetries' => 1],
+            requestOptions: ['timeout' => $timeoutSeconds, 'maxRetries' => 1] + $requestOptions,
             openTelemetry: false,
         );
     }
