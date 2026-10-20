@@ -1,0 +1,49 @@
+# Patterns Show Control: the repository root is deployed as public_html.
+# Only public/ is web-reachable; every other directory (app, config, storage, templates, vendor, ...) is denied,
+# and every request that is not a real file under public/ goes to public/index.php.
+
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS (Hostinger terminates TLS on LiteSpeed; X-Forwarded-Proto covers a proxy in front).
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$ [NC]
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # The canonical host has no www.
+    RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+    # Streaming replies (the support assistant) must not be compressed or buffered, nor cut off when idle.
+    RewriteRule ^api/chat - [E=no-gzip:1,E=dont-vary:1,E=noabort:1,E=noconntimeout:1]
+
+    # Nothing outside public/ is ever served directly.
+    RewriteRule ^(app|config|content|database|design|docs|knowledge|storage|templates|tests|tools|vendor|node_modules)(/|$) - [F,L,NC]
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|README\.md|\.git.*|.*\.(md|sql|sh|lock|dist|neon|yml|yaml|log|bak|ini|env))$ - [F,L,NC]
+
+    # A real file under public/ is served as is (assets, icons, robots-free statics).
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Direct requests for /public/... are redirected to the clean URL so nothing is indexed twice.
+    RewriteCond %{THE_REQUEST} \s/public/([^\s?]*) [NC]
+    RewriteRule ^ /%1 [L,R=301]
+
+    # Everything else is the application.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^ public/index.php [L,QSA]
+</IfModule>
+
+# Dotfiles and backup/config files are never served, even if the rules above are bypassed.
+<FilesMatch "^\.|\.(php\.dist|sql|md|log|ini|lock|bak|env)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>

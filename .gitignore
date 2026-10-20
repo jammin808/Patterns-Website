@@ -1,0 +1,26 @@
+# Dependencies (installed by composer on the server or by tools/build-release.sh)
+/vendor/
+/node_modules/
+/tools/phpunit/vendor/
+
+# Server-only configuration and runtime data: never committed
+/config/local.php
+/storage/*
+!/storage/.htaccess
+!/storage/README.md
+
+# Build and test output
+/dist/
+/build/
+/test-results/
+/playwright-report/
+/tests/e2e/.artifacts/
+.phpunit.result.cache
+.phpunit.cache/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
