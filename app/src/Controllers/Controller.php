@@ -27,6 +27,8 @@ abstract class Controller
             'flashes' => $session->isStarted() ? $session->takeFlashes() : [],
             'user' => $session->isStarted() ? $this->app->auth()->user() : null,
         ];
+        // Partials (the FAQ accordion, for one) add their structured data to the page's Seo.
+        $this->app->view()->share('seo', $data['seo']);
         return Response::html($this->app->view()->page($template, $data, $layout), $status);
     }
 

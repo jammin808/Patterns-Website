@@ -371,7 +371,7 @@ final class AccountsTest extends TestCase
         self::assertSame($id, self::signedInId());
 
         $r = $this->post('/portal/logout/');
-        self::assertRedirect($r, '/');
+        self::assertRedirect($r, '/portal/login/');
         self::assertNull(self::signedInId());
         self::assertArrayNotHasKey('__Host-psc_rm', $this->jar);
         self::assertSame(0, (int) $this->db->value("SELECT COUNT(*) FROM user_tokens WHERE purpose = 'remember'"));
@@ -577,7 +577,7 @@ final class AccountsTest extends TestCase
         self::assertSame([], array_filter($this->mails(), static fn (array $m): bool => $m['template'] === 'account-deleted-admin'));
 
         $r = $this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE']);
-        self::assertRedirect($r, '/');
+        self::assertRedirect($r, '/portal/login/');
         $row = $this->db->one('SELECT * FROM users WHERE id = ?', [$id]);
         self::assertSame('disabled', $row['status']);
         self::assertSame('deleted-' . $id . '@deleted.invalid', $row['email']);
@@ -905,7 +905,7 @@ final class AccountsTest extends TestCase
         $this->freshBrowser();
         $this->signIn();
         $r = $this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE']);
-        self::assertRedirect($r, '/');
+        self::assertRedirect($r, '/portal/login/');
         $row = $this->db->one('SELECT status, email, name FROM users WHERE id = ?', [$id]);
         self::assertSame('disabled', $row['status']);
         self::assertSame('Deleted user', $row['name']);
@@ -931,7 +931,7 @@ final class AccountsTest extends TestCase
 
         $this->makeUser('second@example.test', self::PASSWORD, 'admin');
         self::assertStringContainsString('action="/portal/account/delete/"', $this->request('GET', '/portal/account/')->body);
-        self::assertRedirect($this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE']), '/');
+        self::assertRedirect($this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE']), '/portal/login/');
         self::assertSame('disabled', $this->db->value('SELECT status FROM users WHERE id = ?', [$admin]));
     }
 
