@@ -50,13 +50,67 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         ];
         $merged = array_replace_recursive($base, $config);
         $this->app = App::boot(Config::fromArray(PSC_ROOT, $merged));
-        $this->db = Database::connect('sqlite::memory:');
-        (new Migrator($this->db, PSC_ROOT . '/database/migrations', $this->storage . '/cache/schema-version'))->migrate();
+        $this->db = self::database($this->storage);
         $this->app->useDatabase($this->db);
         $this->mail = $this->app->mailer();
         $_SESSION = [];
         $this->jar = [];
         Content::flush();
+    }
+
+    private static ?Database $shared = null;
+
+    /**
+     * SQLite in memory by default. With PSC_TEST_DB_DSN set (a MySQL or MariaDB database that may be wiped), the
+     * suite runs against it instead: the schema is rebuilt once per run and every table is emptied before each
+     * test, so the queries are proven on the production engine too.
+     */
+    private static function database(string $storage): Database
+    {
+        $dsn = (string) getenv('PSC_TEST_DB_DSN');
+        if ($dsn === '') {
+            $db = Database::connect('sqlite::memory:');
+            (new Migrator($db, PSC_ROOT . '/database/migrations', $storage . '/cache/schema-version'))->migrate();
+            return $db;
+        }
+        if (self::$shared === null) {
+            self::$shared = Database::connect($dsn, (string) getenv('PSC_TEST_DB_USER'), (string) getenv('PSC_TEST_DB_PASSWORD'));
+            self::$shared->pdo()->exec('SET FOREIGN_KEY_CHECKS = 0');
+            foreach (self::$shared->all('SHOW TABLES') as $row) {
+                self::$shared->pdo()->exec('DROP TABLE `' . str_replace('`', '', (string) array_values($row)[0]) . '`');
+            }
+            self::$shared->pdo()->exec('SET FOREIGN_KEY_CHECKS = 1');
+            (new Migrator(self::$shared, PSC_ROOT . '/database/migrations', $storage . '/cache/schema-version'))->migrate();
+            return self::$shared;
+        }
+        $db = self::$shared;
+        foreach ($db->all('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()') as $row) {
+            $db->pdo()->exec('DROP TRIGGER IF EXISTS `' . str_replace('`', '', (string) array_values($row)[0]) . '`');
+        }
+        $db->pdo()->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach ($db->all('SHOW TABLES') as $row) {
+            $table = (string) array_values($row)[0];
+            if ($table !== 'schema_migrations') {
+                $db->pdo()->exec('TRUNCATE TABLE `' . str_replace('`', '', $table) . '`');
+            }
+        }
+        $db->pdo()->exec('SET FOREIGN_KEY_CHECKS = 1');
+        return $db;
+    }
+
+    /**
+     * Makes every $event (INSERT, UPDATE, DELETE) on $table fail with a database error, in the dialect of the
+     * database under test, to prove a handler survives a failed write.
+     */
+    protected function refuseWrites(string $name, string $event, string $table): void
+    {
+        if ($this->db->driver() === 'mysql') {
+            $this->db->pdo()->exec("CREATE TRIGGER {$name} BEFORE {$event} ON {$table} FOR EACH ROW SIGNAL SQLSTATE 'HY000' SET MESSAGE_TEXT = 'refused'");
+        } else {
+            // Not RAISE(ABORT): SQLite reports that as a constraint violation, which handlers rightly treat as a
+            // race. A trigger reading a missing table fails as a plain database error.
+            $this->db->pdo()->exec("CREATE TRIGGER {$name} BEFORE {$event} ON {$table} BEGIN SELECT * FROM no_such_table; END");
+        }
     }
 
     protected function setUp(): void

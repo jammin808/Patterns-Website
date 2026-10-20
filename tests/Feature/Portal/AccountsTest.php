@@ -951,6 +951,10 @@ final class AccountsTest extends TestCase
         self::assertSame(['name' => 'Nina Stage', 'company' => 'Front of House'], $this->db->one('SELECT name, company FROM users WHERE id = ?', [$id]));
 
         // A record holding bytes that are not UTF-8 (written before these checks, or imported) is still exported.
+        // MySQL in strict mode cannot hold such bytes at all, so the legacy record exists only on SQLite.
+        if ($this->db->driver() !== 'sqlite') {
+            return;
+        }
         $this->db->insert('tickets', ['user_id' => $id, 'type' => 'bug', 'product' => 'patterns', 'title' => "Bad \xff bytes", 'body' => 'Body', 'last_activity_at' => time(), 'created_at' => time(), 'updated_at' => time()]);
         $export = $this->request('GET', '/portal/account/export/');
         self::assertSame(200, $export->status);

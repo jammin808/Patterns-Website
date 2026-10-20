@@ -16,14 +16,15 @@ jobs:
       matrix:
         php: ['8.2', '8.3', '8.4']
     services:
-      mysql:
-        image: mysql:8.4
+      # Hostinger's shared hosting runs MariaDB; the suite runs on it as well as on SQLite.
+      mariadb:
+        image: mariadb:10.11
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: psc
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: psc
         ports: ['3306:3306']
         options: >-
-          --health-cmd "mysqladmin ping -proot" --health-interval 5s --health-timeout 5s --health-retries 20
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -39,6 +40,12 @@ jobs:
           composer install --no-interaction --no-progress
           composer install --no-interaction --no-progress --working-dir=tools/phpunit
       - name: PHPUnit (SQLite)
+        run: tools/phpunit/vendor/bin/phpunit
+      - name: PHPUnit (MariaDB)
+        env:
+          PSC_TEST_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=psc;charset=utf8mb4
+          PSC_TEST_DB_USER: root
+          PSC_TEST_DB_PASSWORD: root
         run: tools/phpunit/vendor/bin/phpunit
       - name: MySQL schema and queries
         env:

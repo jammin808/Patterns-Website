@@ -10,6 +10,12 @@ final class Request
     /** @var array<string, string> */
     private array $attributes = [];
 
+    /** @var array<string, mixed> */
+    public readonly array $query;
+
+    /** @var array<string, mixed> */
+    public readonly array $post;
+
     /**
      * @param array<string, mixed> $query
      * @param array<string, mixed> $post
@@ -21,14 +27,35 @@ final class Request
     public function __construct(
         public readonly string $method,
         public readonly string $path,
-        public readonly array $query = [],
-        public readonly array $post = [],
+        array $query = [],
+        array $post = [],
         public readonly array $headers = [],
         public readonly array $cookies = [],
         public readonly array $files = [],
         public readonly array $server = [],
         private readonly string $rawBody = '',
     ) {
+        $this->query = self::scrub($query);
+        $this->post = self::scrub($post);
+    }
+
+    /**
+     * Replaces invalid UTF-8 in every string with U+FFFD, so nothing malformed reaches the database or a page.
+     *
+     * @param array<mixed> $values
+     * @return array<mixed>
+     */
+    public static function scrub(array $values): array
+    {
+        $previous = mb_substitute_character();
+        mb_substitute_character(0xFFFD);
+        array_walk_recursive($values, static function (mixed &$v): void {
+            if (is_string($v) && !mb_check_encoding($v, 'UTF-8')) {
+                $v = mb_scrub($v, 'UTF-8');
+            }
+        });
+        mb_substitute_character($previous);
+        return $values;
     }
 
     public static function fromGlobals(): self
@@ -91,7 +118,7 @@ final class Request
         if ($this->rawBody === '') {
             return [];
         }
-        $data = json_decode($this->rawBody, true);
+        $data = json_decode(mb_scrub($this->rawBody, 'UTF-8'), true);
         return is_array($data) ? $data : [];
     }
 

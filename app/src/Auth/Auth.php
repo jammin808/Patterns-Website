@@ -110,7 +110,8 @@ final class Auth
      */
     public static function cleanLine(string $value): string
     {
-        if (!mb_check_encoding($value, 'UTF-8')) {
+        // Invalid bytes arrive already replaced by U+FFFD (Request::scrub): a name holding one is refused too.
+        if (!mb_check_encoding($value, 'UTF-8') || str_contains($value, "\u{FFFD}")) {
             return '';
         }
         return trim((string) preg_replace('/[\s\x00-\x1F\x7F]+/u', ' ', $value));

@@ -899,8 +899,8 @@ final class TicketsTest extends TestCase
     {
         $this->actAs(self::A);
         $id = $this->open(self::feature());
-        // A failure that is not a duplicate key: a trigger that reads a table that does not exist.
-        $this->db->exec('CREATE TRIGGER ticket_votes_fail BEFORE INSERT ON ticket_votes BEGIN SELECT * FROM no_such_table; END');
+        // A failure that is not a duplicate key: a trigger that refuses the insert.
+        $this->refuseWrites('ticket_votes_fail', 'INSERT', 'ticket_votes');
         $this->actAs(self::B);
         $_SESSION['_flash'] = [];
         $r = $this->post("/portal/tickets/{$id}/vote/", ['return' => '/portal/ideas/']);
@@ -909,8 +909,12 @@ final class TicketsTest extends TestCase
         self::assertSame(0, $this->rows('SELECT COUNT(*) FROM ticket_votes'));
         self::assertSame(0, (int) $this->ticket($id)['votes']);
 
-        // A duplicate key is still the race it stands for: the vote lands on "voted".
+        // A duplicate key is still the race it stands for: the vote lands on "voted". Simulating the race needs a
+        // trigger that silently skips a delete, which only SQLite has; the refusal above runs on both engines.
         $this->db->exec('DROP TRIGGER ticket_votes_fail');
+        if ($this->db->driver() !== 'sqlite') {
+            return;
+        }
         $b = (int) $this->db->value('SELECT id FROM users WHERE email = ?', [self::B]);
         $this->db->exec('CREATE TRIGGER ticket_votes_race BEFORE DELETE ON ticket_votes BEGIN SELECT RAISE(IGNORE); END');
         $this->db->insert('ticket_votes', ['ticket_id' => $id, 'user_id' => $b, 'created_at' => time()]);

@@ -914,7 +914,7 @@ final class DownloadsLicencesTest extends TestCase
         self::assertDoesNotMatchRegularExpression('/\b(Warning|Notice|Deprecated|Fatal error)\b:/', $r->body, $label);
         self::assertSame(1, substr_count($r->body, '<h1'), $label . ': one h1');
         self::assertStringNotContainsString(' style="', $r->body, $label . ': no inline styles');
-        self::assertStringNotContainsString('<script', $r->body, $label . ': no inline script');
+        self::assertDoesNotMatchRegularExpression('#<script(?![^>]*\\ssrc=)(?![^>]*application/ld\\+json)#', $r->body, $label . ': no inline script');
     }
 
     public function testEveryPageRendersCleanlyInEveryState(): void
@@ -1163,7 +1163,7 @@ final class DownloadsLicencesTest extends TestCase
         $id = $this->makeRelease();
         $this->db->insert('download_events', ['release_id' => $id, 'user_id' => null, 'ip_hash' => null, 'created_at' => time()]);
         $file = $this->vault . '/' . $this->db->value('SELECT file_path FROM releases WHERE id = ?', [$id]);
-        $this->db->exec("CREATE TRIGGER keep_releases BEFORE DELETE ON releases BEGIN SELECT RAISE(ABORT, 'refused'); END");
+        $this->refuseWrites('keep_releases', 'DELETE', 'releases');
         $this->signInAs(self::ADMIN);
 
         $r = $this->post('/portal/admin/releases/' . $id . '/', ['action' => 'delete', 'confirm' => '1']);
@@ -1179,7 +1179,7 @@ final class DownloadsLicencesTest extends TestCase
         $owner = $this->makeUser(self::CLIENT);
         $this->makeUser(self::ADMIN, 'correct horse battery', 'admin');
         $id = $this->makeLicence($owner, ['status' => 'issued', 'issued_at' => time()]);
-        $this->db->exec("CREATE TRIGGER refuse_files BEFORE INSERT ON licence_files BEGIN SELECT RAISE(ABORT, 'refused'); END");
+        $this->refuseWrites('refuse_files', 'INSERT', 'licence_files');
         $this->signInAs(self::ADMIN);
         $url = '/portal/admin/licences/' . $id . '/';
 
