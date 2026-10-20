@@ -98,7 +98,7 @@ return [
     '/patterns/licensing/' => [
         'template' => 'pages/patterns/licensing',
         'title' => 'Patterns Pricing & Licences | Patterns Show Control',
-        'description' => 'How Patterns will be licensed: offline licences tied to your show machine, no licence server, with nonprofit and rental options. Register for news.',
+        'description' => 'How Patterns will be licensed: one-off licences tied to your show machine and activated offline, with no licence server. Register interest for launch news.',
         'crumb' => 'Licensing',
         'parent' => '/patterns/',
         'section' => 'patterns',
@@ -174,7 +174,7 @@ return [
     '/agmessage/licensing/' => [
         'template' => 'pages/agmessage/licensing',
         'title' => 'AGMessage Pricing & Delivery | Patterns Show Control',
-        'description' => 'How AGMessage is offered: run it yourself or have it delivered for your AGM, with pilot and agency options. Tell us about your meeting for a quote.',
+        'description' => 'AGMessage delivered for your AGM: a venue laptop, the software set up and a technician, with agency rates and a pilot. Self-run licences are coming.',
         'crumb' => 'Licensing',
         'parent' => '/agmessage/',
         'section' => 'agmessage',
@@ -273,7 +273,7 @@ return [
     '/workflows/agm-shareholder-questions/' => [
         'template' => 'pages/workflows/show',
         'workflow' => 'agm-shareholder-questions',
-        'title' => 'Answer AGM Shareholder Questions in Under a Minute',
+        'title' => 'Answer AGM Shareholder Questions Live from the Back-Room',
         'description' => 'How a back-room team finds the answer, pushes the document to the chair\'s screen and confirms the wording, live, while the meeting carries on.',
         'crumb' => 'AGM shareholder questions',
         'parent' => '/workflows/',

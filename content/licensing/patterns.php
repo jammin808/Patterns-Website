@@ -8,7 +8,7 @@ return [
     'product' => 'patterns',
     'pricing_status' => 'coming-soon',
     'model' => 'Patterns will follow the same one-off, offline licensing as StageWatch: a licence you buy once, activated with a licence file on your show machine, with no subscription and no licence server.',
-    'intro' => 'Patterns licences are coming soon. The plan follows StageWatch\'s ladder, from a trial of every feature to licences for one operator and for production companies. Prices and what each licence includes will be announced together. Register your interest and you will be among the first to hear.',
+    'intro' => 'Patterns licences are coming soon. The plan follows StageWatch\'s ladder, from a trial on your own show machine to licences for one operator and for production companies. Prices and what each licence includes will be announced together. Register your interest and you will be among the first to hear.',
     'tiers' => [
         [
             'id' => 'trial',
@@ -17,7 +17,7 @@ return [
             'price_label' => 'Coming soon',
             'period' => null,
             'machines' => null,
-            'summary' => 'Try every feature on your own show machine before you choose a licence.',
+            'summary' => 'Try Patterns on your own show machine before you choose a licence. Details are coming soon.',
             'includes' => [],
             'highlight' => false,
             'requestable' => false,
@@ -72,11 +72,11 @@ return [
         ['title' => 'One-off, like StageWatch', 'text' => 'Patterns will follow the same one-off, offline licensing as StageWatch: bought once, with no subscription.'],
         ['title' => 'No licence server', 'text' => 'Patterns does not depend on a licence server or a hardware key. A show machine that refuses to start because a server is out of reach is exactly the failure Patterns exists to prevent.'],
         ['title' => 'Works offline', 'text' => 'Patterns runs on the venue\'s own network with no internet connection. Only the optional AI assistant and online content, such as web pages, streams, weather and Spotify, need the internet.'],
-        ['title' => 'Portable', 'text' => 'Patterns is one portable app for Windows 10 and 11. It runs from any folder, including a USB stick, with no installer and no admin rights.'],
+        ['title' => 'Portable', 'text' => 'Patterns is one portable app for 64-bit Windows 10 and 11. It runs from any folder you can write to, including a USB stick, with no installer and no admin rights.'],
         ['title' => 'Your show travels with you', 'text' => 'Settings, presets, brand kits, media and show files live beside the app, so copying the folder moves the whole show to another machine.'],
     ],
     'how_to_buy' => [
-        'Open the contact page and choose Sales and Patterns.',
+        'Press Register interest. The contact form opens with licences and Patterns already chosen.',
         'Tell us about your shows and how many machines you run.',
         'You will hear from us when Patterns licences and prices are announced.',
     ],
@@ -88,8 +88,8 @@ return [
         ['q' => 'How much will Patterns cost?', 'a' => 'Prices are not announced yet. Register your interest on the contact page and you will be among the first to hear.'],
         ['q' => 'Will Patterns be a subscription?', 'a' => 'No. Patterns will follow the same one-off licensing as StageWatch, which is bought once with no subscription.'],
         ['q' => 'Will a Patterns licence need the internet?', 'a' => 'No. Patterns will follow StageWatch\'s offline model, where a licence is a file you install on the show machine. Patterns does not depend on a licence server or a hardware key.'],
-        ['q' => 'Do the optional extras cost anything?', 'a' => 'The NDI Runtime, VLC media player and LibreOffice are free downloads. Spotify break music needs your own Spotify Premium account, and the AI assistant uses your own Anthropic API key, which Anthropic bills separately.'],
+        ['q' => 'Do the optional extras cost anything?', 'a' => 'The NDI Runtime, VLC media player and LibreOffice are free downloads, and MET Norway\'s weather forecasts are free. Open-Meteo asks for its own key for commercial shows. Spotify break music needs your own Spotify Premium account, and the AI assistant uses your own Anthropic API key, which Anthropic bills separately.'],
         ['q' => 'Where do I download Patterns?', 'a' => 'From the downloads area of the client portal. Create a free client account to sign in.'],
-        ['q' => 'Can I ask about licences for a production company?', 'a' => 'Yes. Choose Sales and Patterns on the contact page and tell us about your rigs. A Production licence for production companies is part of the plan.'],
+        ['q' => 'Can I ask about licences for a production company?', 'a' => 'Yes. Press Register interest, or choose "Buying a licence or pricing" and Patterns on the contact page, and tell us about your rigs. A Production licence for production companies is part of the plan.'],
     ],
 ];
