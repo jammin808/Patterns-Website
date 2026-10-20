@@ -23,8 +23,9 @@ use Psc\Support\Uploads;
  *   attach   the owner and administrators
  *   vote     any signed-in user, on public feature requests only
  * Anyone else gets a 404, so a ticket's existence is never revealed. Internal comments and their files are for
- * administrators only: never shown to clients, never counted in comment_count, never emailed, and they do not move
- * last_activity_at (which clients see). Bugs and questions start private; feature requests start public.
+ * administrators only: never shown to clients, never counted in comment_count, never emailed, and they leave the
+ * ticket row untouched (its columns, last_activity_at and updated_at among them, reach the client). Bugs and
+ * questions start private; feature requests start public.
  */
 final class TicketController extends Controller
 {
@@ -40,14 +41,17 @@ final class TicketController extends Controller
         'closed' => 'Closed',
     ];
 
-    /** What each status means, in the client's words (ticket page and status emails). */
+    /**
+     * What each status means, in the client's words (ticket page and status emails). Every type of ticket uses the
+     * same words, so none of them claims more than the status itself says (a done question has no download).
+     */
     public const STATUS_HELP = [
         'open' => 'Waiting to be read.',
         'triaged' => 'Read and sorted, and in the queue.',
         'planned' => 'On the list for a future update.',
         'in_progress' => 'Being worked on now.',
-        'done' => 'Fixed or built. The newest version is in Downloads.',
-        'declined' => 'Not something that will go ahead. The conversation says why.',
+        'done' => 'Finished: fixed, built or answered. Any details are in the conversation.',
+        'declined' => 'Not going ahead. Any reasons are in the conversation.',
         'closed' => 'Closed. Add a reply if you need to pick it up again.',
     ];
 
@@ -72,9 +76,18 @@ final class TicketController extends Controller
 
     public const MAX_FILES = 5;
 
-    /** Per-user limits on creation endpoints: [hits, window seconds]. */
+    /** Per-user limits on the endpoints that write rows: [hits, window seconds]. */
     private const LIMIT_TICKETS = [20, 86400];
     private const LIMIT_COMMENTS = [60, 3600];
+    private const LIMIT_VOTES = [100, 3600];
+
+    /**
+     * Characters that are invisible or reorder the text around them (zero-width space, word joiner, byte-order
+     * mark, bidirectional embeddings, overrides and isolates). They are removed from titles, version numbers and
+     * file names, where they could make a title look empty, or make a zip file whose name holds a right-to-left
+     * override look like a PNG.
+     */
+    private const INVISIBLE = '/[\x{200B}\x{2060}\x{FEFF}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u';
 
     private const BOARD_SORTS = [
         'votes' => 't.votes DESC, t.last_activity_at DESC, t.id DESC',
@@ -255,7 +268,8 @@ final class TicketController extends Controller
         $uid = (int) $user['id'];
 
         $comments = $db->all(
-            'SELECT c.id, c.user_id, c.body, c.is_staff, c.is_internal, c.created_at, u.name AS author_name'
+            'SELECT c.id, c.user_id, c.body, c.is_staff, c.is_internal, c.created_at, u.name AS author_name,'
+            . " CASE WHEN u.id IS NULL OR u.email LIKE '%.invalid' THEN 1 ELSE 0 END AS author_gone"
             . ' FROM ticket_comments c LEFT JOIN users u ON u.id = c.user_id'
             . ' WHERE c.ticket_id = ?' . ($admin ? '' : ' AND c.is_internal = 0')
             . ' ORDER BY c.created_at, c.id',
@@ -392,14 +406,22 @@ final class TicketController extends Controller
         }
         $id = (int) $ticket['id'];
         $uid = (int) $user['id'];
+        [$limit, $window] = self::LIMIT_VOTES;
+        if (!$this->app->limiter()->hit('ticket-vote:' . $uid, $limit, $window)) {
+            return $this->redirect($this->voteReturn($request->input('return'), $id), 'warning', 'You have changed your votes many times in the last hour. Please wait a little, then try again.');
+        }
         $added = $this->app->db()->transaction(static function (Database $db) use ($id, $uid): bool {
             $added = false;
             if ($db->exec('DELETE FROM ticket_votes WHERE ticket_id = ? AND user_id = ?', [$id, $uid]) === 0) {
                 try {
                     $db->insert('ticket_votes', ['ticket_id' => $id, 'user_id' => $uid, 'created_at' => time()]);
                     $added = true;
-                } catch (\PDOException) {
-                    // A second click raced this one and its vote is already in: the toggle lands on "voted".
+                } catch (\PDOException $e) {
+                    // Only a duplicate key means a second click raced this one and its vote is already in (the
+                    // toggle lands on "voted"); any other failure is not a vote and must not be reported as one.
+                    if ((string) $e->getCode() !== '23000') {
+                        throw $e;
+                    }
                     $added = true;
                 }
             }
@@ -581,9 +603,17 @@ final class TicketController extends Controller
         return trim((string) preg_replace('/[\s\x00-\x1F\x7F]+/u', ' ', $v));
     }
 
+    /** A single-line value without invisible or reordering characters (see INVISIBLE), its spaces tidied again. */
+    public static function visible(string $value): string
+    {
+        return trim((string) preg_replace('/ {2,}/', ' ', (string) preg_replace(self::INVISIBLE, '', $value)));
+    }
+
     /**
-     * Adds a comment with its stored files, keeping comment_count (public comments only) and last_activity_at in
-     * step in the same transaction. Returns the comment id.
+     * Adds a comment with its stored files, keeping comment_count (public comments only), last_activity_at and
+     * updated_at in step in the same transaction. Returns the comment id. An internal note leaves the ticket row as
+     * it was: every column of it reaches the owner somewhere (the ticket page, the lists, their data export), so a
+     * changed one would tell them that hidden activity exists.
      *
      * @param array<string, mixed> $ticket
      * @param list<array{original_name: string, stored_name: string, size: int, mime: string, path: string}> $files
@@ -602,11 +632,13 @@ final class TicketController extends Controller
                 'created_at' => $now,
             ]);
             self::insertAttachments($db, $ticketId, $commentId, $authorId, $files, $now);
-            $db->exec(
-                'UPDATE tickets SET comment_count = (SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = ? AND is_internal = 0),'
-                . ' updated_at = ?' . ($internal ? '' : ', last_activity_at = ?') . ' WHERE id = ?',
-                $internal ? [$ticketId, $now, $ticketId] : [$ticketId, $now, $now, $ticketId]
-            );
+            if (!$internal) {
+                $db->exec(
+                    'UPDATE tickets SET comment_count = (SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = ? AND is_internal = 0),'
+                    . ' updated_at = ?, last_activity_at = ? WHERE id = ?',
+                    [$ticketId, $now, $now, $ticketId]
+                );
+            }
             return $commentId;
         });
     }
@@ -667,7 +699,7 @@ final class TicketController extends Controller
     private function validateTicket(string $type, Request $request): array
     {
         $errors = [];
-        $title = self::line($request, 'title');
+        $title = self::visible(self::line($request, 'title'));
         $tlen = mb_strlen($title);
         if ($tlen < 5 || $tlen > 150) {
             $errors['title'] = $tlen < 5 ? 'Give it a short title of at least 5 characters.' : 'Keep the title under 150 characters.';
@@ -690,13 +722,14 @@ final class TicketController extends Controller
         $version = '';
         $environment = '';
         if ($type === 'bug') {
-            $version = self::line($request, 'app_version');
+            $version = self::visible(self::line($request, 'app_version'));
             if (mb_strlen($version) > 40) {
                 $errors['app_version'] = 'Keep the version under 40 characters.';
             }
             $environment = self::text($request, 'environment');
-            if (mb_strlen($environment) > 1000) {
-                $errors['environment'] = 'Keep this under 1,000 characters.';
+            // The column is VARCHAR(255) in MySQL, which refuses a longer value in strict mode.
+            if (mb_strlen($environment) > 255) {
+                $errors['environment'] = 'Keep this under 255 characters.';
             }
             $severity = self::pick($request->input('severity'), self::SEVERITIES);
             if ($severity === '') {
@@ -705,17 +738,17 @@ final class TicketController extends Controller
             $what = $long('what_happened', true, 'Tell us what happened, in at least 10 characters.');
             $expected = $long('expected', false, '');
             $steps = $long('steps', false, '');
-            $body = "## What happened\n\n" . $what;
+            $body = "### What happened\n\n" . $what;
             if ($expected !== '') {
-                $body .= "\n\n## What I expected\n\n" . $expected;
+                $body .= "\n\n### What I expected\n\n" . $expected;
             }
             if ($steps !== '') {
-                $body .= "\n\n## Steps to reproduce\n\n" . $steps;
+                $body .= "\n\n### Steps to reproduce\n\n" . $steps;
             }
         } elseif ($type === 'feature') {
             $problem = $long('problem', true, 'Describe the problem it would solve, in at least 10 characters.');
             $idea = $long('idea', true, 'Describe your idea, in at least 10 characters.');
-            $body = "## The problem it solves\n\n" . $problem . "\n\n## The idea\n\n" . $idea;
+            $body = "### The problem it solves\n\n" . $problem . "\n\n### The idea\n\n" . $idea;
         } else {
             $body = $long('question', true, 'Write your question, in at least 10 characters.');
         }
@@ -729,11 +762,43 @@ final class TicketController extends Controller
         ], $errors];
     }
 
-    /** @return array<string, mixed>|null the request's $_FILES entry for a field */
+    /**
+     * The request's $_FILES entry for a field, as one file or a flat list. A crafted form can nest names
+     * (attachments[a][b]); those items are left out, since no form of ours sends them and reading them as
+     * strings would only produce warnings and a misleading error.
+     *
+     * @return array<string, mixed>|null
+     */
     private static function fileEntry(Request $request, string $field): ?array
     {
         $entry = $request->files[$field] ?? null;
-        return is_array($entry) ? $entry : null;
+        if (!is_array($entry) || !isset($entry['name'])) {
+            return null;
+        }
+        $keys = ['name', 'type', 'tmp_name', 'error', 'size'];
+        if (!is_array($entry['name'])) {
+            foreach ($keys as $k) {
+                if (isset($entry[$k]) && !is_scalar($entry[$k])) {
+                    return null;
+                }
+            }
+            return $entry;
+        }
+        $flat = array_fill_keys($keys, []);
+        foreach (array_keys($entry['name']) as $i) {
+            $item = [];
+            foreach ($keys as $k) {
+                $v = is_array($entry[$k] ?? null) ? ($entry[$k][$i] ?? null) : null;
+                if ($v !== null && !is_scalar($v)) {
+                    continue 2;
+                }
+                $item[$k] = $v;
+            }
+            foreach ($keys as $k) {
+                $flat[$k][] = $item[$k];
+            }
+        }
+        return $flat;
     }
 
     /** @return list<string> */
@@ -771,10 +836,11 @@ final class TicketController extends Controller
             $result = Uploads::store($file, $dir, $this->allowedExtensions(), $this->maxMb() * 1024 * 1024, $trust);
             if ($result['ok'] !== true) {
                 self::discard($stored);
-                return ['files' => [], 'error' => Uploads::cleanName($file['name']) . ': ' . $result['error']];
+                return ['files' => [], 'error' => self::visible(Uploads::cleanName($file['name'])) . ': ' . $result['error']];
             }
+            $name = self::visible($result['original_name']);
             $stored[] = [
-                'original_name' => $result['original_name'],
+                'original_name' => $name !== '' ? $name : 'file',
                 'stored_name' => $result['stored_name'],
                 'size' => $result['size'],
                 'mime' => $result['mime'],
@@ -878,7 +944,8 @@ final class TicketController extends Controller
 
     /**
      * How a comment's author is shown: "You", staff by name, and other clients by first name and initial (on a
-     * public ticket other clients read the thread; their full names and email addresses stay private).
+     * public ticket other clients read the thread; their full names and email addresses stay private). A deleted
+     * account (anonymised with a reserved .invalid address) is "A former client" to clients.
      *
      * @param array<string, mixed> $comment
      */
@@ -890,6 +957,9 @@ final class TicketController extends Controller
         }
         if ((int) $comment['is_staff'] === 1 || $viewerIsAdmin) {
             return $name !== '' ? $name : 'Former account';
+        }
+        if ((int) ($comment['author_gone'] ?? 0) === 1) {
+            return 'A former client';
         }
         return self::shortName($name);
     }
@@ -903,13 +973,22 @@ final class TicketController extends Controller
         if ((int) $owner['id'] === $viewerId) {
             return 'You';
         }
-        return $viewerIsAdmin ? (string) $owner['name'] : self::shortName((string) $owner['name']);
+        if ($viewerIsAdmin) {
+            return (string) $owner['name'];
+        }
+        return str_ends_with((string) $owner['email'], '.invalid') ? 'A former client' : self::shortName((string) $owner['name']);
     }
 
-    /** "Ada Lovelace" → "Ada L."; one word stays as it is. */
+    /**
+     * "Ada Lovelace" → "Ada L."; one word stays as it is. A word with an @ in it is left out, so a name typed as
+     * an email address ("ada@example.com", "Ada (ada@example.com)") never shows the address to other clients.
+     */
     public static function shortName(string $name): string
     {
-        $parts = preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $parts = array_values(array_filter(
+            preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+            static fn (string $part): bool => !str_contains($part, '@')
+        ));
         if ($parts === []) {
             return 'A client';
         }

@@ -58,12 +58,19 @@ final class AdminTicketController extends Controller
             $params[] = $f['status'];
         }
         if ($f['q'] !== '') {
-            if (preg_match('/^#?(\d{1,9})$/', $f['q'], $m)) {
+            // "#12" is that ticket only; a bare "12" (or "2024") is that ticket or any text containing it.
+            if (preg_match('/^#(\d{1,9})$/', $f['q'], $m)) {
                 $where[] = 't.id = ?';
                 $params[] = (int) $m[1];
             } else {
-                $where[] = "(t.title LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!' OR u.name LIKE ? ESCAPE '!')";
+                $text = "t.title LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!' OR u.name LIKE ? ESCAPE '!'";
                 $like = Database::like($f['q']);
+                if (preg_match('/^\d{1,9}$/', $f['q'])) {
+                    $where[] = '(t.id = ? OR ' . $text . ')';
+                    $params[] = (int) $f['q'];
+                } else {
+                    $where[] = '(' . $text . ')';
+                }
                 array_push($params, $like, $like, $like);
             }
         }

@@ -12,6 +12,6 @@ if ($files === []) {
 ?>
 <ul class="pt-files" aria-label="<?= e($label ?? 'Attached files') ?>">
     <?php foreach ($files as $f): ?>
-        <li><a href="/portal/attachments/<?= (int) $f['id'] ?>/"><?= e($f['original_name']) ?></a> <span class="pt-small pt-muted"><?= e(filesize_human((int) $f['size'])) ?></span></li>
+        <li><a href="/portal/attachments/<?= (int) $f['id'] ?>/"><bdi><?= e($f['original_name']) ?></bdi></a> <span class="pt-small pt-muted"><?= e(filesize_human((int) $f['size'])) ?></span></li>
     <?php endforeach; ?>
 </ul>

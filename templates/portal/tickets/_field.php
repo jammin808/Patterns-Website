@@ -13,6 +13,7 @@
  * @var array<string, string> $options select options, value => label
  * @var array<string, string|int> $attrs extra attributes (autocomplete, maxlength, rows, …)
  * @var string $id
+ * @var bool $markOptional say "(optional)" on a field that is not required (off for filter forms)
  */
 $kind ??= 'text';
 $value = (string) ($value ?? '');
@@ -22,6 +23,7 @@ $required ??= false;
 $options ??= [];
 $attrs ??= [];
 $id ??= 'f-' . $name;
+$markOptional ??= true;
 $describedBy = [];
 if ($help !== null && $help !== '') {
     $describedBy[] = $id . '-help';
@@ -44,7 +46,7 @@ if ($describedBy !== []) {
 }
 ?>
 <div class="pt-field">
-    <label for="<?= e($id) ?>"><?= e($label) ?><?php if (!$required): ?> <span class="pt-muted">(optional)</span><?php endif; ?></label>
+    <label for="<?= e($id) ?>"><?= e($label) ?><?php if (!$required && $markOptional): ?> <span class="pt-muted">(optional)</span><?php endif; ?></label>
     <?php if ($kind === 'textarea'): ?>
         <textarea<?= $attr ?>><?= e($value) ?></textarea>
     <?php elseif ($kind === 'select'): ?>

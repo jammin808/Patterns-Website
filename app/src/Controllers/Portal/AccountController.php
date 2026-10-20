@@ -43,14 +43,15 @@ final class AccountController extends Controller
                 'tickets' => (int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$id]),
             ],
             'deleteWord' => self::DELETE_WORD,
+            'soleAdmin' => $this->isSoleAdmin($user),
         ], 'Your account');
     }
 
     public function profile(Request $request): Response
     {
         $user = $this->user();
-        $name = trim($request->input('name'));
-        $company = trim($request->input('company'));
+        $name = Auth::cleanLine($request->input('name'));
+        $company = Auth::cleanLine($request->input('company'));
         $marketing = $request->input('marketing') === '1' ? 1 : 0;
         $errors = [];
         if ($name === '' || mb_strlen($name) > 120) {
@@ -114,6 +115,10 @@ final class AccountController extends Controller
         if (!$this->app->limiter()->hit('account-delete:' . $id, 5, 3600)) {
             return $this->backWithErrors($back, $request, [], 'Too many attempts in a short time. Please wait an hour, then try again.');
         }
+        if ($this->isSoleAdmin($user)) {
+            // Deleting it would leave the portal with nobody who can approve accounts or issue licences.
+            return $this->redirect($back, 'danger', 'Your account was not deleted. You are the only administrator. Make another account an administrator first, then try again.');
+        }
         $errors = [];
         if (!password_verify($request->input('delete_password'), (string) $user['password_hash'])) {
             $errors['delete_password'] = 'That is not your current password.';
@@ -134,7 +139,7 @@ final class AccountController extends Controller
             $db->update('users', [
                 'status' => 'disabled',
                 'role' => 'client',
-                'email' => 'deleted-' . $id . '@deleted.invalid',
+                'email' => self::anonymisedEmail($db, $id),
                 'name' => 'Deleted user',
                 'company' => null,
                 'password_hash' => Auth::hash(bin2hex(random_bytes(32))),
@@ -201,7 +206,8 @@ final class AccountController extends Controller
             'licences' => $licences,
             'assistant_conversations' => $conversations,
         ];
-        $json = json_encode(self::isoDates($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        // Bytes that are not UTF-8 (older or imported records) become U+FFFD rather than failing the whole copy.
+        $json = json_encode(self::isoDates($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
         Audit::log($this->app, $id, 'account.exported', (string) $id);
         $name = 'patterns-account-' . $id . '-' . gmdate('Y-m-d') . '.json';
         return new Response($json, 200, Uploads::downloadHeaders($name, strlen($json), 'application/json'));
@@ -219,6 +225,34 @@ final class AccountController extends Controller
             throw new \LogicException('Account pages need the auth middleware');
         }
         return $user;
+    }
+
+    /**
+     * Whether this account is an administrator and no other active account is one.
+     *
+     * @param array<string, mixed> $user
+     */
+    private function isSoleAdmin(array $user): bool
+    {
+        if (($user['role'] ?? '') !== 'admin') {
+            return false;
+        }
+        return (int) $this->app->db()->value("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active' AND id <> ?", [(int) $user['id']]) === 0;
+    }
+
+    /**
+     * The address a deleted account is left with: deleted-<id>@deleted.invalid, which no person can register
+     * (Auth::isUsableEmail refuses .invalid). Should a row already hold it, a random suffix keeps it unique, so
+     * nothing stored can stop an account being deleted.
+     */
+    private static function anonymisedEmail(Database $db, int $id): string
+    {
+        $email = 'deleted-' . $id . '@deleted.invalid';
+        $holder = $db->value('SELECT id FROM users WHERE email = ?', [$email]);
+        if ($holder === null || (int) $holder === $id) {
+            return $email;
+        }
+        return 'deleted-' . $id . '-' . bin2hex(random_bytes(6)) . '@deleted.invalid';
     }
 
     /**

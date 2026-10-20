@@ -8,7 +8,9 @@
  * @var int $minLength
  * @var array{licences: int, tickets: int} $kept
  * @var string $deleteWord
+ * @var bool $soleAdmin the only active administrator (the account cannot be deleted until there is another)
  */
+$soleAdmin ??= false;
 // Values typed into the details form win after a validation error; otherwise the saved ones.
 $fromProfile = array_key_exists('name', $old);
 $name = $fromProfile ? $old['name'] : (string) $account['name'];
@@ -63,7 +65,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
         <div class="pt-field pt-field--inline">
             <input id="profile-marketing" name="marketing" type="checkbox" value="1"<?= $marketing ? ' checked' : '' ?> aria-describedby="profile-marketing-help">
             <label for="profile-marketing">Email me about new releases and features</label>
-            <p class="pt-help" id="profile-marketing-help">This is only for news about releases and features.</p>
+            <p class="pt-help" id="profile-marketing-help">Untick this at any time to stop them.</p>
         </div>
         <div class="pt-actions">
             <button type="submit" class="pt-btn pt-btn--primary">Save details</button>
@@ -119,7 +121,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
     <h2 class="pt-h2" id="data-title">Your data</h2>
     <p>Download a copy of everything your account holds: your details, tickets and comments, licences and any conversations with the support assistant while you were signed in. It is a JSON file, which most text editors can open.</p>
     <div class="pt-actions">
-        <a class="pt-btn pt-btn--secondary" href="/portal/account/export/" download>Download my data</a>
+        <a class="pt-btn pt-btn--secondary" href="/portal/account/export/">Download my data</a>
     </div>
     <p class="pt-small pt-muted">How we use your data is explained in the <a href="/legal/privacy/">privacy policy</a>.</p>
 </section>
@@ -134,8 +136,13 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
         <li>Licences stay on record<?php if ($kept['licences'] > 0): ?> (you have <?= e($licenceCount) ?>)<?php endif; ?>. Download any licence files you need first.</li>
         <li>Tickets and comments stay<?php if ($kept['tickets'] > 0): ?> (you have <?= e($ticketCount) ?>)<?php endif; ?>, so conversations still make sense. They show &ldquo;Deleted user&rdquo; as the author.</li>
     </ul>
-    <p>If you would like a copy of your data, <a href="/portal/account/export/" download>download it</a> before you continue.</p>
+    <p>If you would like a copy of your data, <a href="/portal/account/export/">download it</a> before you continue.</p>
 
+    <?php if ($soleAdmin): ?>
+    <div class="pt-alert pt-alert--info" role="status">
+        <p><strong>You are the only administrator.</strong> To delete this account, first make another account an administrator on the <a href="/portal/admin/users/">Users</a> page.</p>
+    </div>
+    <?php else: ?>
     <form method="post" action="/portal/account/delete/" class="pt-form">
         <?= csrf_field() ?>
         <fieldset class="pt-fieldset">
@@ -167,4 +174,5 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
             <button type="submit" class="pt-btn pt-btn--danger">Delete my account</button>
         </div>
     </form>
+    <?php endif; ?>
 </section>

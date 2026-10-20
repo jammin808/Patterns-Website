@@ -92,7 +92,7 @@ $termsError = $errors['terms'] ?? null;
                 </div>
                 <div class="pt-field pt-field--inline">
                     <input id="register-marketing" name="marketing" type="checkbox" value="1"<?= ($old['marketing'] ?? '') === '1' ? ' checked' : '' ?> aria-describedby="register-marketing-help">
-                    <label for="register-marketing">Email me about new releases and features <span class="pt-muted">(optional)</span></label>
+                    <label for="register-marketing">Email me about new releases and features</label>
                     <p class="pt-help" id="register-marketing-help">You can turn this off at any time on your account page.</p>
                 </div>
             </fieldset>

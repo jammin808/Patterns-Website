@@ -75,6 +75,13 @@ final class AuthController extends Controller
     public function registerForm(Request $request): Response
     {
         $session = $this->app->session();
+        // Straight after a sign-up (post, redirect, get): the check-your-email page, shown once, so reloading it
+        // never sends the form again.
+        $registered = $session->get('registered_email');
+        if (is_string($registered) && $registered !== '') {
+            $session->forget('registered_email');
+            return $this->portal('portal/auth/check-email', ['email' => $registered], 'Check your email');
+        }
         return $this->portal('portal/auth/register', [
             'registration' => $this->registrationMode(),
             'old' => $session->takeOld(),
@@ -89,9 +96,9 @@ final class AuthController extends Controller
             return $this->redirect('/portal/register/', 'info', 'Accounts are by invitation only. Please contact us if you need one.');
         }
         $input = [
-            'name' => trim($request->input('name')),
+            'name' => Auth::cleanLine($request->input('name')),
             'email' => trim($request->input('email')),
-            'company' => trim($request->input('company')),
+            'company' => Auth::cleanLine($request->input('company')),
             'password' => $request->input('password'),
             'marketing' => $request->input('marketing') === '1',
         ];
@@ -110,9 +117,8 @@ final class AuthController extends Controller
             return $this->backWithErrors('/portal/register/', $request, $result['errors']);
         }
         // The same page whether the address was new or already had an account (that one gets a notice instead).
-        return $this->portal('portal/auth/check-email', [
-            'email' => Auth::normaliseEmail($input['email']),
-        ], 'Check your email');
+        $this->app->session()->set('registered_email', Auth::normaliseEmail($input['email']));
+        return Response::redirect('/portal/register/', 303);
     }
 
     public function verify(Request $request): Response
@@ -198,8 +204,10 @@ final class AuthController extends Controller
     {
         $purpose = $request->input('purpose');
         $token = $request->input('token');
-        if (!in_array($purpose, ['reset', 'invite'], true) || $token === '') {
-            return $this->redirect('/portal/reset/', 'danger', 'This link has expired or was already used. Ask for a new one below.');
+        // A real token is "selector.validator" in hex, well under 128 characters.
+        if (!in_array($purpose, ['reset', 'invite'], true) || $token === '' || strlen($token) > 128) {
+            // The page without a good token explains that the link no longer works and offers a new one.
+            return Response::redirect('/portal/reset/', 303);
         }
         $invite = $purpose === 'invite';
         $back = '/portal/reset/?token=' . rawurlencode($token) . ($invite ? '&invite=1' : '');
@@ -210,7 +218,7 @@ final class AuthController extends Controller
         $result = $this->app->auth()->resetPassword($token, $password, $purpose);
         if (!$result['ok']) {
             if (isset($result['errors']['token'])) {
-                return $this->redirect('/portal/reset/' . ($invite ? '?invite=1' : ''), 'danger', $result['errors']['token']);
+                return Response::redirect('/portal/reset/' . ($invite ? '?invite=1' : ''), 303);
             }
             return $this->backWithErrors($back, $request, $result['errors']);
         }

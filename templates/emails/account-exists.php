@@ -1,6 +1,6 @@
-<?php /** @var string $name @var string $siteName @var string $baseUrl */ ?>
+<?php /** @var string $name empty when the address is not yet proven (Auth::greetingName) @var string $siteName @var string $baseUrl */ ?>
 <h1 style="font-size:18px;margin:0 0 12px;">You already have an account</h1>
-<p>Hello <?= e($name) ?>,</p>
+<p>Hello<?= ($name ?? '') !== '' ? ' ' . e($name) : '' ?>,</p>
 <p>Someone tried to create a <?= e($siteName) ?> account with this email address. It already has an account, so nothing new was set up.</p>
 <p>If it was you, sign in with your existing password:</p>
 <?= $this->render('emails/_button', ['url' => $baseUrl . '/portal/login/', 'label' => 'Sign in']) ?>

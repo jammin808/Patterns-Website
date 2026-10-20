@@ -21,6 +21,20 @@ final class Auth
 {
     private const TTL = ['verify' => 172800, 'reset' => 3600, 'invite' => 604800, 'remember' => 0];
 
+    /**
+     * Hashes of a throwaway string at PHP's default cost for each algorithm (matching one grants nothing: there is
+     * no account behind it). A sign-in for an unknown email verifies against one, so it costs one verify exactly as
+     * a wrong password does; hashing afresh would cost a hash and a verify, twice as long, which tells an observer
+     * the email has no account.
+     */
+    private const DUMMY_HASHES = [
+        'argon2id' => '$argon2id$v=19$m=65536,t=4,p=1$Ri9Ib3RsZ2kvNzFhcjJnUQ$yGahdIcMAB/7ur4+bHBqBpN0NbdElO3CfD5Iu4vREYU',
+        '2y' => '$2y$10$TfdSk/rdF1y4wC6ezK/JSu6AsvHHQxUSJhUcpxS.S20csWo1cqmGm',
+    ];
+
+    /** Emails an address with an account receives from repeated sign-up attempts, per hour (the rest are silent). */
+    private const EXISTING_ACCOUNT_NOTICES_PER_HOUR = 3;
+
     /** @var array<string, mixed>|null|false false = not looked up yet */
     private array|null|false $user = false;
 
@@ -91,6 +105,41 @@ final class Auth
     }
 
     /**
+     * A one-line text field (a name, a company) as stored: valid UTF-8 only (anything else is empty), control
+     * characters and runs of whitespace as one space, trimmed. Line breaks never reach an email or a page.
+     */
+    public static function cleanLine(string $value): string
+    {
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            return '';
+        }
+        return trim((string) preg_replace('/[\s\x00-\x1F\x7F]+/u', ' ', $value));
+    }
+
+    /**
+     * An address an account may have: well formed, within the column, and not under the reserved .invalid
+     * top-level domain (RFC 2606), which can never receive mail and holds the addresses of deleted accounts.
+     */
+    public static function isUsableEmail(string $email): bool
+    {
+        $email = self::normaliseEmail($email);
+        return filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+            && mb_strlen($email) <= 190
+            && !str_ends_with($email, '.invalid');
+    }
+
+    /**
+     * The name an email to this account greets it by: empty until the address is proven, so a stranger who typed
+     * someone else's address into the sign-up form cannot put words of their own into an email to it.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function greetingName(array $row): string
+    {
+        return ($row['email_verified_at'] ?? null) !== null ? (string) $row['name'] : '';
+    }
+
+    /**
      * @return array{ok: bool, reason: string, user?: array<string, mixed>}
      *   reason: ok | invalid | throttled | unverified | approval | disabled
      */
@@ -101,15 +150,21 @@ final class Auth
         $limiter = $this->app->limiter();
         $window = $this->app->config->int('security.login_window_seconds', 900);
         $max = $this->app->config->int('security.login_max_attempts', 5);
-        if ($limiter->peek('login-acct:' . $email) >= $max || !$limiter->hit('login-ip:' . $ip, $max * 4, $window)) {
+        // Failures count per account and per address, so people signing in correctly from one shared network (a
+        // venue, an office) never use up each other's attempts. Every attempt also counts against a far higher
+        // ceiling per address, because each one costs a full password verify (Argon2id: 64 MiB of memory).
+        if ($limiter->peek('login-acct:' . $email) >= $max
+            || $limiter->peek('login-ip:' . $ip) >= $max * 4
+            || !$limiter->hit('login-ip-all:' . $ip, $max * 20, $window)) {
             Audit::log($this->app, null, 'login.throttled', null, ['email_hash' => hash('sha256', $email)]);
             return ['ok' => false, 'reason' => 'throttled'];
         }
         $row = $email !== '' ? $this->findByEmail($email) : null;
-        // An unknown email still pays for one hash, so timing does not reveal which emails have accounts.
-        $valid = password_verify($password, $row !== null ? (string) $row['password_hash'] : self::hash('not-a-password'));
+        // An unknown email costs one verify, as a wrong password does, so timing does not reveal which emails have accounts.
+        $valid = password_verify($password, $row !== null ? (string) $row['password_hash'] : $this->dummyHash());
         if ($row === null || !$valid) {
             $limiter->hits('login-acct:' . $email, $window);
+            $limiter->hits('login-ip:' . $ip, $window);
             Audit::log($this->app, $row !== null ? (int) $row['id'] : null, 'login.failed');
             return ['ok' => false, 'reason' => 'invalid'];
         }
@@ -184,17 +239,22 @@ final class Auth
             return ['ok' => false, 'errors' => $errors];
         }
         $email = self::normaliseEmail($input['email']);
+        // Hashed before the lookup, so a new address and a taken one cost the same time.
+        $hash = self::hash($input['password']);
         $existing = $this->findByEmail($email);
         if ($existing !== null) {
-            $this->app->mailer()->send($email, 'You already have an account', 'account-exists', ['name' => (string) $existing['name']]);
+            // Capped per address, so the form cannot be used to flood someone's inbox with notices.
+            if ($this->app->limiter()->hit('register-exists:' . $email, self::EXISTING_ACCOUNT_NOTICES_PER_HOUR, 3600)) {
+                $this->app->mailer()->send($email, 'You already have an account', 'account-exists', ['name' => self::greetingName($existing)]);
+            }
             return ['ok' => true, 'errors' => []];
         }
         $now = time();
         $id = $this->app->db()->insert('users', [
             'email' => $email,
-            'name' => trim($input['name']),
-            'company' => trim($input['company'] ?? '') ?: null,
-            'password_hash' => self::hash($input['password']),
+            'name' => self::cleanLine($input['name']),
+            'company' => self::cleanLine($input['company'] ?? '') ?: null,
+            'password_hash' => $hash,
             'role' => $this->isAdminEmail($email) ? 'admin' : 'client',
             'status' => 'pending',
             'marketing_opt_in' => !empty($input['marketing']) ? 1 : 0,
@@ -215,7 +275,7 @@ final class Auth
         $this->app->db()->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose = 'verify'", [$userId]);
         $token = $this->issue($userId, 'verify');
         $this->app->mailer()->send((string) $row['email'], 'Confirm your email address', 'verify-email', [
-            'name' => (string) $row['name'],
+            'name' => self::greetingName($row),
             'url' => $this->app->baseUrl() . '/portal/verify/?token=' . rawurlencode($token),
         ]);
     }
@@ -227,12 +287,17 @@ final class Auth
         if ($row === null) {
             return null;
         }
-        $needsApproval = $this->app->config->string('security.registration') === 'approval' && !$this->isAdminEmail((string) $row['email']);
+        // As in resetPassword(): an account an administrator invited never waits for an administrator's approval.
+        $needsApproval = $this->app->config->string('security.registration') === 'approval'
+            && !$this->isAdminEmail((string) $row['email'])
+            && !$this->wasInvited((int) $row['id']);
+        $joinsQueue = $row['status'] === 'pending' && $needsApproval;
         $status = $row['status'] === 'pending' ? ($needsApproval ? 'approval' : 'active') : (string) $row['status'];
         $this->app->db()->update('users', ['status' => $status, 'email_verified_at' => time(), 'updated_at' => time()], ['id' => (int) $row['id']]);
         Audit::log($this->app, (int) $row['id'], 'email.verified');
         $row = $this->find((int) $row['id']);
-        if ($row !== null && $status === 'approval') {
+        // Administrators hear once, when the account joins the queue, not again for an account already in it.
+        if ($row !== null && $joinsQueue) {
             $this->notifyAdmins('An account is waiting for approval', 'admin-approval', ['user' => $row]);
         }
         return $row;
@@ -252,7 +317,7 @@ final class Auth
         $this->app->db()->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose = 'reset'", [(int) $row['id']]);
         $token = $this->issue((int) $row['id'], 'reset');
         $this->app->mailer()->send((string) $row['email'], 'Reset your password', 'reset-password', [
-            'name' => (string) $row['name'],
+            'name' => self::greetingName($row),
             'url' => $this->app->baseUrl() . '/portal/reset/?token=' . rawurlencode($token),
         ]);
         Audit::log($this->app, (int) $row['id'], 'password.reset_requested');
@@ -265,8 +330,8 @@ final class Auth
     }
 
     /**
-     * Sets a new password from a reset or invite token. Every remember-me token of the account is dropped, and
-     * sessions elsewhere end because their auth version no longer matches.
+     * Sets a new password from a reset or invite token. Every other way into the account ends with it (see
+     * endOtherCredentials()), and sessions elsewhere end because their auth version no longer matches.
      *
      * @return array{ok: bool, errors: array<string, string>}
      */
@@ -296,7 +361,7 @@ final class Auth
             $set['email_verified_at'] = time();
         }
         $this->app->db()->update('users', $set, ['id' => (int) $row['id']]);
-        $this->app->db()->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose IN ('remember', 'reset')", [(int) $row['id']]);
+        $this->endOtherCredentials((int) $row['id']);
         Audit::log($this->app, (int) $row['id'], 'password.reset');
         if ($needsApproval) {
             $fresh = $this->find((int) $row['id']);
@@ -308,7 +373,8 @@ final class Auth
     }
 
     /**
-     * Changes the signed-in user's password after checking the current one; this session stays signed in.
+     * Changes the signed-in user's password after checking the current one. This session stays signed in (and
+     * remembered, if it was); every other session and link ends, as after a reset.
      *
      * @return array{ok: bool, errors: array<string, string>}
      */
@@ -325,11 +391,14 @@ final class Auth
         if ($error !== null) {
             return ['ok' => false, 'errors' => ['password' => $error]];
         }
+        // This browser keeps "Keep me signed in" if it had it; every other browser's token goes with the rest.
+        $cookie = $this->app->request()?->cookie($this->app->cookieName('psc_rm'));
+        $remembered = is_string($cookie) && (int) ($this->lookup($cookie, 'remember')['id'] ?? 0) === (int) $row['id'];
         $this->app->db()->update('users', ['password_hash' => self::hash($new), 'updated_at' => time()], ['id' => (int) $row['id']]);
-        $this->app->db()->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose = 'remember'", [(int) $row['id']]);
+        $this->endOtherCredentials((int) $row['id']);
         $fresh = $this->find((int) $row['id']);
         if ($fresh !== null) {
-            $this->login($fresh, false);
+            $this->login($fresh, $remembered);
         }
         Audit::log($this->app, (int) $row['id'], 'password.changed');
         return ['ok' => true, 'errors' => []];
@@ -343,14 +412,19 @@ final class Auth
     public function invite(string $name, string $email, ?string $company, string $role = 'client'): array
     {
         $email = self::normaliseEmail($email);
+        $name = self::cleanLine($name);
+        $company = $company !== null ? self::cleanLine($company) : null;
         $errors = [];
-        if (trim($name) === '' || mb_strlen($name) > 120) {
+        if ($name === '' || mb_strlen($name) > 120) {
             $errors['name'] = 'Enter a name.';
         }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+        if (!self::isUsableEmail($email)) {
             $errors['email'] = 'Enter a valid email address.';
         } elseif ($this->findByEmail($email) !== null) {
             $errors['email'] = 'That email already has an account.';
+        }
+        if ($company !== null && mb_strlen($company) > 160) {
+            $errors['company'] = 'Keep the company name under 160 characters.';
         }
         if ($errors !== []) {
             return ['ok' => false, 'errors' => $errors];
@@ -358,8 +432,8 @@ final class Auth
         $now = time();
         $id = $this->app->db()->insert('users', [
             'email' => $email,
-            'name' => trim($name),
-            'company' => $company !== null && trim($company) !== '' ? trim($company) : null,
+            'name' => $name,
+            'company' => $company !== null && $company !== '' ? $company : null,
             'password_hash' => self::hash(bin2hex(random_bytes(24))),
             'role' => in_array($role, ['client', 'admin'], true) ? $role : 'client',
             'status' => 'pending',
@@ -368,7 +442,7 @@ final class Auth
         ]);
         $token = $this->issue($id, 'invite');
         $this->app->mailer()->send($email, 'Your Patterns Show Control account', 'invite', [
-            'name' => trim($name),
+            'name' => $name,
             'url' => $this->app->baseUrl() . '/portal/reset/?invite=1&token=' . rawurlencode($token),
         ]);
         Audit::log($this->app, $this->id(), 'user.invited', (string) $id);
@@ -382,15 +456,15 @@ final class Auth
     public function validateRegistration(array $input): array
     {
         $errors = [];
-        $name = trim((string) ($input['name'] ?? ''));
+        $name = self::cleanLine((string) ($input['name'] ?? ''));
         $email = self::normaliseEmail((string) ($input['email'] ?? ''));
         if ($name === '' || mb_strlen($name) > 120) {
             $errors['name'] = 'Enter your name (up to 120 characters).';
         }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+        if (!self::isUsableEmail($email)) {
             $errors['email'] = 'Enter a valid email address.';
         }
-        if (mb_strlen((string) ($input['company'] ?? '')) > 160) {
+        if (mb_strlen(self::cleanLine((string) ($input['company'] ?? ''))) > 160) {
             $errors['company'] = 'Keep the company name under 160 characters.';
         }
         $pw = $this->passwordError((string) ($input['password'] ?? ''), $email);
@@ -473,6 +547,39 @@ final class Auth
         return $row;
     }
 
+    /**
+     * A hash to verify an unknown email's password against, at the cost of a real one. The built-in hashes match
+     * PHP's defaults; a platform with other defaults makes one once and keeps it, so a miss still costs one verify.
+     */
+    private function dummyHash(): string
+    {
+        $algorithm = self::algorithm();
+        $builtIn = self::DUMMY_HASHES[(string) $algorithm] ?? null;
+        if ($builtIn !== null && !password_needs_rehash($builtIn, $algorithm)) {
+            return $builtIn;
+        }
+        $file = $this->app->storage->dir('cache') . '/auth-dummy-hash';
+        $kept = is_file($file) ? trim((string) @file_get_contents($file)) : '';
+        if ($kept !== '' && !password_needs_rehash($kept, $algorithm)) {
+            return $kept;
+        }
+        $hash = self::hash(bin2hex(random_bytes(16)));
+        @file_put_contents($file, $hash, LOCK_EX);
+        return $hash;
+    }
+
+    /**
+     * After a password is set, every other way into the account ends: remember-me and reset tokens go, and any
+     * invitation or confirmation link still out is spent (kept as a row, so wasInvited() still knows the history).
+     * Sessions elsewhere end by themselves, because their auth version follows the password hash.
+     */
+    private function endOtherCredentials(int $userId): void
+    {
+        $db = $this->app->db();
+        $db->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose IN ('remember', 'reset')", [$userId]);
+        $db->exec("UPDATE user_tokens SET used_at = ? WHERE user_id = ? AND purpose IN ('invite', 'verify') AND used_at IS NULL", [time(), $userId]);
+    }
+
     /** Whether an administrator created the account (an invite token was ever issued for it). */
     private function wasInvited(int $userId): bool
     {
@@ -520,12 +627,21 @@ final class Auth
         if ($user === null) {
             return null;
         }
-        $selector = explode('.', $token, 2)[0];
+        return $this->spend(explode('.', $token, 2)[0], $purpose) ? $user : null;
+    }
+
+    /**
+     * Spends a token. A one-time link is claimed by a single conditional write, so of two requests racing with the
+     * same link only one wins. A remember-me token is rotated rather than claimed: two tabs reopening at once must
+     * not sign the browser out, so both are let through.
+     */
+    private function spend(string $selector, string $purpose): bool
+    {
+        $db = $this->app->db();
         if ($purpose === 'remember') {
-            $this->app->db()->exec('DELETE FROM user_tokens WHERE selector = ?', [$selector]);
-        } else {
-            $this->app->db()->exec('UPDATE user_tokens SET used_at = ? WHERE selector = ?', [time(), $selector]);
+            $db->exec("DELETE FROM user_tokens WHERE selector = ? AND purpose = 'remember'", [$selector]);
+            return true;
         }
-        return $user;
+        return $db->exec('UPDATE user_tokens SET used_at = ? WHERE selector = ? AND purpose = ? AND used_at IS NULL', [time(), $selector, $purpose]) === 1;
     }
 }
