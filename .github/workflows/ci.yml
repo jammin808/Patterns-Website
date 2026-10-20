@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: PHP ${{ matrix.php }} tests
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: psc
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -proot" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, pdo_sqlite, mbstring, intl, curl, fileinfo, gd
+          coverage: none
+          tools: composer:v2
+      - name: Lint
+        run: find app config content public templates tools tests -name '*.php' -not -path '*/vendor/*' -print0 | xargs -0 -n 50 php -l > /dev/null
+      - name: Install
+        run: |
+          composer install --no-interaction --no-progress
+          composer install --no-interaction --no-progress --working-dir=tools/phpunit
+      - name: PHPUnit (SQLite)
+        run: tools/phpunit/vendor/bin/phpunit
+      - name: MySQL schema and queries
+        env:
+          PSC_TEST_MYSQL_DSN: mysql:host=127.0.0.1;port=3306;dbname=psc;charset=utf8mb4
+          PSC_TEST_MYSQL_USER: root
+          PSC_TEST_MYSQL_PASSWORD: root
+        run: php tools/check-mysql.php
+
+  e2e:
+    name: Browser checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, mbstring, intl, curl, fileinfo
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: |
+          composer install --no-interaction --no-progress
+          cd tools/e2e && npm ci && npx playwright install --with-deps chromium
+      - name: Run
+        run: cd tools/e2e && npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: tools/e2e/test-results
+          retention-days: 7
+
+  bundle:
+    name: Release bundle
+    runs-on: ubuntu-24.04
+    needs: [php, e2e]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Build
+        run: tools/build-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patterns-site
+          path: dist/*.zip
+          retention-days: 30

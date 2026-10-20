@@ -1,0 +1,46 @@
+name: Deploy branch
+
+# On every push to main that passes CI's checks, the built site (production dependencies, no development files)
+# is committed to the "deploy" branch. Hostinger's Git deployment pulls that branch into public_html.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Build
+        run: tools/build-release.sh
+      - name: Commit to the deploy branch
+        # The deploy branch only ever moves forward (no force-push), so the server's "git pull" always fast-forwards.
+        run: |
+          sha="${{ github.event.workflow_run.head_sha }}"
+          remote="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads "$remote" deploy > /dev/null; then
+            git clone -q --branch deploy --single-branch "$remote" ../deploy
+          else
+            mkdir ../deploy && git -C ../deploy init -q && git -C ../deploy checkout -q -b deploy
+          fi
+          rsync -a --delete --exclude '.git/' dist/site/ ../deploy/
+          cd ../deploy
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing to deploy"; exit 0; fi
+          git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -q -m "Deploy ${sha}"
+          git push -q "$remote" deploy

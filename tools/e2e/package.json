@@ -1,0 +1,12 @@
+{
+  "name": "patterns-site-e2e",
+  "private": true,
+  "description": "Browser checks for the Patterns Show Control website: every page, accessibility, SEO basics, the portal and the assistant widget.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.56.1"
+  }
+}

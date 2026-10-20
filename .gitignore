@@ -1,6 +1,6 @@
 # Dependencies (installed by composer on the server or by tools/build-release.sh)
 /vendor/
-/node_modules/
+node_modules/
 /tools/phpunit/vendor/
 
 # Server-only configuration and runtime data: never committed
@@ -12,7 +12,7 @@
 # Build and test output
 /dist/
 /build/
-/test-results/
+test-results/
 /playwright-report/
 /tests/e2e/.artifacts/
 .phpunit.result.cache

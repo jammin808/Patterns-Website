@@ -1,0 +1,33 @@
+import { defineConfig, devices } from '@playwright/test';
+import os from 'node:os';
+import path from 'node:path';
+
+const storage = path.join(os.tmpdir(), `psc-e2e-${process.pid}`);
+process.env.PSC_E2E_STORAGE = storage;
+
+export default defineConfig({
+  testDir: './tests',
+  timeout: 60_000,
+  fullyParallel: false,
+  workers: 1,
+  reporter: [['list']],
+  use: {
+    baseURL: 'http://127.0.0.1:8765',
+    trace: 'retain-on-failure',
+  },
+  projects: [
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /pages\.spec/ },
+  ],
+  webServer: {
+    command: 'php -S 127.0.0.1:8765 tools/dev-router.php',
+    cwd: '../..',
+    url: 'http://127.0.0.1:8765/health',
+    reuseExistingServer: !process.env.CI,
+    env: {
+      PSC_CONFIG: path.resolve('config.e2e.php'),
+      PSC_E2E_STORAGE: storage,
+      PSC_NO_CONFIG_MOVE: '1',
+    },
+  },
+});
