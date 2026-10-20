@@ -79,7 +79,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      * @param array<string, mixed> $post
      * @param array<string, string> $headers
      */
-    protected function request(string $method, string $uri, array $post = [], array $headers = [], ?string $json = null, bool $https = true): Response
+    protected function request(string $method, string $uri, array $post = [], array $headers = [], ?string $json = null, bool $https = true, array $files = []): Response
     {
         $path = (string) (parse_url($uri, PHP_URL_PATH) ?? '/');
         parse_str((string) (parse_url($uri, PHP_URL_QUERY) ?? ''), $query);
@@ -98,7 +98,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'REMOTE_ADDR' => '203.0.113.7',
             'HTTPS' => $https ? 'on' : '',
         ];
-        $request = new Request($method, Request::normalisePath($path), $query, $post, $lower, $this->jar, [], $server, $json ?? '');
+        $request = new Request($method, Request::normalisePath($path), $query, $post, $lower, $this->jar, $files, $server, $json ?? '');
         // Each request gets fresh per-request services (as a new PHP process would), sharing database and session.
         $config = $this->app->config;
         $this->app = App::boot($config);
@@ -122,6 +122,46 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             $post['_csrf'] = $this->csrf();
         }
         return $this->request('POST', $uri, $post);
+    }
+
+    /**
+     * Posts a form with files. $files maps a field name to one or more fake uploads made by fakeUpload(); the
+     * application accepts them because app.env is "testing" (see Uploads::store's $trustTestFiles).
+     *
+     * @param array<string, mixed> $post
+     * @param array<string, list<array{name: string, type: string, tmp_name: string, error: int, size: int}>> $files
+     */
+    protected function postFiles(string $uri, array $post, array $files): Response
+    {
+        $post['_csrf'] = $this->csrf();
+        $php = [];
+        foreach ($files as $field => $list) {
+            $php[$field] = ['name' => [], 'type' => [], 'tmp_name' => [], 'error' => [], 'size' => []];
+            foreach ($list as $f) {
+                foreach (['name', 'type', 'tmp_name', 'error', 'size'] as $k) {
+                    $php[$field][$k][] = $f[$k];
+                }
+            }
+        }
+        return $this->request('POST', $uri, $post, [], null, true, $php);
+    }
+
+    /**
+     * A temporary file standing in for an upload.
+     *
+     * @return array{name: string, type: string, tmp_name: string, error: int, size: int}
+     */
+    protected function fakeUpload(string $name, string $contents): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'psc-up');
+        file_put_contents($tmp, $contents);
+        return ['name' => $name, 'type' => 'application/octet-stream', 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => strlen($contents)];
+    }
+
+    /** The smallest valid PNG, for upload tests. */
+    protected static function pngBytes(): string
+    {
+        return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
     }
 
     protected function csrf(): string

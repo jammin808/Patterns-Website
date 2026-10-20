@@ -34,14 +34,22 @@ final class SeoController extends Controller
     public function robots(Request $request): Response
     {
         $base = $this->app->baseUrl();
+        // The portal is not disallowed: crawlers must be able to fetch it to read its noindex. Search and answer
+        // engines are welcome; model-training crawlers are the owner's call (content/site.php 'block_training').
         $lines = [
             'User-agent: *',
             'Allow: /',
-            'Disallow: /portal/',
             'Disallow: /api/',
             '',
-            'Sitemap: ' . $base . '/sitemap.xml',
         ];
+        if (!empty(Content::get('site')['block_training'])) {
+            foreach (['GPTBot', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'CCBot'] as $bot) {
+                $lines[] = 'User-agent: ' . $bot;
+            }
+            $lines[] = 'Disallow: /';
+            $lines[] = '';
+        }
+        $lines[] = 'Sitemap: ' . $base . '/sitemap.xml';
         return Response::text(implode("\n", $lines) . "\n")->header('Cache-Control', 'public, max-age=3600');
     }
 

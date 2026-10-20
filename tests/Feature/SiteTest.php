@@ -57,7 +57,8 @@ final class SiteTest extends TestCase
         self::assertNotEmpty($xml->url);
 
         $robots = $this->request('GET', '/robots.txt')->body;
-        self::assertStringContainsString('Disallow: /portal/', $robots);
+        self::assertStringContainsString('Disallow: /api/', $robots);
+        self::assertStringNotContainsString('Disallow: /portal/', $robots);
         self::assertStringContainsString('Sitemap: https://patternsshowcontrol.test/sitemap.xml', $robots);
 
         $llms = $this->request('GET', '/llms.txt');

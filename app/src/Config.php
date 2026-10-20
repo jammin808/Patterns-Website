@@ -99,6 +99,9 @@ final class Config
         if (is_file($outside)) {
             return $outside;
         }
+        if (is_file(dirname($root) . '/private/config.php')) {
+            return dirname($root) . '/private/config.php';
+        }
         $local = $root . '/config/local.php';
         if (!is_file($local)) {
             return null;

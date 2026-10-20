@@ -19,11 +19,22 @@ ServerSignature Off
     RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
     RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 
-    # Streaming replies (the support assistant) must not be compressed or buffered, nor cut off when idle.
-    RewriteRule ^api/chat - [E=no-gzip:1,E=dont-vary:1,E=noabort:1,E=noconntimeout:1]
+    # Streaming replies (the support assistant) must not be compressed (gzip or LiteSpeed's Brotli) or buffered,
+    # nor cut off when idle.
+    RewriteRule ^api/chat$ - [E=no-gzip:1,E=no-brotli:1,E=dont-vary:1,E=noabort:1,E=noconntimeout:1]
+
+    # Release files are served only by an internal redirect from the portal (X-LiteSpeed-Location), never by a
+    # direct request: ORG_REQ_URI is the URL the visitor asked for, not the internal one. Other servers deny the
+    # folder outright (the rule below) and the portal streams the file itself. Each file also sits in a random
+    # folder name, so a path cannot be guessed.
+    <IfModule LiteSpeed>
+        RewriteCond %{ORG_REQ_URI} ^/downloads-vault(/|$) [NC]
+        RewriteRule ^ - [F,L]
+        RewriteRule ^downloads-vault/ - [L]
+    </IfModule>
 
     # Nothing outside public/ is ever served directly.
-    RewriteRule ^(app|config|content|database|design|docs|knowledge|storage|templates|tests|tools|vendor|node_modules)(/|$) - [F,L,NC]
+    RewriteRule ^(app|config|content|database|design|docs|knowledge|storage|templates|tests|tools|vendor|node_modules|downloads-vault)(/|$) - [F,L,NC]
     RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|README\.md|\.git.*|.*\.(md|sql|sh|lock|dist|neon|yml|yaml|log|bak|ini|env))$ - [F,L,NC]
 
     # A real file under public/ is served as is (assets, icons, robots-free statics).
