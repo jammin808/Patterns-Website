@@ -285,13 +285,25 @@ final class Auth
             return ['ok' => false, 'errors' => ['token' => 'This link has expired or was already used. Ask for a new one.']];
         }
         $set = ['password_hash' => self::hash($password), 'updated_at' => time(), 'failed_logins' => 0, 'locked_until' => null];
+        $needsApproval = false;
         if ($row['status'] === 'pending') {
-            $set['status'] = 'active';
+            // The link proves the address, so the account moves on as an email check would: a self-registered
+            // account still waits for an administrator when registration needs approval; an invited one does not.
+            $needsApproval = $this->app->config->string('security.registration') === 'approval'
+                && !$this->isAdminEmail((string) $row['email'])
+                && !$this->wasInvited((int) $row['id']);
+            $set['status'] = $needsApproval ? 'approval' : 'active';
             $set['email_verified_at'] = time();
         }
         $this->app->db()->update('users', $set, ['id' => (int) $row['id']]);
         $this->app->db()->exec("DELETE FROM user_tokens WHERE user_id = ? AND purpose IN ('remember', 'reset')", [(int) $row['id']]);
         Audit::log($this->app, (int) $row['id'], 'password.reset');
+        if ($needsApproval) {
+            $fresh = $this->find((int) $row['id']);
+            if ($fresh !== null) {
+                $this->notifyAdmins('An account is waiting for approval', 'admin-approval', ['user' => $fresh]);
+            }
+        }
         return ['ok' => true, 'errors' => []];
     }
 
@@ -459,6 +471,12 @@ final class Auth
             Audit::log($this->app, (int) $row['id'], 'user.promoted', null, ['by' => 'admin_emails']);
         }
         return $row;
+    }
+
+    /** Whether an administrator created the account (an invite token was ever issued for it). */
+    private function wasInvited(int $userId): bool
+    {
+        return $this->app->db()->value("SELECT 1 FROM user_tokens WHERE user_id = ? AND purpose = 'invite' LIMIT 1", [$userId]) !== null;
     }
 
     /** Issues a one-time token and returns "selector.validator" (the only time the validator exists in clear). */
