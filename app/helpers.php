@@ -157,7 +157,7 @@ if (!function_exists('e')) {
                 $items = array_map(static fn (string $l): string => '<li>' . md_inline((string) preg_replace('/^\s*([-*]|\d+\.)\s+/', '', $l)) . '</li>', $lines);
                 $html[] = ($ordered ? '<ol>' : '<ul>') . implode('', $items) . ($ordered ? '</ol>' : '</ul>');
             } elseif (preg_match('/^(#{2,4})\s+(.*)$/', $lines[0], $m) && count($lines) === 1) {
-                $level = min(4, strlen($m[1]) + 1);
+                $level = strlen($m[1]);
                 $html[] = "<h{$level}>" . md_inline($m[2]) . "</h{$level}>";
             } elseif (str_starts_with($block, '```')) {
                 $code = (string) preg_replace('/^```[a-z0-9]*\n?|```$/i', '', $block);
