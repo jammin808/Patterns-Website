@@ -159,7 +159,7 @@ final class AccountController extends Controller
             'kept' => $kept,
         ]);
         $this->app->auth()->logout();
-        return $this->redirect('/', 'success', 'Your account is deleted and you are signed out. Thank you for using Patterns Show Control.');
+        return $this->redirect('/portal/login/', 'success', 'Your account is deleted and you are signed out. Thank you for using Patterns Show Control.');
     }
 
     public function export(Request $request): Response

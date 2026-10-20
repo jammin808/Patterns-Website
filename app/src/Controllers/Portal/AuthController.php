@@ -230,7 +230,7 @@ final class AuthController extends Controller
     public function logout(Request $request): Response
     {
         $this->app->auth()->logout();
-        return $this->redirect('/', 'success', 'You are signed out.');
+        return $this->redirect('/portal/login/', 'success', 'You are signed out.');
     }
 
     private function registrationMode(): string

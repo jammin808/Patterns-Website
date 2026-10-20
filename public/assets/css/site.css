@@ -1200,3 +1200,8 @@
     .c-compare-scroll, .c-table-wrap, .pt-table-wrap { overflow: visible; }
   }
 }
+
+/* Announcements a visitor dismissed are hidden before first paint (theme-init.js sets data-dismissed). */
+@layer utilities {
+  :root[data-dismissed~="launch-2026"] [data-dismissible="launch-2026"] { display: none; }
+}

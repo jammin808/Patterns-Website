@@ -37,11 +37,14 @@ if (!function_exists('e')) {
         return App::get()->baseUrl() . '/' . ltrim($path, '/');
     }
 
-    /** An inline icon from the sprite (decorative unless a label is given). */
+    /**
+     * An icon from the sprite the layout inlines once per page (docs/DESIGN.md 8.30): decorative unless a label is
+     * given. $class adds modifiers such as 'c-icon--sm'.
+     */
     function icon(string $name, string $class = '', ?string $label = null): string
     {
         $aria = $label !== null ? 'role="img" aria-label="' . e($label) . '"' : 'aria-hidden="true" focusable="false"';
-        return '<svg class="icon' . ($class !== '' ? ' ' . e($class) : '') . '" ' . $aria . '><use href="' . e(asset('/assets/img/icons.svg')) . '#' . e($name) . '"></use></svg>';
+        return '<svg class="c-icon' . ($class !== '' ? ' ' . e($class) : '') . '" ' . $aria . '><use href="#i-' . e($name) . '"/></svg>';
     }
 
     /** The hidden CSRF field for a form (starts the session). */
