@@ -67,6 +67,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 - The contact page needs no account. Choose a topic: Buying a licence or pricing, Help with the software, A licence I already have, Rental, reseller or partnership, Press or events, or Something else.
 - Messages are kept and emailed to the developer, and replies come by email, in English. Do not promise a response time.
 - Product and topic links can open the form ready filled, for example from a licensing page's Register interest button.
+- A message can hold up to three web links. If the form says to press Send message again, or that it was refused, what was typed is still in the form; the same message sent twice is passed on once.
 - Share the contact form, never an email address.
 
 ## Your account and your data

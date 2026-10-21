@@ -1194,7 +1194,7 @@ final class AdminTest extends TestCase
         $admin = $_SESSION;
 
         $this->freshBrowser();
-        $this->post('/portal/forgot/', ['email' => 'active@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'active@example.test'] + $this->filledIn('forgot'));
         $resetToken = self::token((string) $this->lastMailTo('active@example.test')['data']['url']);
         $hash = $this->userRow($active)['password_hash'];
 

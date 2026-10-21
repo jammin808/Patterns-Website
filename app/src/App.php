@@ -372,22 +372,7 @@ final class App
         }
         $type = $response->getHeader('Content-Type') ?? '';
         if (str_starts_with($type, 'text/html') && !$response->hasHeader('Content-Security-Policy')) {
-            $ga = Analytics::id($this->config->string('analytics.ga_id'));
-            $tag = $ga !== '' ? Analytics::csp($ga) : ['script' => '', 'img' => '', 'connect' => ''];
-            $response->header('Content-Security-Policy', implode('; ', [
-                "default-src 'self'",
-                trim("script-src 'self' " . $tag['script']),
-                "style-src 'self'",
-                trim("img-src 'self' data: " . $tag['img']),
-                "font-src 'self'",
-                trim("connect-src 'self' " . $tag['connect']),
-                "media-src 'self'",
-                "frame-src 'none'",
-                "frame-ancestors 'none'",
-                "form-action 'self'",
-                "base-uri 'self'",
-                "object-src 'none'",
-            ]) . ($request->isHttps() ? '; upgrade-insecure-requests' : ''));
+            $response->header('Content-Security-Policy', $this->contentSecurityPolicy($request));
         }
         if (!$response->hasHeader('Cache-Control')) {
             $sessionUsed = $this->session !== null && $this->session->isStarted();
@@ -402,6 +387,41 @@ final class App
             $response->header('X-Robots-Tag', 'noindex');
         }
         return $response;
+    }
+
+    /**
+     * The one Content-Security-Policy every HTML page sends: 'self' only, plus the Google tag's hash and hosts when
+     * analytics is on, plus any sources a page adds (the contact form's Turnstile), by directive.
+     *
+     * @param array<string, string> $extra directive => space-separated sources to add, e.g. ['frame-src' => 'https://…']
+     */
+    public function contentSecurityPolicy(Request $request, array $extra = []): string
+    {
+        $ga = Analytics::id($this->config->string('analytics.ga_id'));
+        $tag = $ga !== '' ? Analytics::csp($ga) : ['script' => '', 'img' => '', 'connect' => ''];
+        $policy = [
+            'default-src' => "'self'",
+            'script-src' => trim("'self' " . $tag['script']),
+            'style-src' => "'self'",
+            'img-src' => trim("'self' data: " . $tag['img']),
+            'font-src' => "'self'",
+            'connect-src' => trim("'self' " . $tag['connect']),
+            'media-src' => "'self'",
+            'frame-src' => "'none'",
+            'frame-ancestors' => "'none'",
+            'form-action' => "'self'",
+            'base-uri' => "'self'",
+            'object-src' => "'none'",
+        ];
+        foreach ($extra as $directive => $sources) {
+            $current = $policy[$directive] ?? '';
+            $policy[$directive] = $current === "'none'" || $current === '' ? $sources : $current . ' ' . $sources;
+        }
+        $parts = [];
+        foreach ($policy as $directive => $sources) {
+            $parts[] = $directive . ' ' . $sources;
+        }
+        return implode('; ', $parts) . ($request->isHttps() ? '; upgrade-insecure-requests' : '');
     }
 
     /** An internal redirect target: always one slash then a path, so it can never be read as another host. */

@@ -135,7 +135,10 @@ final class SiteTest extends TestCase
     public function testSecurityTxtAndManifest(): void
     {
         $txt = $this->request('GET', '/.well-known/security.txt')->body;
-        self::assertStringContainsString('Contact: mailto:', $txt);
+        // The contact page's https URI (RFC 9116 allows one), so the file publishes no address to collect.
+        self::assertSame(1, preg_match('/^Contact: (\S+)$/m', $txt, $contact));
+        self::assertSame('https://patternsshowcontrol.test/contact/', $contact[1]);
+        self::assertStringNotContainsString('mailto:', $txt);
         // Policy is for a disclosure policy (RFC 9116), not the privacy notice; Expires rolls, so it never falls due
         // within the file's cache life (on 31 December it used to be hours away).
         self::assertStringNotContainsString('Policy:', $txt);
@@ -179,6 +182,41 @@ final class SiteTest extends TestCase
         self::assertSame(200, $r->status, 'the site still runs on the file it read');
         self::assertTrue(json_decode($r->body, true, 512, JSON_THROW_ON_ERROR)['checks']['config_shadowed']);
         self::assertStringContainsString('max-age=300', (string) $this->request('GET', '/')->getHeader('Cache-Control'), 'the shadowed file changes nothing');
+    }
+
+    /**
+     * No page a visitor or crawler can fetch names an email address, so none can be collected for spam: every
+     * page in the registry and every workflow, the machine-readable files and the portal's sign-in pages. The way
+     * to reach a person is the contact form, a support ticket or the assistant; the organisation's structured data
+     * points at the contact page.
+     */
+    public function testNoPublicPageNamesAnEmailAddress(): void
+    {
+        $paths = array_keys(Content::pages());
+        foreach (array_keys(Content::get('workflows')) as $slug) {
+            $paths[] = '/workflows/' . $slug . '/';
+        }
+        $paths = array_merge(array_values(array_unique($paths)), [
+            '/llms.txt', '/.well-known/security.txt', '/sitemap.xml', '/robots.txt', '/manifest.webmanifest',
+            '/portal/login/', '/portal/register/', '/portal/forgot/', '/portal/verify/resend/', '/portal/verify/', '/portal/reset/',
+        ]);
+        self::assertGreaterThan(30, count($paths));
+        $address = '/[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/i';
+        foreach ($paths as $path) {
+            $r = $this->request('GET', (string) $path);
+            self::assertSame(200, $r->status, (string) $path);
+            self::assertSame(0, preg_match($address, $r->body, $m), $path . ' names ' . ($m[0] ?? ''));
+            self::assertStringNotContainsString('mailto:', $r->body, (string) $path);
+        }
+        $missing = $this->request('GET', '/no-such-page/');
+        self::assertSame(404, $missing->status);
+        self::assertSame(0, preg_match($address, $missing->body), 'nor does the page for a missing address');
+
+        self::assertSame(1, preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $this->request('GET', '/')->body, $ld));
+        $graph = json_decode($ld[1], true, 512, JSON_THROW_ON_ERROR)['@graph'];
+        $org = array_values(array_filter($graph, static fn (array $n): bool => ($n['@type'] ?? '') === 'Organization'))[0];
+        self::assertSame([['@type' => 'ContactPoint', 'contactType' => 'customer support', 'url' => 'https://patternsshowcontrol.test/contact/', 'availableLanguage' => ['en-GB']]], $org['contactPoint']);
+        self::assertArrayNotHasKey('email', $org);
     }
 
     /** The manifest's colours are the dark theme's page colour, the same as the layout's theme-color meta. */

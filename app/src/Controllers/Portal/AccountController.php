@@ -70,12 +70,13 @@ final class AccountController extends Controller
                 $changed[] = $column;
             }
         }
+        // An answer goes to the top of the page, where its message is (and takes focus); a refusal goes to the form.
         if ($changed === []) {
-            return $this->redirect('/portal/account/#details', 'info', 'Nothing to save: your details are already up to date.');
+            return $this->redirect('/portal/account/', 'info', 'Nothing to save: your details are already up to date.');
         }
         $this->app->db()->update('users', $set + ['updated_at' => time()], ['id' => (int) $user['id']]);
         Audit::log($this->app, (int) $user['id'], 'account.profile_updated', (string) $user['id'], ['fields' => $changed]);
-        return $this->redirect('/portal/account/#details', 'success', 'Your details are saved.');
+        return $this->redirect('/portal/account/', 'success', 'Your details are saved.');
     }
 
     public function password(Request $request): Response
@@ -104,7 +105,7 @@ final class AccountController extends Controller
         if ($errors !== []) {
             return $this->backWithErrors($back, $request, $errors);
         }
-        return $this->redirect($back, 'success', 'Your password is changed. Any other browsers signed in to this account are now signed out.');
+        return $this->redirect('/portal/account/', 'success', 'Your password is changed. Any other browsers signed in to this account are now signed out.');
     }
 
     public function delete(Request $request): Response

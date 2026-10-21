@@ -483,11 +483,93 @@ function initForms() {
     field.addEventListener('input', update);
     update();
   }
+  /*
+   * Feedback on load. A server-rendered [data-error-summary] takes focus, so the first thing read after a refused
+   * send is what to fix, and each of its links moves focus to its field with the label in view. Otherwise the
+   * answer to what the visitor just did ([data-feedback]: a flash, "Message sent") takes focus, unless the address's
+   * #fragment has put the visitor elsewhere on the page (their new reply, the vote they pressed): there it is read
+   * out instead, and the page stays where the fragment put it.
+   */
+  const fromHash = (hash) => {
+    try { return hash.length > 1 ? document.getElementById(decodeURIComponent(hash.slice(1))) : null; } catch { return null; }
+  };
   const summary = $('[data-error-summary]');
   if (summary && !summary.hidden) {
     if (!summary.hasAttribute('tabindex')) summary.setAttribute('tabindex', '-1');
     summary.focus();
+    summary.addEventListener('click', (event) => {
+      const link = event.target instanceof Element ? event.target.closest('a[href^="#"]') : null;
+      const field = link ? fromHash(link.hash) : null;
+      if (!field) return;
+      event.preventDefault();
+      field.focus({ preventScroll: true });
+      // The question goes into view with the field: a radio group's legend, otherwise the field's own label.
+      const label = field.labels && field.labels.length ? field.labels[0] : null;
+      ((field.type === 'radio' && field.closest('fieldset')) || label || field).scrollIntoView({ block: 'start' });
+    });
+  } else {
+    const answer = $$('[data-feedback]').find((el) => el.getClientRects().length > 0);
+    const elsewhere = fromHash(location.hash);
+    if (answer && elsewhere && !answer.contains(elsewhere) && !elsewhere.contains(answer)) {
+      announce(answer.textContent.replace(/\s+/g, ' ').trim());
+    } else if (answer) {
+      if (!answer.hasAttribute('tabindex')) answer.setAttribute('tabindex', '-1');
+      answer.focus();
+    }
   }
+
+  /*
+   * A form that posts is sent once. The first press marks it busy until the next page: aria-busy on the form,
+   * aria-disabled on the button, and a button with data-busy shows (and announces) those words, such as "Sending…",
+   * in place of its label. Another press or Enter does nothing. The button is never disabled, so its name and value
+   * still go with the form. A page restored from the back/forward cache is ready to send again. Without scripting,
+   * the server's own guards stand alone (duplicate messages are dropped, every sending form is rate limited).
+   */
+  const sending = new Map();
+  const release = (form) => {
+    const state = sending.get(form);
+    if (!state) return;
+    sending.delete(form);
+    form.removeAttribute('aria-busy');
+    if (!state.button) return;
+    state.button.removeAttribute('aria-disabled');
+    if (state.label !== null) {
+      state.button.textContent = state.label;
+      state.button.style.minWidth = state.minWidth;
+    }
+  };
+  for (const form of $$('form')) {
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') continue;
+    form.addEventListener('submit', (event) => {
+      if (sending.has(form)) {
+        event.preventDefault();
+        return;
+      }
+      const button = event.submitter instanceof HTMLElement
+        ? event.submitter
+        : form.querySelector('button[type="submit"], button:not([type]), input[type="submit"]');
+      const state = { button, label: null, minWidth: '' };
+      sending.set(form, state);
+      form.setAttribute('aria-busy', 'true');
+      if (button) {
+        button.setAttribute('aria-disabled', 'true');
+        const words = button.dataset.busy;
+        // Only a plain-text button's label is swapped, keeping its width so nothing beside it moves.
+        if (words && button.tagName === 'BUTTON' && button.children.length === 0) {
+          state.label = button.textContent;
+          state.minWidth = button.style.minWidth;
+          button.style.minWidth = `${button.getBoundingClientRect().width}px`;
+          button.textContent = words;
+          announce(words);
+        }
+      }
+      // A later handler may still cancel this submit: then nothing is on its way and the form is ready again.
+      setTimeout(() => { if (event.defaultPrevented) release(form); }, 0);
+    });
+  }
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) [...sending.keys()].forEach(release);
+  });
 }
 
 guard('theme', initTheme);

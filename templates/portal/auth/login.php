@@ -7,6 +7,7 @@
  * @var array<string, string> $old
  * @var array<string, string> $errors
  * @var string $registration open | approval | invite
+ * @var list<array{type: string, message: string}> $flashes
  */
 $email = $old['email'] ?? '';
 ?>
@@ -32,8 +33,15 @@ $email = $old['email'] ?? '';
         </div>
     <?php endif; ?>
 
-    <form method="post" action="/portal/login/" class="pt-form">
+    <form method="post" action="/portal/login/" class="pt-form" novalidate>
         <?= csrf_field() ?>
+        <?= $this->partial('error-summary', [
+            'errors' => $errors,
+            'fields' => ['email' => 'login-email', 'password' => 'login-password'],
+            'flashes' => $flashes ?? [],
+            'action' => 'and try again',
+            'failed' => 'You are not signed in',
+        ]) ?>
         <?php if ($next !== '/portal/'): ?>
             <input type="hidden" name="next" value="<?= e($next) ?>">
         <?php endif; ?>
@@ -65,7 +73,7 @@ $email = $old['email'] ?? '';
             <p class="pt-help" id="login-remember-help">For up to <?= e($app->config->int('security.remember_days', 30)) ?> days on this browser. Leave it unticked on a shared computer.</p>
         </div>
         <div class="pt-actions">
-            <button type="submit" class="pt-btn pt-btn--primary">Sign in</button>
+            <button type="submit" class="pt-btn pt-btn--primary" data-busy="Signing in…">Sign in</button>
             <a class="pt-btn pt-btn--ghost" href="/portal/forgot/">Forgotten your password?</a>
         </div>
     </form>

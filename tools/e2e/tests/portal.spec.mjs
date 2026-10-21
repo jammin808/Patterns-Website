@@ -22,6 +22,8 @@ test('register, verify, sign in, report a bug and see the ideas board', async ({
   await page.getByLabel(/^password/i).first().fill('a long show password 42');
   const terms = page.getByLabel(/terms/i);
   if (await terms.count()) await terms.check();
+  // The sign-up form turns back a send faster than a person fills it in (three seconds): take a person's time.
+  await page.waitForTimeout(3_100);
   await page.getByRole('button', { name: /create|register|sign up/i }).click();
   await expect(page.locator('h1')).toContainText(/email/i);
 

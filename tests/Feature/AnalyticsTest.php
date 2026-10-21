@@ -50,6 +50,24 @@ final class AnalyticsTest extends TestCase
         self::assertSame(["'self'"], $directives['style-src'], 'nothing else is loosened');
     }
 
+    /** With Turnstile switched on, the contact page adds Cloudflare's host to the one policy instead of replacing it. */
+    public function testTheContactPageKeepsTheTagWhenTurnstileIsOn(): void
+    {
+        $this->bootApp(['analytics' => ['ga_id' => self::ID], 'security' => ['turnstile_site_key' => 'site-key', 'turnstile_secret' => 'secret']]);
+        $r = $this->request('GET', '/contact/');
+        $directives = [];
+        foreach (explode(';', (string) $r->getHeader('Content-Security-Policy')) as $part) {
+            $words = preg_split('/\s+/', trim($part)) ?: [];
+            $directives[(string) array_shift($words)] = $words;
+        }
+        self::assertContains('https://*.googletagmanager.com', $directives['script-src']);
+        self::assertContains('https://challenges.cloudflare.com', $directives['script-src']);
+        self::assertSame(['https://challenges.cloudflare.com'], $directives['frame-src'], "Turnstile's frame replaces 'none'");
+        self::assertContains('https://*.google-analytics.com', $directives['connect-src']);
+        self::assertContains('https://challenges.cloudflare.com', $directives['connect-src']);
+        self::assertSame(["'none'"], $directives['object-src']);
+    }
+
     /** The tag sends the full address to Google, so a page whose address carries a one-time token never loads it. */
     public function testPagesWithATokenInTheirAddressCarryNoTag(): void
     {

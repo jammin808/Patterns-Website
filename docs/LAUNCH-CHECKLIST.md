@@ -11,7 +11,6 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       before. Choose the daily figure (the default is 1,500,000).
 - [ ] Mailboxes `support@` and `no-reply@` and the SMTP password for `no-reply@`.
 - [ ] Connect GitHub in hPanel → Git (branch `deploy`), or deploy the release zip by hand.
-- [ ] Decide whether `support@patternsshowcontrol.co.uk` is shown publicly (it is in the structured data and on the contact page) or only the contact form.
 
 ## Legal (drafts in `content/legal/`, need your review)
 

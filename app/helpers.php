@@ -59,6 +59,17 @@ if (!function_exists('e')) {
     }
 
     /**
+     * The bot defences' hidden fields for a public form (Psc\Support\FormGuard): its signed showing time, kept from
+     * $old after a refused send, and the honeypot. $id makes the honeypot's element id unique on the page.
+     *
+     * @param array<string, mixed> $old
+     */
+    function form_guard(string $form, array $old = [], string $id = ''): string
+    {
+        return (new \Psc\Support\FormGuard(App::get()))->fields($form, $old, $id);
+    }
+
+    /**
      * A content file's data (content/<name>.php).
      *
      * @return array<mixed>

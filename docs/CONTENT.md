@@ -18,7 +18,6 @@ return [
     'llms_intro' => '…two or three sentences…',
     'tagline' => '…',
     'publisher' => ['name' => 'Ben Rohleder', 'country' => 'United Kingdom'],
-    'email' => 'support@patternsshowcontrol.co.uk',
     'nav' => [ // the header; 'children' make the Products mega-menu
         ['label' => 'Ecosystem', 'href' => '/ecosystem/'],
         ['label' => 'Products', 'children' => [['product' => 'patterns'], ['product' => 'stagewatch'], …]],

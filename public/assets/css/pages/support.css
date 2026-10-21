@@ -229,8 +229,6 @@
   .support-contact { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
   .support-contact-main { display: grid; gap: var(--sp-5); align-content: start; min-width: 0; }
   .support-contact-main :is(.c-form, .c-error-summary) { scroll-margin-top: calc(var(--header-h) + 16px); }
-  main:has(.support-contact .c-error-summary) > .l-wrap > .pt-alert--danger { display: none; }
-  .support-sent:focus { outline: none; }
   .support-contact-title { font-size: var(--fs-5); }
   .support-sent { scroll-margin-top: calc(var(--header-h) + 16px); padding: 20px 22px;
     & .c-callout-title { font-size: var(--fs-4); font-family: var(--font-display); font-stretch: 108%; }

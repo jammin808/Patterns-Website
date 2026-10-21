@@ -67,7 +67,7 @@ final class AccountsTest extends TestCase
             'company' => 'Cue Lights Ltd',
             'password' => self::PASSWORD,
             'terms' => '1',
-        ]);
+        ] + $this->filledIn('register'));
     }
 
     private static function assertRedirect(Response $r, string $location, int $status = 303): void
@@ -165,8 +165,8 @@ final class AccountsTest extends TestCase
         self::assertRedirect($taken, '/portal/register/');
         self::assertSame(200, $takenPage->status);
         self::assertSame(
-            str_replace('fresh@example.test', 'EMAIL', $freshPage->body),
-            str_replace('taken@example.test', 'EMAIL', $takenPage->body),
+            str_replace('fresh@example.test', 'EMAIL', self::withoutFormTimes($freshPage->body)),
+            str_replace('taken@example.test', 'EMAIL', self::withoutFormTimes($takenPage->body)),
             'the page never tells which addresses have accounts'
         );
 
@@ -250,7 +250,7 @@ final class AccountsTest extends TestCase
     {
         $this->bootApp(['security' => ['registration' => 'approval']]);
         $this->register('nina@example.test');
-        $this->post('/portal/forgot/', ['email' => 'nina@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'nina@example.test'] + $this->filledIn('forgot'));
         $token = self::tokenFrom($this->mailUrl('nina@example.test', 'reset-password'));
 
         $r = $this->post('/portal/reset/', ['token' => $token, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
@@ -263,7 +263,7 @@ final class AccountsTest extends TestCase
         // An administrator's invitation needs no further approval, even through the reset link.
         $invited = $this->app->auth()->invite('Ivy Wing', 'ivy@example.test', null);
         self::assertTrue($invited['ok']);
-        $this->post('/portal/forgot/', ['email' => 'ivy@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'ivy@example.test'] + $this->filledIn('forgot'));
         $token = self::tokenFrom($this->mailUrl('ivy@example.test', 'reset-password'));
         $this->post('/portal/reset/', ['token' => $token, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE email = ?', ['ivy@example.test']));
@@ -318,7 +318,7 @@ final class AccountsTest extends TestCase
         $this->signIn();
         self::assertNull(self::signedInId(), 'held after five failures');
 
-        $this->post('/portal/forgot/', ['email' => 'client@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'client@example.test'] + $this->filledIn('forgot'));
         $token = self::tokenFrom($this->mailUrl('client@example.test', 'reset-password'));
         $ok = $this->post('/portal/reset/', ['token' => $token, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
         self::assertRedirect($ok, '/portal/login/');
@@ -366,7 +366,7 @@ final class AccountsTest extends TestCase
         self::assertStringContainsString('action="/portal/verify/resend/"', $page->body);
         self::assertStringContainsString('name="email" value="pending@example.test"', $page->body);
 
-        $resend = $this->post('/portal/verify/resend/', ['email' => 'pending@example.test']);
+        $resend = $this->post('/portal/verify/resend/', ['email' => 'pending@example.test'] + $this->filledIn('resend'));
         self::assertRedirect($resend, '/portal/login/');
         $url = $this->mailUrl('pending@example.test', 'verify-email');
         $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
@@ -379,16 +379,27 @@ final class AccountsTest extends TestCase
         $this->makeUser('pending@example.test', self::PASSWORD, 'client', 'pending');
         $this->makeUser('active@example.test');
         $answers = [];
-        foreach (['pending@example.test', 'active@example.test', 'nobody@example.test', 'not-an-email'] as $email) {
+        foreach (['pending@example.test', 'active@example.test', 'nobody@example.test'] as $email) {
             $_SESSION['_flash'] = [];
-            $r = $this->post('/portal/verify/resend/', ['email' => $email]);
+            $r = $this->post('/portal/verify/resend/', ['email' => $email] + $this->filledIn('resend'));
             $answers[] = [$r->status, $r->getHeader('Location'), self::flashes()];
         }
         self::assertCount(1, array_unique(array_map('serialize', $answers)), 'the same answer for every address');
+        self::assertSame([303, '/portal/login/', [\Psc\Controllers\Portal\AuthController::RESEND_ANSWER]], $answers[0]);
         self::assertCount(1, $this->mails(), 'only the unconfirmed account gets a link');
 
+        // What is not an address at all is told how to write one (a fact about the typing, never about an account),
+        // on the form's own page with the input kept.
+        $_SESSION['_flash'] = [];
+        $r = $this->post('/portal/verify/resend/', ['email' => 'not-an-email'] + $this->filledIn('resend'));
+        self::assertRedirect($r, '/portal/verify/resend/');
+        $page = $this->request('GET', '/portal/verify/resend/')->body;
+        self::assertStringContainsString('<li><a href="#resend-email">' . Controller::EMAIL_FORMAT . '</a></li>', $page);
+        self::assertMatchesRegularExpression('/id="resend-email"[^>]*value="not-an-email"[^>]*aria-invalid="true"/', $page);
+        self::assertCount(1, $this->mails());
+
         for ($i = 0; $i < 4; $i++) {
-            $this->post('/portal/verify/resend/', ['email' => 'pending@example.test']);
+            $this->post('/portal/verify/resend/', ['email' => 'pending@example.test'] + $this->filledIn('resend'));
         }
         $sent = array_filter($this->mails(), static fn (array $m): bool => $m['to'] === 'pending@example.test');
         self::assertCount(3, $sent, 'three links an hour for one address');
@@ -493,12 +504,12 @@ final class AccountsTest extends TestCase
         self::assertSame(200, $form->status);
         self::assertStringContainsString('action="/portal/forgot/"', $form->body);
 
-        $known = $this->post('/portal/forgot/', ['email' => 'client@example.test']);
+        $known = $this->post('/portal/forgot/', ['email' => 'client@example.test'] + $this->filledIn('forgot'));
         self::assertRedirect($known, '/portal/forgot/');
-        $knownPage = $this->request('GET', '/portal/forgot/')->body;
-        $unknown = $this->post('/portal/forgot/', ['email' => 'nobody@example.test']);
+        $knownPage = self::withoutFormTimes($this->request('GET', '/portal/forgot/')->body);
+        $unknown = $this->post('/portal/forgot/', ['email' => 'nobody@example.test'] + $this->filledIn('forgot'));
         self::assertRedirect($unknown, '/portal/forgot/');
-        $unknownPage = $this->request('GET', '/portal/forgot/')->body;
+        $unknownPage = self::withoutFormTimes($this->request('GET', '/portal/forgot/')->body);
         self::assertSame($knownPage, $unknownPage, 'the same answer whether or not the address has an account');
         self::assertStringContainsString('If that address has an account, a reset link is on its way.', $knownPage);
         self::assertNull($this->lastMailTo('nobody@example.test'));
@@ -558,7 +569,7 @@ final class AccountsTest extends TestCase
     public function testAnUnknownLinkPurposeIsRefused(): void
     {
         $id = $this->makeUser();
-        $this->post('/portal/forgot/', ['email' => 'client@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'client@example.test'] + $this->filledIn('forgot'));
         $token = self::tokenFrom($this->mailUrl('client@example.test', 'reset-password'));
         $before = $this->hashOf($id);
 
@@ -609,7 +620,9 @@ final class AccountsTest extends TestCase
             'email' => 'hijack@example.test',
             'role' => 'admin',
         ]);
-        self::assertRedirect($r, '/portal/account/#details');
+        // A saved change is answered at the top of the page, where its message takes focus.
+        self::assertRedirect($r, '/portal/account/');
+        self::assertStringContainsString('<div class="pt-alert pt-alert--success" role="status" tabindex="-1" data-feedback>Your details are saved.</div>', $this->request('GET', '/portal/account/')->body);
         $mine = $this->db->one('SELECT * FROM users WHERE id = ?', [$me]);
         self::assertSame('Casey Cue', $mine['name']);
         self::assertSame('Front of House Ltd', $mine['company']);
@@ -652,7 +665,7 @@ final class AccountsTest extends TestCase
         self::assertSame($before, $this->hashOf($id));
 
         $ok = $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD]);
-        self::assertRedirect($ok, '/portal/account/#password');
+        self::assertRedirect($ok, '/portal/account/');
         self::assertTrue(password_verify(self::NEW_PASSWORD, $this->hashOf($id)));
         self::assertSame(200, $this->request('GET', '/portal/account/')->status, 'this browser stays signed in');
         self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM audit_log WHERE action = 'password.changed'"));
@@ -710,7 +723,7 @@ final class AccountsTest extends TestCase
         self::assertNull(self::signedInId());
         self::assertRedirect($this->signIn('deleted-' . $id . '@deleted.invalid', self::PASSWORD), '/portal/login/');
         self::assertNull(self::signedInId());
-        $this->post('/portal/forgot/', ['email' => 'deleted-' . $id . '@deleted.invalid']);
+        $this->post('/portal/forgot/', ['email' => 'deleted-' . $id . '@deleted.invalid'] + $this->filledIn('forgot'));
         self::assertNull($this->lastMailTo('deleted-' . $id . '@deleted.invalid'), 'no reset for a deleted account');
     }
 
@@ -843,7 +856,7 @@ final class AccountsTest extends TestCase
         $this->bootApp(['security' => ['registration' => 'approval']]);
         $this->app->auth()->invite('Ivy Wing', 'ivy@example.test', null);
         $invite = self::tokenFrom($this->mailUrl('ivy@example.test', 'invite'));
-        $this->post('/portal/verify/resend/', ['email' => 'ivy@example.test']);
+        $this->post('/portal/verify/resend/', ['email' => 'ivy@example.test'] + $this->filledIn('resend'));
         $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('ivy@example.test', 'verify-email'))));
         self::assertStringContainsString('Email address confirmed', $verify->body);
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE email = ?', ['ivy@example.test']));
@@ -873,7 +886,7 @@ final class AccountsTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             $_SESSION['_flash'] = [];
             self::assertRedirect($this->register('taken@example.test'), '/portal/register/');
-            $pages[] = $this->request('GET', '/portal/register/')->body;
+            $pages[] = self::withoutFormTimes($this->request('GET', '/portal/register/')->body);
         }
         self::assertCount(1, array_unique($pages), 'every attempt gets the same page');
         $notices = array_filter($this->mails(), static fn (array $m): bool => $m['to'] === 'taken@example.test');
@@ -890,8 +903,8 @@ final class AccountsTest extends TestCase
     {
         $spam = 'Claim your prize at www.spam.example';
         $this->register('stranger@example.test', ['name' => $spam]);
-        $this->post('/portal/verify/resend/', ['email' => 'stranger@example.test']);
-        $this->post('/portal/forgot/', ['email' => 'stranger@example.test']);
+        $this->post('/portal/verify/resend/', ['email' => 'stranger@example.test'] + $this->filledIn('resend'));
+        $this->post('/portal/forgot/', ['email' => 'stranger@example.test'] + $this->filledIn('forgot'));
         $this->register('stranger@example.test', ['name' => $spam]);
         $templates = [];
         foreach ($this->mails() as $mail) {
@@ -904,7 +917,7 @@ final class AccountsTest extends TestCase
         self::assertSame(['verify-email', 'verify-email', 'reset-password', 'account-exists'], $templates);
 
         $this->makeUser('known@example.test');
-        $this->post('/portal/forgot/', ['email' => 'known@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'known@example.test'] + $this->filledIn('forgot'));
         self::assertStringContainsString('Hello Test Known,', $this->lastMailTo('known@example.test')['html'] ?? '', 'a proven address is greeted by name');
     }
 
@@ -916,7 +929,7 @@ final class AccountsTest extends TestCase
     {
         $this->app->auth()->invite('Ivy Wing', 'ivy@example.test', null);
         $invite = self::tokenFrom($this->mailUrl('ivy@example.test', 'invite'));
-        $this->post('/portal/forgot/', ['email' => 'ivy@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'ivy@example.test'] + $this->filledIn('forgot'));
         $reset = self::tokenFrom($this->mailUrl('ivy@example.test', 'reset-password'));
         $this->post('/portal/reset/', ['token' => $reset, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
         $ivy = (int) $this->db->value('SELECT id FROM users WHERE email = ?', ['ivy@example.test']);
@@ -931,7 +944,7 @@ final class AccountsTest extends TestCase
         // A reset link asked for before a password change dies with the old password.
         $id = $this->makeUser();
         $this->freshBrowser();
-        $this->post('/portal/forgot/', ['email' => 'client@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'client@example.test'] + $this->filledIn('forgot'));
         $reset = self::tokenFrom($this->mailUrl('client@example.test', 'reset-password'));
         $this->signIn();
         $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD]);
@@ -945,7 +958,7 @@ final class AccountsTest extends TestCase
         $this->freshBrowser();
         $this->register('nina@example.test');
         $verify = self::tokenFrom($this->mailUrl('nina@example.test', 'verify-email'));
-        $this->post('/portal/forgot/', ['email' => 'nina@example.test']);
+        $this->post('/portal/forgot/', ['email' => 'nina@example.test'] + $this->filledIn('forgot'));
         $reset = self::tokenFrom($this->mailUrl('nina@example.test', 'reset-password'));
         $this->post('/portal/reset/', ['token' => $reset, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE email = ?', ['nina@example.test']));
@@ -978,7 +991,7 @@ final class AccountsTest extends TestCase
         self::assertSame(2, (int) $this->db->value("SELECT COUNT(*) FROM user_tokens WHERE purpose = 'remember' AND user_id = ?", [$id]));
 
         $r = $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD]);
-        self::assertRedirect($r, '/portal/account/#password');
+        self::assertRedirect($r, '/portal/account/');
         self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM user_tokens WHERE purpose = 'remember' AND user_id = ?", [$id]));
 
         $_SESSION = []; // this browser's session ends; its cookie signs it in again

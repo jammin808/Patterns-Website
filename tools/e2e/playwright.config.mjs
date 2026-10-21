@@ -19,7 +19,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /pages\.spec/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /(pages|forms)\.spec/ },
   ],
   webServer: {
     command: 'php -S 127.0.0.1:8765 tools/dev-router.php',

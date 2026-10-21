@@ -18,7 +18,6 @@ return [
         'locale' => 'en-GB',
         'force_https' => true,
         'admin_emails' => [],             // verified accounts with these emails are administrators
-        'support_email' => 'support@patternsshowcontrol.co.uk',
         'publisher' => 'Ben Rohleder',
         // The client's address behind a CDN or proxy (docs/DEPLOY.md §4). null: REMOTE_ADDR. 'HTTP_X_FORWARDED_FOR'
         // is read from the right (the address the proxy saw, never one a visitor wrote); any other header only from
