@@ -129,11 +129,15 @@
   .support-help-chat .c-chat--inline .c-chat-panel { max-width: none; }
   /* Before the first message the log holds nothing, so it takes no room: the suggestions and the input move up into
      the first screen. It grows to its usual height with the first message, which the visitor has just sent. */
-  .support-help-chat .c-chat-log:empty { min-height: 0; padding-block: 0; }
+  .support-help-chat .c-chat-log:empty { min-height: 0; padding-block: 0;
+    & + .c-chat-suggest { padding-top: 14px; } }
   @media (width >= 64rem) { .support-help-chat .c-chat--inline .c-chat-panel { max-width: 500px; } }
 
   /* ===== Support hub: the help pages, the portal's actions, the account note ===== */
   .support-links a { min-height: 64px; }
+  /* The list clips its edges and each row paints over its neighbours, so a ring drawn outside a link is hidden: draw
+     it inside instead (the help links here, the FAQ's closing links and the downloads index). */
+  :is(.support-links, .support-dl-index .c-support-links) a:focus-visible { outline-offset: -3px; }
   .support-actions { list-style: none; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     & > li { display: grid; } }
   .support-action { height: 100%; & > .c-icon { color: var(--text-2); margin-bottom: 4px; } }

@@ -167,8 +167,8 @@ $sharedText = count($shared) > 1 ? implode(', ', array_slice($shared, 0, -1)) . 
 <section class="l-section l-section--tint" aria-labelledby="faq-title">
     <div class="l-wrap l-split l-split--aside">
         <div>
-            <h2 id="faq-title">Questions</h2>
-            <p class="c-lede u-mt-4">About this workflow. There are more answers in the <a href="/support/faq/">frequently asked questions</a>.</p>
+            <h2 id="faq-title">Questions about this workflow</h2>
+            <p class="c-lede u-mt-4">There are more answers in the <a href="/support/faq/">frequently asked questions</a>.</p>
         </div>
         <?= $this->partial('faq', ['faqs' => $wf['faqs'], 'name' => 'wf-faq']) ?>
     </div>

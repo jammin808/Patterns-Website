@@ -970,7 +970,9 @@
      compact so it fits the main column on a laptop, and scrolls past that rather than crushing its titles. */
   :is(.c-table, .pt-table) tbody th[scope="row"] { min-width: 11rem; }
   :is(.c-table, .pt-table):has(thead th:nth-child(9)) { font-size: var(--fs-0);
-    & :is(th, td) { padding: 9px 10px; } & tbody th { font-size: var(--fs-0); } & .pt-badge { padding-inline: 7px 8px; } }
+    & :is(th, td) { padding: 9px 7px; } & tbody th { font-size: var(--fs-0); } & .pt-badge { padding-inline: 7px 8px; }
+    /* Long column names over short values (Needs a person, Last activity) wrap instead of widening the table. */
+    & thead th { white-space: normal; } }
   /* A narrow table without the stacked variant keeps its columns: cells stop wrapping, the row title keeps a
      readable measure, and the wrapper scrolls sideways (site.js makes it keyboard-reachable). */
   @container table (width < 40rem) {
@@ -1056,6 +1058,7 @@
     & li:not(:has(> .c-icon))::before { content: ""; width: 16px; height: 16px; flex: none; background: var(--text-3);
       mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='square'%3E%3Cpath d='M6 3h8.5L19 7.5V21H6z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat; }
     & li > form { margin: 0; } & li > form.pt-actions, & li > form .pt-actions { margin-top: 0; } }
+  .pt-card-body .pt-files { padding: 0; }
   .c-empty, .pt-empty { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 10px; padding: clamp(28px, 5vw, 48px) 20px; text-align: center; border: 1px dashed var(--field); border-radius: var(--r-3); background: var(--s1);
     & > :not(.c-btn, .pt-btn) { flex-basis: 100%; } & > .c-empty-mark { flex: 0 0 64px; margin-inline: calc((100% - 64px) / 2); }
     & p { max-width: 56ch; margin-inline: auto; color: var(--text-2); } }
@@ -1174,7 +1177,9 @@
 
   /* ===== Portal shell (templates/layouts/portal.php, docs/PORTAL-UI.md) ===== */
   .pt-shell { display: grid; gap: 24px; width: min(100% - 2 * var(--gutter-x), var(--max)); margin: 24px auto clamp(48px, 6vw, 80px); grid-template-columns: minmax(0, 1fr); }
-  @media (width >= 64rem) { .pt-shell { grid-template-columns: 15rem minmax(0, 1fr); gap: 40px; margin-top: 32px; } }
+  /* The rail is 13rem on laptops (so the admin lists fit at 1366px) and 15rem from 90rem. */
+  @media (width >= 64rem) { .pt-shell { grid-template-columns: 13rem minmax(0, 1fr); gap: 32px; margin-top: 32px; } }
+  @media (width >= 90rem) { .pt-shell { grid-template-columns: 15rem minmax(0, 1fr); gap: 40px; } }
   .pt-nav { min-width: 0; font-size: var(--fs-1);
     & ul { list-style: none; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
     & li { flex: none; }
@@ -1188,7 +1193,10 @@
   @media (width < 64rem) {
     .pt-nav { display: grid; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--line);
       & ul { padding: 0 28px 2px 0; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
-      & a { min-height: 36px; padding: 6px 12px; } }
+      & a { min-height: 36px; padding: 6px 12px; }
+      /* The current page's link opens scrolled into the middle of its row, not cut off at the edge (an
+         enhancement; the rows only scroll here, so the page itself never moves). */
+      & a[aria-current] { scroll-initial-target: nearest; scroll-snap-align: center; } }
     .pt-nav-heading { margin: 6px 0 0; }
     .pt-nav-signout { margin-top: 2px; padding-top: 0; border-top: 0; }
   }
@@ -1198,14 +1206,15 @@
       & a { border-color: transparent; background: none; white-space: normal; }
       & a:hover { background: var(--s2); }
       & a:is([aria-current="page"], [aria-current="true"]) { background: var(--s1); border-color: var(--line); box-shadow: inset 3px 0 0 var(--text); } }
-    .pt-nav-signout { flex-direction: column; align-items: flex-start; }
+    .pt-nav-signout { flex-direction: column; align-items: flex-start;
+      & > p { padding-left: 13px; } & > .pt-btn { padding-inline: 12px; } }
   }
   /* Signed out (sign-in, register, reset): no rail; the two links become one segmented switch above the card. */
   .pt-shell:has(.pt-auth):not(:has(.pt-nav-signout)) { grid-template-columns: minmax(0, 1fr);
     & > .pt-nav { position: static; justify-self: center; width: min(100%, 30rem); margin-top: clamp(0px, 3vw, 24px); padding: 0; border: 0; }
     & > .pt-nav ul { flex-direction: row; gap: 2px; padding: 2px; overflow: visible; mask-image: none; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1); }
     & > .pt-nav li { flex: 1 1 0; }
-    & > .pt-nav a { justify-content: center; min-height: 40px; border: 0; border-radius: var(--r-1); background: none; box-shadow: none; }
+    & > .pt-nav a { justify-content: center; min-height: 40px; border: 0; border-radius: var(--r-1); background: none; box-shadow: none; scroll-initial-target: none; }
     & > .pt-nav a:hover { background: var(--s2); }
     & > .pt-nav a[aria-current] { background: var(--s3); color: var(--text); box-shadow: inset 0 -2px 0 var(--text-2); }
     & .pt-auth { margin-top: 16px; }
@@ -1220,14 +1229,18 @@
   .pt-header-actions, .pt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .pt-header-actions { margin-top: 12px; }
   .pt-actions { margin-top: 16px; }
-  /* A ghost button standing alone in the header reads as a button, with a hairline; first in a row of actions it
-     lines its words up with the text above (the hover fill still shows the whole target). */
+  /* A ghost button standing alone in the header reads as a button, with a hairline. */
   .pt-header-actions .pt-btn--ghost { --btn-bd: var(--line-2); }
   .pt-header-actions .pt-btn--ghost:hover { --btn-bd: var(--text-2); }
   .pt-header-actions .pt-vote { min-height: 48px; padding-inline: 14px; font-size: var(--fs-2); }
-  @media (width >= 40rem) {
-    .pt-actions > .pt-btn--ghost:first-child { margin-left: -22px; }
-    .pt-actions > .pt-btn--ghost.pt-btn--small:first-child { margin-left: -14px; }
+  /* A ghost link in a row of actions (Cancel, Forgotten your password?, See all your tickets) or alone in a card
+     footer is a text link: underlined words that line up with the text above at every width, also when the row
+     wraps on a phone, with the button's height kept as the target. Ghost buttons that submit stay buttons. */
+  .pt-actions:has(> a.pt-btn--ghost) { column-gap: 24px; }
+  :is(.pt-actions > a.pt-btn--ghost, .pt-card-footer > a.pt-btn--ghost:only-child) {
+    --btn-bd: transparent; padding-inline: 3px; margin-inline: -3px; background: none;
+    text-decoration: underline; text-decoration-color: var(--line-2); text-decoration-thickness: 1px; text-underline-offset: 0.25em;
+    &:hover { --btn-bd: transparent; background: none; text-decoration-color: currentColor; }
   }
   .pt-actions > .pt-small { color: var(--text-2); }
   .pt-section { margin-top: 40px; &:first-child, .pt-grid > & { margin-top: 0; } }
@@ -1236,6 +1249,9 @@
   /* Page flow: blocks in the main column, a section or the sign-in card are spaced evenly unless they set their own. */
   :where(.pt-main, .pt-section, .pt-auth) > :where(* + *) { margin-top: 16px; }
   :where(.pt-section) > :where(ul:not([class]), ol:not([class])) { padding-left: 1.3em; & > li + li { margin-top: 6px; } }
+  /* Running text keeps the body measure in the wide main column; a notice in a section matches the form's. */
+  :where(.pt-main, .pt-section) > :where(p, ul:not([class]), ol:not([class])) { max-width: 70ch; }
+  .pt-section > .pt-alert { max-width: 46rem; }
   .pt-section h3:not([class]), .pt-section > h3 { margin-top: 24px; font-size: var(--fs-3); font-stretch: 108%; }
   .pt-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr); }
   @media (width >= 40rem) { .pt-grid--2, .pt-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1252,7 +1268,7 @@
   .pt-card-body .pt-prose { font-size: var(--fs-1); color: var(--text-2); & :is(h2, h3, h4) { margin-top: 1.2em; } & :is(h2, h3, h4):first-child { margin-top: 0; } }
   .pt-card-body .pt-kv { margin-top: 12px; }
   /* A plain list in a card body is a list of rows: the link first, its badges beside it, the meta line under it. */
-  .pt-card-body > ul { list-style: none; padding: 0; display: grid;
+  .pt-card-body > ul:not([class]) { list-style: none; padding: 0; display: grid;
     & > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
     & > li:first-child { padding-top: 2px; border-top: 0; }
     & > li > a { font-weight: 600; color: var(--text); }

@@ -843,7 +843,7 @@ Toasts never time out on their own (WCAG 2.2.1); they have a close button.
 
 ### 8.27 Portal shell and parts (docs/PORTAL-UI.md)
 
-`pt-shell` (a 15rem rail plus the main column from 64rem; on phones the rail is a sideways-scrolling row, and the
+`pt-shell` (a 13rem rail plus the main column from 64rem, 15rem from 90rem; on phones the rail is a sideways-scrolling row, and the
 Administration links stay visible), `pt-nav` (links with `aria-current`), `pt-nav-heading`, `pt-nav-signout`,
 `pt-main`, `pt-header` (`pt-eyebrow`, `pt-title`, `pt-lede`, `pt-header-actions`), `pt-section` + `pt-h2`,
 `pt-grid--2|3`, `pt-card` (`--link`, `-title`, `-meta`, `-body`, `-footer`), `pt-stats`, `pt-table-wrap`,
@@ -854,17 +854,23 @@ in the kitchen sink.
 
 How the portal's markup is laid out (everything below is CSS; the templates keep the contract's markup):
 
-- **Rail.** From 64rem a sticky 15rem rail. Below it, a compact band of sideways-scrolling rows with a faded right
-  edge, the Administration row under it and the sign-out line last. Signed out (the rail has no sign-out form and
+- **Rail.** From 64rem a sticky 13rem rail (15rem from 90rem, so the admin lists fit the main column on a 1366px
+  laptop). Below it, a compact band of sideways-scrolling rows with a faded right edge, the Administration row under
+  it and the sign-out line last; the current page's link opens scrolled into the middle of its row
+  (`scroll-initial-target`, an enhancement). Signed out (the rail has no sign-out form and
   the page is a `pt-auth` card), there is no rail: "Sign in" and "Create an account" become one segmented switch
   centred above the card.
 - **Page flow.** Blocks in `pt-main`, a `pt-section` and `pt-auth` are 16px apart unless they set their own space;
   plain lists in a section are indented with 6px between items; an `h3` in a section is 17px with 24px above it.
+  Paragraphs and plain lists there keep the 70ch body measure, and a `pt-alert` in a section the form's 46rem.
 - **Header.** `pt-title` may hold a `pt-mono` reference; badges in `pt-lede` sit on the text line. A ghost button
-  in `pt-header-actions` has a hairline so it reads as a button; the first ghost button in a `pt-actions` row lines
-  its words up with the text above (from 40rem).
+  in `pt-header-actions` has a hairline so it reads as a button.
+- **Ghost links.** A ghost link-button (`a.pt-btn--ghost`) in a `pt-actions` row (Cancel, Forgotten your password?,
+  See all your tickets), or alone in a `pt-card-footer` (View details), is drawn as an underlined text link: its words
+  line up with the text above at every width, also when the row wraps on a phone, and it keeps the button's height
+  as its target; the row's gap widens to 24px. A ghost `button` (Sign out) stays a button.
 - **Cards.** `pt-card--link` is one target: its `span` parts (`-title`, `-meta`, `-body`, `-footer`) are blocks and a
-  badge sits at its top left. A bare `ul` in `pt-card-body` is a list of rows: the link, its badges beside it, the
+  badge sits at its top left. A bare `ul` (no class) in `pt-card-body` is a list of rows: the link, its badges beside it, the
   `pt-small` meta line under it, hairlines between. Headings in a card body are 16px; release notes (`pt-prose`)
   are 14px. A `pt-actions` row or `p` in `pt-card-footer` loses its own margin. A `form` can be the card.
 - **Forms.** `pt-form` keeps a 46rem measure (the full width inside a card or `pt-auth`). The contract's order is
@@ -874,11 +880,12 @@ How the portal's markup is laid out (everything below is CSS; the templates keep
 - **Tables.** Edge shadows appear only where columns are scrolled out of view. A table narrower than 40rem without
   `--stack` keeps its columns: cells stop wrapping, the row title (`tbody th`) keeps 12.5rem, and the wrapper
   scrolls, with a visible caption staying in view above the moving columns. A table of nine or more columns (the
-  admin lists) is set compact (13px, tighter cells) and the row title never drops below 11rem. Give every `td` a
+  admin lists) is set compact (13px, 7px between cell and rule, column names that wrap) so it fits the main column
+  from a 1366px laptop up, and the row title never drops below 11rem. Give every `td` a
   `data-label` and add `pt-table--stack` to get one card per row instead. `pre` in a cell (audit details) wraps at
   30rem.
 - **Files.** Each `pt-files` item without an icon gets a document glyph; the size, or a small delete `form.pt-actions`,
-  sits at the end of the row.
+  sits at the end of the row, also inside a card body.
 - **Flashes and empty states.** `pt-alert` flows as a block (text and links on one line). `pt-empty` puts its words on
   rows of their own and its buttons side by side.
 
@@ -1006,11 +1013,12 @@ followspot in its colour; PlayMap's card says "Early access".
 | `home`, `default` | home; any page without its own | the multiview of the four drawn screens; the four apps as a router panel |
 | `ecosystem`, `integrations`, `ai` | the ecosystem pages | the apps on Show Bus; integration chips; the proposal reaching only the amber gate |
 | `patterns`, `stagewatch`, `agmessage`, `playmap` | each product's overview, features and licensing | the product's drawn screen on a monitor with its UMD |
-| `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production with their prices from `content/licensing/stagewatch.php` |
-| `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list; what the downloads hold; the assistant; the contact topics; the facts |
+| `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
+| `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
 
 Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines; hyphenated words never
-break. Text is sized to stay legible at a 400px thumbnail. Words and prices come from `content/`; the build fails if
+break, and the build warns when a headline needs a fourth line (shorten it: Support's card uses its H1, "Support",
+with the page's description as the line, rather than its 55-character title). Text is sized to stay legible at a 400px thumbnail. Words and prices come from `content/`; the build fails if
 `content/pages.php` names an `og` image with no card. Cards are palette PNGs when that is visually identical, and stay
 under 150 KB (25–90 KB today).
 
