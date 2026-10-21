@@ -80,3 +80,12 @@ jobs:
           if git diff --cached --quiet; then echo "Nothing to deploy"; exit 0; fi
           git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -q -m "Deploy ${SHA}"
           git push -q "$remote" deploy
+      - name: Flush the CDN once Hostinger serves this build
+        if: steps.tip.outputs.deploy == 'true'
+        # Hostinger pulls the deploy branch by itself; once /health reports this build, the CDN's copies of the old
+        # pages are flushed so no visitor is served the site as it was. The token reaches this step only.
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ vars.HOSTINGER_USERNAME || 'u162541462' }}
+          SITE_DOMAIN: ${{ vars.SITE_DOMAIN || 'patternsshowcontrol.co.uk' }}
+        run: tools/flush-cdn.sh --wait-for "$(cat dist/site/VERSION)"

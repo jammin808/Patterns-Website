@@ -161,6 +161,9 @@ final class SiteTest extends TestCase
         $body = json_decode($r->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('ok', $body['status']);
         self::assertSame(['storage' => true, 'vendor' => true, 'database' => true, 'config_shadowed' => false, 'schema' => true], $body['checks']);
+        self::assertSame(\Psc\Controllers\SeoController::build(), $body['build'], 'the build it runs, for the deploy job to wait on');
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9._-]{1,40}$/', $body['build']);
+        self::assertStringContainsString('no-store', (string) $r->getHeader('Cache-Control'), 'never served from a cache');
 
         $this->bootApp(['chat' => ['api_key' => 'sk-test']]);
         self::assertSame(200, $this->request('GET', '/health')->status, 'the SDK is installed');

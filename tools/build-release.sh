@@ -21,7 +21,7 @@ rsync -a "$root/" "$out/" \
   --include '/storage/.htaccess' --include '/storage/README.md' --exclude '/storage/*' \
   --include '/downloads-vault/README.md' --exclude '/downloads-vault/*' \
   --exclude '/tools/og/' --exclude '/tools/dev-router.php' --exclude '/tools/check-mysql.php' \
-  --exclude '/tools/build-release.sh' --exclude '/config/dev.example.php' \
+  --exclude '/tools/build-release.sh' --exclude '/tools/flush-cdn.sh' --exclude '/config/dev.example.php' \
   --exclude 'config/local.php' --exclude 'phpunit.xml' --exclude '.phpunit.cache/' --exclude 'package*.json' \
   --exclude 'playwright.config.*' --exclude '*.swp' --exclude '.DS_Store'
 

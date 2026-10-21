@@ -60,9 +60,19 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 
 ## 2. After each deploy
 
-- Hostinger's CDN caches public pages for a few minutes (they send `Cache-Control: public, max-age=300`); flush it
-  in hPanel → Performance → CDN after a content change you need live at once. Portal pages, downloads and the
-  assistant always send `private, no-store`.
+- **The CDN is flushed after every deploy, automatically.** Hostinger's CDN caches public pages (they send
+  `Cache-Control: public, max-age=300`). Once the deploy branch is pushed, the deploy workflow waits until `/health`
+  reports the new build (its `build` field, the commit the bundle was built from), then flushes the CDN through the
+  Hostinger API (`tools/flush-cdn.sh`), so no visitor is served the old site. Portal pages, downloads and the
+  assistant always send `private, no-store`. Setup, once:
+  1. hPanel → Profile → API: create an API token.
+  2. GitHub → the repository → Settings → Secrets and variables → Actions → New repository secret:
+     `HOSTINGER_API_TOKEN` = the token. The token reaches only the flush step, and only for a push to this
+     repository's own `main`.
+  3. Optional repository variables `HOSTINGER_USERNAME` (default `u162541462`) and `SITE_DOMAIN` (default
+     `patternsshowcontrol.co.uk`).
+  Without the secret the deploy still runs and warns that the CDN was not flushed. To flush at any time: Actions →
+  Flush CDN → Run workflow, or hPanel → Performance → CDN → Flush cache.
 - Smoke test: `/health` answers `{"status":"ok"}` with every check `true` and `config_shadowed` `false` (with the
   assistant switched on and a key set, a missing `vendor/` makes it `degraded`); a signed-out request to
   `/portal/downloads/1/` redirects to the login page; `curl -N -X POST https://…/api/chat` from another origin is
