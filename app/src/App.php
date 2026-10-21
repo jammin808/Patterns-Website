@@ -102,10 +102,18 @@ final class App
             }
             $this->db = Database::connect($dsn, $this->config->string('db.user'), $this->config->string('db.password'));
             if ($this->config->bool('db.auto_migrate', true)) {
-                (new Migrator($this->db, $this->root . '/database/migrations', $this->storage->dir('cache') . '/schema-version'))->ensure();
+                $this->migrator()->ensure();
             }
         }
         return $this->db;
+    }
+
+    /** The schema migrator for the configured database, its marker keyed to that database's DSN and user. */
+    public function migrator(): Migrator
+    {
+        $dsn = $this->config->string('db.dsn');
+        $identity = ($dsn === '' ? 'sqlite:' . $this->storage->dir('data') . '/site.sqlite' : $dsn) . '|' . $this->config->string('db.user');
+        return new Migrator($this->db(), $this->root . '/database/migrations', $this->storage->dir('cache') . '/schema-version', $identity);
     }
 
     public function useDatabase(Database $db): void

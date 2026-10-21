@@ -35,6 +35,36 @@ final class MigratorTest extends TestCase
         @rmdir($dir);
     }
 
+    /**
+     * The first requests of a new site ran on the default SQLite file and wrote the marker; the MySQL configuration
+     * uploaded afterwards then trusted that marker and never got its tables. A marker speaks only for the database
+     * it was written for.
+     */
+    public function testAMarkerWrittenForOneDatabaseNeverSkipsAnother(): void
+    {
+        $dir = sys_get_temp_dir() . '/psc-mig-' . bin2hex(random_bytes(4));
+        $root = dirname(__DIR__, 2) . '/database/migrations';
+        $first = Database::connect('sqlite::memory:');
+        (new Migrator($first, $root, $dir . '/schema-version', 'sqlite:/data/site.sqlite|'))->ensure();
+        self::assertTrue((new Migrator($first, $root, $dir . '/schema-version', 'sqlite:/data/site.sqlite|'))->isCurrent());
+
+        $second = Database::connect('sqlite::memory:');
+        $other = new Migrator($second, $root, $dir . '/schema-version', 'mysql:host=127.0.0.1;dbname=psc|psc');
+        self::assertFalse($other->isCurrent(), 'a fresh database holds no migrations, whatever the marker says');
+        $other->ensure();
+        self::assertTrue($other->isCurrent());
+        self::assertSame(0, (int) $second->value('SELECT COUNT(*) FROM rate_limits'));
+
+        // The same database again: the marker now speaks for it and the check is skipped.
+        $third = Database::connect('sqlite::memory:');
+        (new Migrator($third, $root, $dir . '/schema-version', 'mysql:host=127.0.0.1;dbname=psc|psc'))->ensure();
+        self::assertFalse((new Migrator($third, $root, $dir . '/schema-version', ''))->isCurrent(), 'ensure() trusted the marker');
+
+        @unlink($dir . '/schema-version');
+        @unlink($dir . '/schema-version.lock');
+        @rmdir($dir);
+    }
+
     public function testMysqlAndSqliteSchemasDeclareTheSameTables(): void
     {
         $root = dirname(__DIR__, 2) . '/database/migrations';
