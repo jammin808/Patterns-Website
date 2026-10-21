@@ -1,0 +1,24 @@
+name: Flush CDN
+
+# Flushes Hostinger's CDN for the site on demand (Actions → Flush CDN → Run workflow). The deploy branch workflow does
+# the same after every deploy.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flush:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Flush the CDN
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ vars.HOSTINGER_USERNAME || 'u162541462' }}
+          SITE_DOMAIN: ${{ vars.SITE_DOMAIN || 'patternsshowcontrol.co.uk' }}
+        run: tools/flush-cdn.sh

@@ -177,8 +177,19 @@ final class SeoController extends Controller
         $checks['config_shadowed'] = $cfg->shadowed();
         $checks['schema'] = $checks['database'] && $this->app->migrator()->isCurrent();
         $ok = self::healthy($checks, $cfg->bool('chat.enabled', true) && $cfg->string('chat.api_key') !== '');
-        return Response::json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks], $ok ? 200 : 503)
+        return Response::json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks, 'build' => self::build()], $ok ? 200 : 503)
             ->header('X-Robots-Tag', 'noindex');
+    }
+
+    /**
+     * The build this server runs: the VERSION file the release build writes (the commit it was built from), or "dev"
+     * in a checkout. The deploy job waits for it before flushing the CDN, so the cache never refills with the old site.
+     */
+    public static function build(): string
+    {
+        $file = PSC_ROOT . '/VERSION';
+        $version = is_file($file) ? trim((string) file_get_contents($file, false, null, 0, 64)) : '';
+        return preg_match('/^[A-Za-z0-9._-]{1,40}$/', $version) === 1 ? $version : 'dev';
     }
 
     /**

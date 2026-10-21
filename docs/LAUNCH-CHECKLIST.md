@@ -11,6 +11,7 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       before. Choose the daily figure (the default is 1,500,000).
 - [ ] Mailboxes `support@` and `no-reply@` and the SMTP password for `no-reply@`.
 - [ ] Connect GitHub in hPanel → Git (branch `deploy`), or deploy the release zip by hand.
+- [ ] Add the `HOSTINGER_API_TOKEN` repository secret so every deploy flushes the CDN (docs/DEPLOY.md §2).
 
 ## Legal (drafts in `content/legal/`, need your review)
 
