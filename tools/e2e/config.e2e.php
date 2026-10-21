@@ -5,7 +5,9 @@
 $storage = getenv('PSC_E2E_STORAGE') ?: sys_get_temp_dir() . '/psc-e2e';
 
 return [
-    'analytics' => ['ga_id' => ''],     // no Google tag outside production
+    // The tag and its cookie choice are on, under a test ID; every spec answers the choice up front (playwright
+    // config) except consent.spec, which intercepts Google's hosts, so no run reaches Google.
+    'analytics' => ['ga_id' => 'G-E2ETEST00'],
     'app' => [
         'url' => 'http://127.0.0.1:8765',
         'env' => 'development',

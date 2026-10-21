@@ -335,6 +335,70 @@ function initDismiss() {
   });
 }
 
+/* --------------------------------------------------------------------------------- cookie choice */
+/*
+ * [data-consent] (templates/partials/consent.php) asks whether Google Analytics may set its cookies. The answer is
+ * kept in localStorage `psc-consent` as "granted:<ms>" or "denied:<ms>" and stands for a year; with no answer from
+ * the last year the banner shows. The Google tag's inline part (Psc\View\Analytics) starts with every consent type
+ * denied and loads gtag.js only when the stored answer is "granted"; accepting here does the same at once.
+ * Rejecting after accepting withdraws consent and removes the _ga cookies. Any [data-consent-open] reopens the
+ * banner (it is hidden until this runs, as the choice needs scripting). Without an answer nothing is sent to Google.
+ */
+function initConsent() {
+  const banner = $('[data-consent]');
+  if (!banner) return;
+  const KEY = 'psc-consent';
+  const YEAR = 365 * 24 * 3600 * 1000;
+  const answer = () => {
+    const [value, at] = (store.get(KEY) || '').split(':');
+    return (value === 'granted' || value === 'denied') && Date.now() - Number(at) < YEAR ? value : null;
+  };
+  const loadTag = () => {
+    if ($('script[src^="https://www.googletagmanager.com/gtag/js"]')) return;
+    const tag = document.createElement('script');
+    tag.async = true;
+    tag.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(banner.dataset.ga || '')}`;
+    document.head.append(tag);
+  };
+  const removeGaCookies = () => {
+    const host = location.hostname;
+    for (const pair of document.cookie.split('; ')) {
+      const name = pair.split('=')[0];
+      if (name !== '_ga' && !name.startsWith('_ga_')) continue;
+      for (const domain of ['', `; domain=${host}`, `; domain=.${host}`]) document.cookie = `${name}=; Max-Age=0; path=/${domain}`;
+    }
+  };
+  let opener = null;
+  const close = () => {
+    banner.hidden = true;
+    if (opener && document.contains(opener)) opener.focus();
+    opener = null;
+  };
+  const choose = (value) => {
+    store.set(KEY, `${value}:${Date.now()}`);
+    if (typeof window.gtag === 'function') window.gtag('consent', 'update', { analytics_storage: value });
+    if (value === 'granted') loadTag(); else removeGaCookies();
+    close();
+    announce(value === 'granted' ? 'Statistics cookies accepted' : 'Statistics cookies rejected');
+  };
+  banner.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-consent-choice]');
+    if (button) choose(button.dataset.consentChoice === 'granted' ? 'granted' : 'denied');
+  });
+  // Escape closes a banner reopened from a link, keeping the answer already given; a first answer is still owed.
+  banner.addEventListener('keydown', (e) => { if (e.key === 'Escape' && opener && answer()) close(); });
+  for (const link of $$('[data-consent-open]')) {
+    link.hidden = false;
+    link.addEventListener('click', () => {
+      opener = link;
+      banner.hidden = false;
+      const current = answer();
+      $(`[data-consent-choice="${current === 'denied' ? 'denied' : 'granted'}"]`, banner)?.focus();
+    });
+  }
+  banner.hidden = answer() !== null;
+}
+
 /* ------------------------------------------------------------------ floating assistant launcher */
 /*
  * [data-chat-fab] is rendered tucked away (is-tucked) and shows once this has measured the page, so a page that
@@ -582,6 +646,7 @@ guard('scroll-regions', initScrollRegions);
 guard('copy', initCopy);
 guard('account', initAccount);
 guard('dismiss', initDismiss);
+guard('consent', initConsent);
 guard('fab', initFab);
 guard('ladder', initLadder);
 guard('tabs', initTabs);

@@ -16,10 +16,13 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:8765',
     trace: 'retain-on-failure',
+    // Statistics cookies already rejected, so the cookie choice never covers what a spec clicks and nothing loads
+    // from Google; consent.spec starts from an empty browser instead.
+    storageState: { cookies: [], origins: [{ origin: 'http://127.0.0.1:8765', localStorage: [{ name: 'psc-consent', value: `denied:${Date.now()}` }] }] },
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /(pages|forms)\.spec/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /(pages|forms|consent)\.spec/ },
   ],
   webServer: {
     command: 'php -S 127.0.0.1:8765 tools/dev-router.php',

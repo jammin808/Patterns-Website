@@ -27,6 +27,9 @@ $productHome = ['/patterns/' => 'patterns', '/stagewatch/' => 'stagewatch', '/ag
             <ul role="list">
                 <li><a href="/legal/privacy/">Privacy</a></li>
                 <li><a href="/legal/cookies/">Cookies</a></li>
+                <?php if (\Psc\View\Analytics::forPage($app ?? \Psc\App::get()) !== ''): ?>
+                    <li><button type="button" class="c-footer-consent" data-consent-open hidden>Cookie settings</button></li>
+                <?php endif; ?>
                 <li><a href="/legal/terms/">Terms</a></li>
                 <li><a href="/legal/licence-terms/">Licence terms</a></li>
             </ul>
