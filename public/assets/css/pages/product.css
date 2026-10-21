@@ -12,7 +12,7 @@
   .c-product-tag .c-tag { font-size: var(--fs-0); letter-spacing: 0; }
   .c-pd-definition { max-width: 48ch; color: var(--text); }
   .c-pd-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 34rem; & dd { overflow-wrap: anywhere; }
-    & > div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+    & > .c-pd-spec-wide { grid-column: 1 / -1; } }
   /* The layout's breadcrumbs sit above the product hero: give them the hero's breathing room. */
   main[data-product] > .l-wrap:first-child > .c-crumbs { padding-block: 16px 14px; }
   .c-hero--product .c-shots { margin-top: clamp(8px, 2vw, 24px); }
@@ -133,6 +133,7 @@
   /* ===== Screenshots whose shape is far from 16:10 keep it ===== */
   .c-shot-frame.c-pd-shot-free { aspect-ratio: auto;
     & > img { position: static; height: auto; } }
+  .c-shot-frame.c-pd-shot-fit > img { object-fit: contain; }
 
   /* ===== Features page: the index beside the groups ===== */
   .c-pd-layout { display: grid; gap: clamp(24px, 4vw, 64px); grid-template-columns: minmax(0, 1fr); padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
@@ -251,6 +252,7 @@
   .c-pd-steps :is(.c-ladder-head, .c-cue) { grid-template-columns: 84px minmax(0, 1fr); }
   .c-pd-steps .c-ladder-controls > a { margin-left: 0; }
   @container ladder (width < 46rem) { .c-pd-steps .c-cue { grid-template-areas: "q body"; } }
+  @container ladder (width < 30rem) { .c-pd-steps :is(.c-ladder-head, .c-cue) { grid-template-columns: 48px minmax(0, 1fr); } }
 
   /* Windows High Contrast: the accent tabs and the picked answer keep their colour. */
   @media (forced-colors: active) {

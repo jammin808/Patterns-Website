@@ -60,6 +60,11 @@ $specs = array_filter([
     'Version' => $product['version'] ?? null,
     ($licenceLine === 'Coming soon' ? 'Licences' : 'Pricing') => $licenceLine,
 ]);
+// Two to a row; a long value (AGMessage's "Runs on") takes a row of its own, and so does a last cell left alone.
+$wide = array_map(static fn ($v): bool => mb_strlen((string) $v) > 40, $specs);
+if (count(array_filter($wide, static fn (bool $w): bool => !$w)) % 2 === 1) {
+    $wide[array_key_last(array_filter($wide, static fn (bool $w): bool => !$w))] = true;
+}
 
 // Feature groups for the bento: a wide one with a picture, a tall one with its first facts, then five more.
 $groups = $product['feature_groups'] ?? [];
@@ -98,7 +103,7 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
                 </div>
                 <dl class="c-specs c-pd-specs u-mt-6">
                     <?php foreach ($specs as $label => $value): ?>
-                        <div><dt><?= e($label) ?></dt><dd<?= $label === 'Version' ? ' class="u-mono"' : '' ?>><?= e($value) ?></dd></div>
+                        <div<?= $wide[$label] ? ' class="c-pd-spec-wide"' : '' ?>><dt><?= e($label) ?></dt><dd<?= $label === 'Version' ? ' class="u-mono"' : '' ?>><?= e($value) ?></dd></div>
                     <?php endforeach; ?>
                 </dl>
             </div>
@@ -112,7 +117,7 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
         </div>
         <?php if ($strip !== []): ?>
             <div class="c-shots<?= count($strip) === 2 ? ' c-shots--2' : '' ?>" data-scroll-region="<?= e($name) ?> screenshots">
-                <?php foreach ($strip as $s): ?><?= $this->partial('shot', ['shot' => $s, 'sizes' => '(width >= 48rem) 30vw, 84vw']) ?><?php endforeach; ?>
+                <?php foreach ($strip as $s): ?><?= $this->partial('product/shot', ['shot' => $s, 'sizes' => '(width >= 48rem) 30vw, 84vw']) ?><?php endforeach; ?>
             </div>
         <?php endif; ?>
         <?= $this->partial('product/subnav', ['productKey' => $key, 'product' => $product, 'class' => 'u-mt-6']) ?>
