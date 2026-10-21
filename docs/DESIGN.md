@@ -328,7 +328,7 @@ One line, 40px tall, ellipsis when narrow, so put the key fact first.
                 <a class="c-mega-title" href="/stagewatch/"><span class="c-swatch"></span>StageWatch <span class="c-role">Time</span></a>
                 <p class="c-mega-line">Stage timer and show calling</p>
                 <ul class="c-mega-links" role="list"><li><a href="/stagewatch/">Overview</a></li><li><a href="/stagewatch/features/">Features</a></li>
-                  <li><a href="/stagewatch/licensing/">Pricing</a></li><li><a href="/support/stagewatch/">Help</a></li></ul>
+                  <li><a href="/stagewatch/licensing/">Licensing</a></li><li><a href="/support/stagewatch/">Help</a></li></ul>
               </li>
               <!-- one li per product, from content/site.php nav.children -->
             </ul>
@@ -376,6 +376,15 @@ One line, 40px tall, ellipsis when narrow, so put the key fact first.
 <nav class="c-crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><a href="/support/">Support</a></li>
   <li><a href="/support/faq/" aria-current="page">Frequently asked questions</a></li></ol></nav>
 ```
+- **The layout places them; a template never does.** `templates/layouts/base.php` renders the trail from the page's
+  `Seo` breadcrumbs (every page but home) and puts it first inside the page hero's `.l-wrap`, before `.c-hero-grid`,
+  so it takes the hero's width (the legal pages' prose column too), backdrop and product bar. A page whose content
+  does not open with a `.c-hero` gets the trail as a strip of its own, `<div class="l-wrap c-crumbs-bar">`, above it.
+  The BreadcrumbList JSON-LD comes from the same list and does not depend on where the trail is drawn.
+- **One rhythm.** The trail sits `clamp(16px, 2vw, 24px)` under the header (inside a product hero, under its 3px
+  bar), and every hero's first line (eyebrow, product tag or h1) sits `clamp(24px, 3vw, 40px)` under the trail,
+  whatever the hero's own top padding. Links are 24px tall.
+- Flash messages (8.23) sit in their own strip above the hero, never between the trail and the hero's heading.
 
 ### 8.5 Buttons and keys
 
@@ -458,7 +467,7 @@ Product (a 3px product bar on top and a followspot behind the visual):
 ```html
 <section class="c-hero c-hero--product" aria-labelledby="p-title">   <!-- inside <main data-product="…"> -->
   <div class="l-wrap">
-    <nav class="c-crumbs" aria-label="Breadcrumb">…</nav>
+    <nav class="c-crumbs" aria-label="Breadcrumb">…</nav>   <!-- put here by the layout (8.4) -->
     <div class="c-hero-grid">
       <div>
         <p class="c-product-tag"><span class="c-swatch"></span>StageWatch <span class="c-role">Time</span></p>
@@ -478,7 +487,7 @@ Compact page (support, legal, workflows, downloads, contact, about):
 ```html
 <section class="c-hero c-hero--page" aria-labelledby="t">
   <div class="l-wrap">
-    <nav class="c-crumbs" aria-label="Breadcrumb">…</nav>
+    <nav class="c-crumbs" aria-label="Breadcrumb">…</nav>   <!-- put here by the layout (8.4) -->
     <div class="c-hero-grid"><p class="c-eyebrow">Support</p><h1 class="c-hero-title" id="t">Questions before the show</h1><p class="c-hero-lede">…</p></div>
   </div>
 </section>
@@ -732,18 +741,36 @@ The clock is green, amber ("WRAP UP") from `data-warn` seconds, and red counting
 - `site.js` sets `data-overflow` on `.c-compare` to `none`, `start`, `middle` or `end`. When the table fits, the
   first header row sticks under the site header. When it scrolls (on phones), the feature column sticks, the hint
   shows and the right edge fades. Generate rows and groups from `content/licensing/<product>.php` `matrix`.
+- **The sticky header row** is `position: sticky; top: var(--header-h)` only under `[data-overflow="none"]`, where
+  `.c-compare-scroll` is `overflow: visible` and so is no scroll container: the row sticks to the page, under the
+  sticky site header. Anywhere else (scrolling sideways, without scripting, or before `site.js` has measured it) the
+  scroller would be the row's sticky container and the offset would push the row down over the rows beneath, so the
+  row stays in place. Head cells are opaque (`--s1`, the recommended column its tint over `--s1`), so rows never
+  show through. Pages need no override of their own; nothing between the table and the page may set an `overflow`
+  other than `visible` or `clip`.
+- Each `.c-tier-head` reserves a 30px row for the flag, so names and prices line up across the head row. A flag that
+  wraps to a second line grows its own row instead of being drawn over the tier name.
 - Tier cards come first on phones; the table is the full detail.
 
 ### 8.22 FAQ accordion
 
 ```html
-<div class="c-faq">
-  <details class="c-faq-item" name="faq" open>          <!-- the same name makes it exclusive -->
-    <summary class="c-faq-q">Do the apps need the internet during a show?<span class="c-xhair" aria-hidden="true"></span></summary>
+<div class="c-faq" id="faq-stagewatch-licence">          <!-- partials/faq.php with name 'stagewatch-licence-faq' -->
+  <details class="c-faq-item" name="stagewatch-licence-faq" open>   <!-- the same name makes it exclusive -->
+    <summary class="c-faq-q"><span>What happens when the <span class="u-nowrap">14-day</span> trial ends?</span><span class="c-xhair" aria-hidden="true"></span></summary>
     <div class="c-faq-a"><p>…</p></div>
   </details>
 </div>
 ```
+- Render it with `templates/partials/faq.php` (`faqs`, `name`, `schema`, `openFirst`). The block's anchor is
+  `faq-<name>`, without repeating a leading `faq-` or trailing `-faq` (`home-faq` → `#faq-home`, `trouble` →
+  `#faq-trouble`). With `schema` on, the page's FAQPage node takes that one fragment as its `@id`
+  (`https://…/stagewatch/licensing/#faq-stagewatch-licence`), so the node names the block it describes. Give each
+  block on a page its own name (it is also the exclusive-open group), which keeps the anchors unique; emit the
+  FAQPage from one block per page.
+- The question is one `span` (the summary is a two-column grid: the words, then the crosshair). Hyphenated words
+  are wrapped in `u-nowrap`, as in the product headings, so "14-day" or "back-room" never breaks at the hyphen on a
+  phone; the longest such word in the content fits a 320px screen.
 
 ### 8.23 Callouts, flash messages, toasts
 
@@ -757,6 +784,10 @@ The clock is green, amber ("WRAP UP") from `data-warn` seconds, and red counting
 </div>
 ```
 Toasts never time out on their own (WCAG 2.2.1); they have a close button.
+
+The layout renders a page's flash messages in a strip under the header, before the hero and its breadcrumbs:
+`<div class="l-wrap c-flashes">` holding `templates/partials/flashes.php`. The messages carry the strip's space
+(16px above and below each), so a strip whose messages a page hides takes no room.
 
 ### 8.24 Forms
 
@@ -777,7 +808,7 @@ Toasts never time out on their own (WCAG 2.2.1); they have a close button.
     <div class="c-radio-cards"><label class="c-radio-card"><input type="radio" name="topic" value="sales"><span>Buying a licence</span></label>…</div></fieldset>
   <div class="c-field"><label for="msg">Message</label><p class="c-help" id="msg-help">What you are running, on which machines, and what you expected to happen.</p>
     <textarea id="msg" name="message" maxlength="2000" aria-describedby="msg-help msg-count" data-count="#msg-count"></textarea>
-    <p class="c-count" id="msg-count" aria-live="polite">0 / 2000</p></div>
+    <p class="c-count" id="msg-count">0 / 2000</p></div>
   <div class="c-field"><label for="file">Attach the show's log <span class="c-label-opt">Optional</span></label><input id="file" name="file" type="file"></div>
   <label class="c-check"><input type="checkbox" name="copy">Send me a copy of this message</label>
   <div class="c-form-foot"><button class="c-btn c-btn--primary" type="submit">Send message</button><p>We use your details only to reply.</p></div>
@@ -786,6 +817,10 @@ Toasts never time out on their own (WCAG 2.2.1); they have a close button.
 - Labels above, the hint above the control, `Optional` on the right. An error is an icon plus a sentence that
   says how to fix it, with `aria-invalid` and `aria-describedby`. After a failed POST the server renders the
   error summary and `site.js` focuses it.
+- **The character counter is not a live region.** A count announced after every keystroke talks over the typing
+  echo. `.c-count` is plain text that `site.js` keeps up to date (`data-count`), the server renders its starting value,
+  and the field lists it in `aria-describedby` after the hint, so a screen reader reads the count when the field
+  takes focus. Never add `aria-live` or a `role` to it.
 - Controls inside `.c-form`, `.pt-form`, `.c-field` and `.pt-field` are styled without classes. Elsewhere use
   `.c-input`, `.c-select` and `.c-textarea`. Textareas grow with their content (`field-sizing`).
 - Portal contract: `form.pt-form > div.pt-field > label + control + p.pt-help + p.pt-error`, `pt-field--inline`
@@ -893,8 +928,9 @@ How the portal's markup is laid out (everything below is CSS; the templates keep
 
 ```html
 <div class="c-chat" data-chat>
-  <button class="c-chat-fab is-tucked" type="button" data-chat-open data-chat-fab aria-expanded="false" aria-controls="chat-panel">
-    <i class="c-lamp" aria-hidden="true"></i><span>Ask<span class="c-chat-fab-long"> the assistant</span></span></button>
+  <a class="c-chat-fab is-tucked" href="/contact/" data-chat-open data-chat-fab>   <!-- chat.js makes it the panel's button -->
+    <i class="c-lamp" aria-hidden="true"></i><span>Ask<span class="c-chat-fab-long"> the assistant</span></span></a>
+  <noscript><a class="c-chat-fab" href="/contact/"><span>Get in touch</span></a></noscript>   <!-- not on /contact/ itself -->
   <section class="c-chat-panel" id="chat-panel" data-chat-panel hidden aria-labelledby="chat-title">
     <header class="c-chat-head"><h2 id="chat-title">Show assistant</h2><span class="c-chat-status"><i class="c-lamp c-lamp--go"></i>Online</span>
       <span class="c-chat-tools">
@@ -922,9 +958,18 @@ How the portal's markup is laid out (everything below is CSS; the templates keep
   panel without `hidden`. A page should have one `[data-chat]` root, because `chat.js` binds every
   `[data-chat-open]` on the page to each root.
 - The floating panel sits bottom right. Below 40rem it is a bottom sheet and the launcher hides while it is open.
-  `site.js` tucks the launcher away while any `[data-chat-tuck]` or `[data-chat-inline]` element is on screen.
+  `site.js` tucks the launcher away while any `[data-chat-tuck]`, `[data-chat-inline]` or other `[data-chat-open]`
+  element is on screen, never while its panel is open or it has focus.
+- **The launcher is a link drawn as a button.** It has no underline in any state and the two-tone ring on focus
+  (8.5). The server renders it `is-tucked` (slid down, transparent, hidden), and `site.js` untucks it once it has
+  measured the page, so a page that opens with a zone in view never flashes it. Without scripting the tucked
+  launcher is not shown at all (`@media (scripting: none)` takes it out of the layout) and the `<noscript>` link
+  stands in: on every page but the contact page itself there is exactly one launcher, a visible link to the contact
+  page. The tuck is not scoped to a scripting query, so a browser that cannot evaluate one still gets one launcher.
 - The support band's launcher card is `.c-launcher` (`.c-launcher-icon`, `b`, `small`) with `data-chat-open`.
-  Product help links are `.c-support-links`.
+  Product help links are `.c-support-links`: the list clips its edges and each cell paints over its neighbours, so a
+  link's focus ring is drawn inside it (`outline-offset: -3px`) and the first link's ring is never cut off. Pages
+  need no override of their own.
 
 ### 8.29 Footer
 

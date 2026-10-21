@@ -26,9 +26,6 @@ $name = static fn (string $key): string => (string) (product($key)['name'] ?? uc
 $overview = ['patterns' => 'Patterns test pattern generator', 'stagewatch' => 'StageWatch stage timer', 'agmessage' => 'AGMessage back-room messaging', 'playmap' => 'PlayMap projection mapping'];
 $chip = static fn (string $key): string => '<span class="c-app" data-product="' . e($key) . '"><i class="c-swatch" aria-hidden="true"></i>' . e((string) (product($key)['name'] ?? $key)) . '</span>';
 
-// Show Bus points: the content names an icon idea; these are the sprite's nearest symbols.
-$busIcons = ['radar' => 'bus', 'pulse' => 'system', 'link' => 'attach', 'check' => 'check', 'clock' => 'clock', 'approve' => 'approve', 'lock' => 'lock', 'key' => 'key'];
-
 // Connections, grouped by the apps they join.
 $groups = [
     'patterns-stagewatch' => ['title' => 'Patterns and StageWatch', 'apps' => ['patterns', 'stagewatch'], 'items' => []],
@@ -136,7 +133,7 @@ foreach ($ai['principles'] as $pr) {
         </div>
         <div class="c-features">
             <?php foreach ($eco['show_bus']['points'] as $pt): ?>
-                <article class="c-feature"><?= icon($busIcons[$pt['icon']] ?? 'bus') ?><h3><?= e($pt['title']) ?></h3><p><?= e($pt['text']) ?></p></article>
+                <article class="c-feature"><?= icon((string) ($pt['icon'] ?? 'bus')) ?><h3><?= e($pt['title']) ?></h3><p><?= e($pt['text']) ?></p></article>
             <?php endforeach; ?>
         </div>
         <div class="l-split l-split--even u-mt-8 hub-offline">

@@ -3,8 +3,7 @@
  * tokens from site.css; no raw colours. Pushed only by those pages' templates.
  */
 @layer components {
-  /* ===== Legal: one centred reading column, the breadcrumbs aligned with it ===== */
-  main:has(> .support-legal-hero) > .l-wrap:has(> .c-crumbs) { --max: 760px; }
+  /* ===== Legal: one centred reading column (the hero's prose-width wrap holds the breadcrumbs too) ===== */
   .support-legal-hero .c-hero-grid { padding-bottom: clamp(24px, 3vw, 36px); }
   .support-legal-hero .c-hero-title { max-width: none; font-size: var(--fs-6); }
   .support-legal-date { margin-top: var(--sp-4); font-size: var(--fs-1); color: var(--text-3); }
@@ -22,9 +21,6 @@
     :root .support-js-only { display: none; }
     .support-contact-block.support-js-only + .support-contact-block { padding-top: 0; border-top: 0; }
   }
-
-  /* ===== Breadcrumbs from the layout: breathing room under the header ===== */
-  main > .l-wrap:has(> .c-crumbs:first-child) { padding-top: 22px; }
 
   /* ===== The apps a workflow uses, as one bar in their colours (cards, the hero's eyebrow) ===== */
   .support-runbar { display: flex; height: 4px; gap: 2px;
@@ -135,9 +131,6 @@
 
   /* ===== Support hub: the help pages, the portal's actions, the account note ===== */
   .support-links a { min-height: 64px; }
-  /* The list clips its edges and each row paints over its neighbours, so a ring drawn outside a link is hidden: draw
-     it inside instead (the help links here, the FAQ's closing links and the downloads index). */
-  :is(.support-links, .support-dl-index .c-support-links) a:focus-visible { outline-offset: -3px; }
   .support-actions { list-style: none; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     & > li { display: grid; } }
   .support-action { height: 100%; & > .c-icon { color: var(--text-2); margin-bottom: 4px; } }

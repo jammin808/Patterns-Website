@@ -8,6 +8,12 @@
  *
  * The model's text is never inserted as HTML: a small Markdown subset is rendered by building DOM nodes, and links
  * are kept only when they stay on this site.
+ *
+ * Openers ([data-chat-open]) may be links to the contact page, so they still lead somewhere without scripting; here
+ * every opener becomes a button for the panel (role, aria-controls, aria-expanded, Enter and Space). Focus moves
+ * only when a person acts: opening puts them in the input, closing the floating panel hands focus back to its
+ * opener, and nothing is focused on load. An inline panel ([data-chat-inline], the support page) is always shown
+ * and never closes.
  */
 
 const CLASS = {
@@ -112,9 +118,10 @@ function init(root) {
   const input = root.querySelector('[data-chat-input]');
   const status = root.querySelector('[data-chat-status]');
   const counter = root.querySelector('[data-chat-count]');
-  const openers = document.querySelectorAll('[data-chat-open]');
+  const openers = Array.from(document.querySelectorAll('[data-chat-open]'));
   if (!panel || !log || !form || !input) return;
 
+  const inlinePanel = root.hasAttribute('data-chat-inline');
   const maxChars = Number(input.getAttribute('maxlength')) || 1200;
   let busy = false;
   let lastOpener = null;
@@ -187,19 +194,35 @@ function init(root) {
     for (const m of transcript) bubble(m.role, m.text);
   }
 
+  const setExpanded = (on) => openers.forEach((o) => o.setAttribute('aria-expanded', String(on)));
+
   function open(from) {
     lastOpener = from || null;
     panel.hidden = false;
     root.classList.add('is-open');
-    openers.forEach((o) => o.setAttribute('aria-expanded', 'true'));
+    setExpanded(true);
     requestAnimationFrame(() => input.focus());
   }
 
+  /* Only the floating panel closes; focus goes back to the opener that was used (or the first one). */
   function close() {
+    if (inlinePanel || panel.hidden) return;
     panel.hidden = true;
     root.classList.remove('is-open');
-    openers.forEach((o) => o.setAttribute('aria-expanded', 'false'));
-    (lastOpener || openers[0])?.focus();
+    setExpanded(false);
+    const back = lastOpener && lastOpener.isConnected ? lastOpener : openers[0];
+    back?.focus();
+  }
+
+  /*
+   * An opener on a page with the inline panel takes the person to its input; elsewhere it opens or closes, and
+   * closing from an opener leaves focus on the opener that was pressed.
+   */
+  function toggle(from) {
+    if (inlinePanel) { input.focus(); return; }
+    if (panel.hidden) { open(from); return; }
+    lastOpener = from || lastOpener;
+    close();
   }
 
   async function send(text) {
@@ -303,11 +326,42 @@ function init(root) {
     counter.textContent = left < 200 ? `${left} characters left` : '';
   }
 
+  const isSpace = (e) => e.key === ' ' || e.key === 'Spacebar';
   openers.forEach((o) => {
+    const isButton = o.tagName === 'BUTTON';
+    if (!isButton) o.setAttribute('role', 'button');
+    if (!o.hasAttribute('aria-controls') && panel.id) o.setAttribute('aria-controls', panel.id);
+    if (inlinePanel) o.removeAttribute('aria-expanded'); else o.setAttribute('aria-expanded', String(!panel.hidden));
+
     o.addEventListener('click', (e) => {
       e.preventDefault();
-      if (panel.hidden) open(o); else close();
+      toggle(o);
     });
+    o.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !inlinePanel && !panel.hidden) { e.preventDefault(); close(); }
+    });
+    if (isButton) return;
+
+    // A link standing in for a button answers a button's keys: Enter at once, Space on release, and neither
+    // follows the link nor scrolls the page.
+    let spaceDown = false;
+    o.addEventListener('keydown', (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (isSpace(e)) {
+        e.preventDefault();
+        spaceDown = true;
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!e.repeat) toggle(o);
+      }
+    });
+    o.addEventListener('keyup', (e) => {
+      if (!isSpace(e) || !spaceDown) return;
+      spaceDown = false;
+      e.preventDefault();
+      toggle(o);
+    });
+    o.addEventListener('blur', () => { spaceDown = false; });
   });
   root.querySelectorAll('[data-chat-close]').forEach((b) => b.addEventListener('click', close));
   root.querySelectorAll('[data-chat-reset]').forEach((b) => b.addEventListener('click', async () => {
@@ -326,10 +380,14 @@ function init(root) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
   });
   input.addEventListener('input', updateCount);
-  panel.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  // Escape closes the floating panel; on the inline panel it does nothing, so the assistant never disappears.
+  panel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || inlinePanel || e.isComposing) return;
+    e.preventDefault();
+    close();
+  });
 
   restore();
-  if (root.hasAttribute('data-chat-inline')) open();
 }
 
 document.querySelectorAll('[data-chat]').forEach(init);

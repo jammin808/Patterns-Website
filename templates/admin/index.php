@@ -76,7 +76,7 @@ $typeTabs = ['bug' => 'Open bug reports', 'feature' => 'Open feature requests', 
 <section class="pt-section" aria-labelledby="ov-assistant">
     <h2 class="pt-h2" id="ov-assistant">Support assistant</h2>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption>Assistant use today and over the last 7 days, including today (UTC days)</caption>
             <thead>
                 <tr>
@@ -92,10 +92,10 @@ $typeTabs = ['bug' => 'Open bug reports', 'feature' => 'Open feature requests', 
                     $u = $assistant[$key]; ?>
                     <tr>
                         <th scope="row"><?= e($label) ?></th>
-                        <td class="pt-num"><?= $n((int) $u['conversations']) ?></td>
-                        <td class="pt-num"><?= $n((int) $u['requests']) ?></td>
-                        <td class="pt-num"><?= $n((int) $u['tokens_in']) ?></td>
-                        <td class="pt-num"><?= $n((int) $u['tokens_out']) ?></td>
+                        <td class="pt-num" data-label="Conversations"><?= $n((int) $u['conversations']) ?></td>
+                        <td class="pt-num" data-label="Requests"><?= $n((int) $u['requests']) ?></td>
+                        <td class="pt-num" data-label="Tokens in"><?= $n((int) $u['tokens_in']) ?></td>
+                        <td class="pt-num" data-label="Tokens out"><?= $n((int) $u['tokens_out']) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

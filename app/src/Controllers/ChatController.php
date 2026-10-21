@@ -9,6 +9,7 @@ use Psc\Chat\ChatService;
 use Psc\Chat\ChatStore;
 use Psc\Chat\Knowledge;
 use Psc\Chat\ModelGateway;
+use Psc\Config;
 use Psc\Http\Request;
 use Psc\Http\Response;
 
@@ -25,6 +26,19 @@ final class ChatController extends Controller
     public static function useGateway(?ModelGateway $gateway): void
     {
         self::$gatewayOverride = $gateway;
+    }
+
+    /**
+     * Whether the assistant can answer at all, from configuration alone: switched on, a key set and the SDK
+     * installed (or a test's stand-in). It is the same for every visitor, so cached public pages may show it; rate
+     * limits and the daily budget are decided per request and are never rendered into a page.
+     */
+    public static function online(Config $config): bool
+    {
+        if (self::$gatewayOverride !== null) {
+            return true;
+        }
+        return $config->bool('chat.enabled', true) && $config->string('chat.api_key') !== '' && AnthropicGateway::available();
     }
 
     public function message(Request $request): Response
@@ -149,12 +163,11 @@ final class ChatController extends Controller
             return self::$gatewayOverride;
         }
         $cfg = $this->app->config;
-        $key = $cfg->string('chat.api_key');
-        if (!$cfg->bool('chat.enabled', true) || $key === '' || !AnthropicGateway::available()) {
+        if (!self::online($cfg)) {
             return null;
         }
         return new AnthropicGateway(
-            $key,
+            $cfg->string('chat.api_key'),
             $cfg->string('chat.model', 'claude-sonnet-5-5'),
             $cfg->string('chat.gate_model', 'claude-haiku-5-5'),
             $cfg->int('chat.max_tokens', 1200),

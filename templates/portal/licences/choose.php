@@ -36,7 +36,7 @@
             <?php foreach ($choice['options'] as $tierId => $o): ?>
                 <a class="pt-card pt-card--link" href="/portal/licences/request/?product=<?= e(rawurlencode($key)) ?>&amp;tier=<?= e(rawurlencode((string) $tierId)) ?>#form">
                     <span class="pt-card-title"><?= e($choice['name']) ?> <?= e($o['name']) ?></span>
-                    <span class="pt-card-meta"><?= e($o['price_label']) ?><?php if ($o['price_note'] !== ''): ?> · <?= e($o['price_note']) ?><?php endif; ?></span>
+                    <span class="pt-card-meta"><?= $this->render('portal/licences/_price', ['option' => $o]) ?></span>
                     <span class="pt-card-body"><?= e($o['summary']) ?></span>
                     <span class="pt-card-footer pt-small"><?= (int) $o['machines'] === 1 ? 'For 1 PC' : 'For ' . (int) $o['machines'] . ' PCs' ?></span>
                 </a>

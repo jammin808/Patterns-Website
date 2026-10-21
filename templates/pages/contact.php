@@ -8,6 +8,7 @@
  * @var array<string, mixed> $old
  * @var array<string, string> $errors
  * @var bool $sent
+ * @var bool $quick the last send came faster than a person types: the input is back and nothing was sent
  * @var string $turnstileKey
  * @var array<string, mixed> $page
  * @var list<array{type: string, message: string}> $flashes
@@ -16,6 +17,7 @@ $topics ??= [];
 $old ??= [];
 $errors ??= [];
 $sent ??= false;
+$quick ??= false;
 $turnstileKey ??= '';
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/support.css')) . '">');
 if ($turnstileKey !== '' && !$sent) {
@@ -95,9 +97,9 @@ $maxMessage = 5000;
                     <?php elseif ($formAlert !== null): ?>
                         <div class="c-callout c-callout--danger c-error-summary" id="form" data-error-summary tabindex="-1" role="alert" aria-labelledby="error-title">
                             <?= icon('alert') ?>
-                            <strong class="c-callout-title" id="error-title">Your message was not sent</strong>
+                            <strong class="c-callout-title" id="error-title"><?= $quick ? 'Your message is not sent yet' : 'Your message was not sent' ?></strong>
                             <p><?= e($formAlert) ?></p>
-                            <?php if ($email !== ''): ?><p>Email <a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></p><?php endif; ?>
+                            <?php if ($email !== '' && !$quick): ?><p>Email <a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></p><?php endif; ?>
                         </div>
                     <?php endif; ?>
 

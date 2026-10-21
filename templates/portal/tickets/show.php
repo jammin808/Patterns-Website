@@ -56,6 +56,11 @@ if ($isAdmin) {
 $fileError = $err('attachments');
 $accept = implode(',', array_map(static fn (string $x): string => '.' . $x, $allowed));
 $m = static fn (string $k, string $default): string => (string) ($oldManage[$k] ?? $default);
+// The status and what it means as one phrase ("In progress — being worked on now"): the description carries on
+// after the dash, so it starts in lower case, and a first sentence that only repeats the status ("Closed.") goes.
+$statusLabel = (string) ($statuses[$status] ?? $status);
+$statusMeaning = trim((string) preg_replace('/^' . preg_quote($statusLabel, '/') . '\.\s*/iu', '', trim((string) ($statusHelp[$status] ?? ''))));
+$statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb_strtolower(mb_substr($statusMeaning, 0, 1)) . mb_substr($statusMeaning, 1);
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow"><?= e($types[$type] ?? 'Ticket') ?> <span class="pt-mono">#<?= $id ?></span></p>
@@ -82,12 +87,12 @@ $m = static fn (string $k, string $default): string => (string) ($oldManage[$k] 
     <h2 class="pt-h2" id="details-heading">Details</h2>
     <dl class="pt-kv">
         <dt>Status</dt>
-        <dd><?= e($statuses[$status] ?? $status) ?> — <?= e($statusHelp[$status] ?? '') ?></dd>
+        <dd><?= e($statusText) ?></dd>
         <dt>Product</dt>
         <dd><?= e($products[(string) $ticket['product']] ?? $ticket['product']) ?></dd>
         <?php if ($type === 'bug' && $severity !== ''): ?>
             <dt>Severity</dt>
-            <dd><?= e($severities[$severity] ?? $severity) ?></dd>
+            <dd><span class="pt-badge pt-badge--<?= e($severity) ?>"><?= e($severities[$severity] ?? $severity) ?></span></dd>
         <?php endif; ?>
         <?php if (!empty($ticket['app_version'])): ?>
             <dt>Version</dt>

@@ -13,6 +13,10 @@ use Psc\View\Schema;
  * The contact page and its form. A message is stored (so nothing is lost if mail fails) and emailed to the
  * administrator with the sender as Reply-To. Spam defences: a honeypot field, a minimum fill time, per-address
  * rate limits and optional Cloudflare Turnstile.
+ *
+ * Only a filled honeypot, which no person sees, is answered with a "Message sent" that stores nothing. A send
+ * faster than the minimum fill time may be a person whose browser filled the form, so it goes back to the form with
+ * the input kept and a request to press Send again; nothing is sent and nothing is lost.
  */
 final class ContactController extends Controller
 {
@@ -25,6 +29,17 @@ final class ContactController extends Controller
         'other' => 'Something else',
     ];
 
+    /**
+     * The fewest whole seconds between the form being shown and a send being accepted. The clock is kept in the
+     * session, so a visitor cannot set it.
+     */
+    public const MIN_FILL_SECONDS = 3;
+
+    /** The form's message after a send that came faster than MIN_FILL_SECONDS. */
+    public const QUICK_MESSAGE = 'That was quick. Please check your message, then send it again.';
+
+    public const EMAIL_ERROR = 'Enter an email address in the format name@example.co.uk';
+
     public function show(Request $request): Response
     {
         $page = Content::page('/contact/') ?? ['title' => 'Contact | Patterns Show Control', 'description' => 'Contact Patterns Show Control.', 'template' => 'pages/contact', 'crumb' => 'Contact', 'section' => 'contact', 'type' => 'contact'];
@@ -34,7 +49,13 @@ final class ContactController extends Controller
         $this->baseGraph($seo);
         $seo->add(Schema::webPage($this->app->baseUrl(), $seo->canonical(), (string) $page['title'], (string) $page['description'], 'ContactPage'));
         $session = $this->app->session();
-        $session->set('contact_started', time());
+        // The fill-time clock starts when the form is shown. A send turned back for being quick does not restart it,
+        // so pressing Send again on the form it comes back to is measured from the first showing.
+        $quick = (bool) $session->get('contact_quick', false);
+        $session->forget('contact_quick');
+        if (!$quick || (int) $session->get('contact_started', 0) === 0) {
+            $session->set('contact_started', time());
+        }
         $prefill = [
             'topic' => array_key_exists($request->queryString('topic'), self::TOPICS) ? $request->queryString('topic') : '',
             'product' => in_array($request->queryString('product'), Content::PRODUCTS, true) ? $request->queryString('product') : '',
@@ -46,6 +67,7 @@ final class ContactController extends Controller
             'old' => $session->takeOld() + $prefill,
             'errors' => $this->takeErrors(),
             'sent' => (bool) $session->get('contact_sent', false),
+            'quick' => $quick,
             'turnstileKey' => $this->app->config->string('security.turnstile_site_key'),
         ], $seo);
         $session->forget('contact_sent');
@@ -62,11 +84,16 @@ final class ContactController extends Controller
     {
         $session = $this->app->session();
         $ip = $this->app->clientIp();
-        // Bots fill the hidden field or post faster than a person can type.
-        $started = (int) $session->get('contact_started', 0);
-        if ($request->input('website') !== '' || ($started > 0 && time() - $started < 3)) {
+        // Only a bot fills the hidden field: it is told the message was sent, and nothing is stored or emailed.
+        if ($request->input('website') !== '') {
             $session->set('contact_sent', true);
             return Response::redirect('/contact/#sent', 303);
+        }
+        // Faster than a person types, but a browser's autofill is as fast: back to the form, input kept, nothing sent.
+        $started = (int) $session->get('contact_started', 0);
+        if ($started > 0 && time() - $started < self::MIN_FILL_SECONDS) {
+            $session->set('contact_quick', true);
+            return $this->backWithErrors('/contact/#form', $request, [], self::QUICK_MESSAGE);
         }
         if (!$this->app->limiter()->hit('contact:' . $ip, 5, 3600)) {
             return $this->backWithErrors('/contact/#form', $request, [], 'You have sent several messages already. Please wait an hour, or email us directly.');
@@ -83,8 +110,10 @@ final class ContactController extends Controller
         if ($data['name'] === '' || mb_strlen($data['name']) > 120) {
             $errors['name'] = 'Enter your name.';
         }
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($data['email']) > 190) {
-            $errors['email'] = 'Enter a valid email address so we can reply.';
+        if (mb_strlen($data['email']) > 190) {
+            $errors['email'] = 'Enter an email address of up to 190 characters.';
+        } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            $errors['email'] = self::EMAIL_ERROR;
         }
         if (mb_strlen($data['company']) > 160) {
             $errors['company'] = 'Keep this under 160 characters.';

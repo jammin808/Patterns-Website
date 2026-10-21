@@ -45,7 +45,7 @@ $field = fn (array $p): string => $this->render('portal/tickets/_field', $p);
 <?php else: ?>
     <p class="pt-small pt-muted"><?= (int) $pager->total ?> <?= $pager->total === 1 ? 'request' : 'requests' ?><?= $filtered ? ' match' . ($pager->total === 1 ? 'es' : '') . ' your filters' : '' ?>.</p>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Feature requests, sorted by <?= e(mb_strtolower($sorts[$filters['sort']] ?? 'most votes')) ?></caption>
             <thead>
                 <tr>
@@ -61,12 +61,12 @@ $field = fn (array $p): string => $this->render('portal/tickets/_field', $p);
                 <?php foreach ($pager->items as $t):
                     $tStatus = (string) $t['status']; ?>
                     <tr id="ticket-<?= (int) $t['id'] ?>">
-                        <td><?= $this->render('portal/tickets/_vote', ['id' => (int) $t['id'], 'title' => (string) $t['title'], 'votes' => (int) $t['votes'], 'voted' => (int) $t['voted'] > 0, 'return' => $returnTo]) ?></td>
+                        <td data-label="Votes"><?= $this->render('portal/tickets/_vote', ['id' => (int) $t['id'], 'title' => (string) $t['title'], 'votes' => (int) $t['votes'], 'voted' => (int) $t['voted'] > 0, 'return' => $returnTo]) ?></td>
                         <th scope="row"><a href="/portal/tickets/<?= (int) $t['id'] ?>/"><?= e($t['title']) ?></a></th>
-                        <td><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
-                        <td><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
-                        <td class="pt-num"><?= (int) $t['comment_count'] ?></td>
-                        <td><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
+                        <td data-label="Product"><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
+                        <td class="pt-num" data-label="Replies"><?= (int) $t['comment_count'] ?></td>
+                        <td data-label="Last activity"><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

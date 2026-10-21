@@ -123,7 +123,7 @@ if (!$isSelf && !$deleted) {
         <div class="pt-empty"><p>No tickets from this account.</p></div>
     <?php else: ?>
         <div class="pt-table-wrap">
-            <table class="pt-table">
+            <table class="pt-table pt-table--stack">
                 <caption class="u-visually-hidden">Tickets from <?= e($account['name']) ?>, the most recently active first</caption>
                 <thead>
                     <tr>
@@ -140,10 +140,10 @@ if (!$isSelf && !$deleted) {
                         $tStatus = (string) $t['status']; ?>
                         <tr>
                             <th scope="row"><a href="/portal/tickets/<?= (int) $t['id'] ?>/"><span class="pt-muted pt-mono">#<?= (int) $t['id'] ?></span> <?= e($t['title']) ?></a></th>
-                            <td><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($ticketTypes[$tType] ?? $tType) ?></span></td>
-                            <td><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
-                            <td><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($ticketStatuses[$tStatus] ?? $tStatus) ?></span></td>
-                            <td><?= $time($t['last_activity_at']) ?></td>
+                            <td data-label="Type"><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($ticketTypes[$tType] ?? $tType) ?></span></td>
+                            <td data-label="Product"><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
+                            <td data-label="Status"><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($ticketStatuses[$tStatus] ?? $tStatus) ?></span></td>
+                            <td data-label="Last activity"><?= $time($t['last_activity_at']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -161,7 +161,7 @@ if (!$isSelf && !$deleted) {
         <div class="pt-empty"><p>No licences or licence requests for this account.</p></div>
     <?php else: ?>
         <div class="pt-table-wrap">
-            <table class="pt-table">
+            <table class="pt-table pt-table--stack">
                 <caption class="u-visually-hidden">Licences for <?= e($account['name']) ?>, the newest first</caption>
                 <thead>
                     <tr>
@@ -177,9 +177,9 @@ if (!$isSelf && !$deleted) {
                         $lProduct = (string) $l['product']; ?>
                         <tr>
                             <th scope="row" class="pt-mono"><a href="/portal/admin/licences/<?= (int) $l['id'] ?>/"><?= e($l['reference']) ?></a></th>
-                            <td><?= e(($products[$lProduct] ?? $lProduct) . ' ' . ($licenceNames[(int) $l['id']] ?? $l['tier'])) ?></td>
-                            <td><span class="pt-badge pt-badge--<?= e($lStatus) ?>"><?= e($licenceStatuses[$lStatus] ?? $lStatus) ?></span></td>
-                            <td><?= $time($l['created_at'], true) ?></td>
+                            <td data-label="Licence"><?= e(($products[$lProduct] ?? $lProduct) . ' ' . ($licenceNames[(int) $l['id']] ?? $l['tier'])) ?></td>
+                            <td data-label="Status"><span class="pt-badge pt-badge--<?= e($lStatus) ?>"><?= e($licenceStatuses[$lStatus] ?? $lStatus) ?></span></td>
+                            <td data-label="Requested"><?= $time($l['created_at'], true) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -197,7 +197,7 @@ if (!$isSelf && !$deleted) {
         <div class="pt-empty"><p>Nothing recorded for this account yet.</p></div>
     <?php else: ?>
         <div class="pt-table-wrap">
-            <table class="pt-table">
+            <table class="pt-table pt-table--stack">
                 <caption class="u-visually-hidden">The latest audit log rows by or about this account, newest first</caption>
                 <thead>
                     <tr>
@@ -211,9 +211,9 @@ if (!$isSelf && !$deleted) {
                     <?php foreach ($audit as $a):
                         $meta = \Psc\Controllers\Admin\AdminController::prettyMeta($a['meta'] !== null ? (string) $a['meta'] : null); ?>
                         <tr>
-                            <td><?= $time($a['created_at']) ?></td>
+                            <td data-label="When"><?= $time($a['created_at']) ?></td>
                             <th scope="row" class="pt-mono"><?= e($a['action']) ?></th>
-                            <td>
+                            <td data-label="By">
                                 <?php if ($a['user_id'] === null): ?>
                                     <span class="pt-muted">No account</span>
                                 <?php elseif ((int) $a['user_id'] === $id): ?>
@@ -224,7 +224,7 @@ if (!$isSelf && !$deleted) {
                                     <span class="pt-muted">Former account</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
+                            <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

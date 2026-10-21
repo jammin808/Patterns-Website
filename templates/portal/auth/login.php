@@ -70,9 +70,9 @@ $email = $old['email'] ?? '';
         </div>
     </form>
 
+    <?php /* Open sign-up is offered once, by the portal's Sign in / Create an account switch above the card. When
+           accounts are by invitation, the card says how to get one instead and offers no sign-up. */ ?>
     <?php if ($registration === 'invite'): ?>
         <p class="pt-small pt-muted">New here? Accounts are by invitation. <a href="/contact/">Contact us</a> if you need one.</p>
-    <?php else: ?>
-        <p class="pt-small">New here? <a href="/portal/register/">Create an account</a>.</p>
     <?php endif; ?>
 </div>

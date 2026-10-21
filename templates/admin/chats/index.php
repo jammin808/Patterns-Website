@@ -37,7 +37,7 @@ $dash = '<span class="pt-muted">0</span>';
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden"><?= $refused ? 'Conversations with at least one refused answer' : 'Assistant conversations' ?>, the most recently active first (<?= (int) $pager->total ?> in all)</caption>
             <thead>
                 <tr>
@@ -59,7 +59,7 @@ $dash = '<span class="pt-muted">0</span>';
                     $row = $counts[$cid] ?? []; ?>
                     <tr>
                         <th scope="row"><a href="<?= e($links[$cid] ?? '/portal/admin/chats/?conversation=' . rawurlencode($cid)) ?>">Started <?= $time($c['created_at']) ?><span class="u-visually-hidden">: transcript of the conversation on <?= e(($c['page'] ?? '') !== '' ? $c['page'] : 'an unknown page') ?></span></a></th>
-                        <td>
+                        <td data-label="Who">
                             <?php if ($c['user_id'] !== null && $c['user_email'] !== null): ?>
                                 <a href="/portal/admin/users/<?= (int) $c['user_id'] ?>/"><?= e($c['user_name']) ?></a>
                             <?php elseif ($c['user_id'] !== null): ?>
@@ -68,14 +68,14 @@ $dash = '<span class="pt-muted">0</span>';
                                 <span class="pt-muted">Visitor</span>
                             <?php endif; ?>
                         </td>
-                        <td class="pt-mono pt-small"><?= e($c['page'] ?? '') ?></td>
-                        <td class="pt-num"><?= (int) $c['turns'] ?></td>
-                        <td class="pt-num"><?= e(number_format((int) $c['tokens_in'] + (int) $c['tokens_out'])) ?></td>
+                        <td class="pt-mono pt-small" data-label="Page"><?= e($c['page'] ?? '') ?></td>
+                        <td class="pt-num" data-label="Turns"><?= (int) $c['turns'] ?></td>
+                        <td class="pt-num" data-label="Tokens"><?= e(number_format((int) $c['tokens_in'] + (int) $c['tokens_out'])) ?></td>
                         <?php foreach ($counted as $v): ?>
-                            <td class="pt-num"><?= ($row[$v] ?? 0) > 0 ? (int) $row[$v] : $dash ?></td>
+                            <td class="pt-num" data-label="<?= e($verdicts[$v] ?? $v) ?>"><?= ($row[$v] ?? 0) > 0 ? (int) $row[$v] : $dash ?></td>
                         <?php endforeach; ?>
-                        <td class="pt-num"><?= ($row['feedback'] ?? 0) > 0 ? (int) $row['feedback'] : $dash ?></td>
-                        <td><?= $time($c['last_at']) ?></td>
+                        <td class="pt-num" data-label="Feedback"><?= ($row['feedback'] ?? 0) > 0 ? (int) $row['feedback'] : $dash ?></td>
+                        <td data-label="Last message"><?= $time($c['last_at']) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

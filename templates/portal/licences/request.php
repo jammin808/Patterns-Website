@@ -32,7 +32,7 @@ $machines = (int) $option['machines'];
         <dt>Licence</dt>
         <dd><?= e($option['name']) ?></dd>
         <dt>Price</dt>
-        <dd><?= e($option['price_label']) ?><?php if ($option['price_note'] !== ''): ?> <span class="pt-muted">(<?= e($option['price_note']) ?>)</span><?php endif; ?></dd>
+        <dd><?= $this->render('portal/licences/_price', ['option' => $option]) ?></dd>
         <dt>Covers</dt>
         <dd><?= $machines === 1 ? '1 PC' : $machines . ' PCs' ?></dd>
     </dl>

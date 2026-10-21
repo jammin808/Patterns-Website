@@ -58,7 +58,7 @@ $filtered = $type !== '' || $status !== '';
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Your tickets, the most recently active first<?= $pager->pages() > 1 ? ' (page ' . $pager->page . ' of ' . $pager->pages() . ')' : '' ?></caption>
             <thead>
                 <tr>
@@ -76,11 +76,11 @@ $filtered = $type !== '' || $status !== '';
                     $tStatus = (string) $t['status']; ?>
                     <tr>
                         <th scope="row"><a href="/portal/tickets/<?= (int) $t['id'] ?>/"><span class="pt-muted pt-mono">#<?= (int) $t['id'] ?></span> <?= e($t['title']) ?></a></th>
-                        <td><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($types[$tType] ?? $tType) ?></span></td>
-                        <td><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
-                        <td><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
-                        <td class="pt-num"><?= (int) $t['comment_count'] ?></td>
-                        <td><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
+                        <td data-label="Type"><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($types[$tType] ?? $tType) ?></span></td>
+                        <td data-label="Product"><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
+                        <td class="pt-num" data-label="Replies"><?= (int) $t['comment_count'] ?></td>
+                        <td data-label="Last activity"><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

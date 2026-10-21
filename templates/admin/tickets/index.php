@@ -53,7 +53,7 @@ $active = ['open', 'triaged', 'planned', 'in_progress'];
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Tickets, sorted by <?= e(mb_strtolower($sorts[$filters['sort']] ?? 'recently active')) ?> (<?= (int) $pager->total ?> in all)</caption>
             <thead>
                 <tr>
@@ -77,17 +77,17 @@ $active = ['open', 'triaged', 'planned', 'in_progress'];
                     $tVis = (string) $t['visibility'];
                     $tSev = (string) ($t['severity'] ?? ''); ?>
                     <tr>
-                        <td class="pt-num pt-mono"><?= (int) $t['id'] ?></td>
+                        <td class="pt-num pt-mono" data-label="#"><?= (int) $t['id'] ?></td>
                         <th scope="row"><a href="/portal/tickets/<?= (int) $t['id'] ?>/"><?= e($t['title']) ?></a></th>
-                        <td><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($types[$tType] ?? $tType) ?></span></td>
-                        <td><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
-                        <td><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
-                        <td><?= $tSev !== '' ? e($severities[$tSev] ?? $tSev) : '<span class="pt-muted">—</span>' ?></td>
-                        <td><?php if ($t['owner_email'] !== null): ?><a href="/portal/admin/users/<?= (int) $t['user_id'] ?>/"><bdi><?= e($t['owner_name']) ?></bdi></a><br><span class="pt-small pt-muted"><?= e($t['owner_email']) ?></span><?php else: ?><span class="pt-muted">Former account</span><?php endif; ?></td>
-                        <td><span class="pt-badge pt-badge--<?= e($tVis) ?>"><?= e($visibilities[$tVis] ?? $tVis) ?></span></td>
-                        <td class="pt-num"><?= $tType === 'feature' ? (int) $t['votes'] : '<span class="pt-muted">—</span>' ?></td>
-                        <td class="pt-num"><?= (int) $t['comment_count'] ?></td>
-                        <td><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
+                        <td data-label="Type"><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($types[$tType] ?? $tType) ?></span></td>
+                        <td data-label="Product"><?= e($products[(string) $t['product']] ?? $t['product']) ?></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($statuses[$tStatus] ?? $tStatus) ?></span></td>
+                        <td data-label="Severity"><?php if ($tSev !== ''): ?><span class="pt-badge pt-badge--<?= e($tSev) ?>"><?= e($severities[$tSev] ?? $tSev) ?></span><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
+                        <td data-label="From"><?php if ($t['owner_email'] !== null): ?><a href="/portal/admin/users/<?= (int) $t['user_id'] ?>/"><bdi><?= e($t['owner_name']) ?></bdi></a> <small><?= e($t['owner_email']) ?></small><?php else: ?><span class="pt-muted">Former account</span><?php endif; ?></td>
+                        <td data-label="Visibility"><span class="pt-badge pt-badge--<?= e($tVis) ?>"><?= e($visibilities[$tVis] ?? $tVis) ?></span></td>
+                        <td class="pt-num" data-label="Votes"><?= $tType === 'feature' ? (int) $t['votes'] : '<span class="pt-muted">—</span>' ?></td>
+                        <td class="pt-num" data-label="Replies"><?= (int) $t['comment_count'] ?></td>
+                        <td data-label="Last activity"><?= $this->render('portal/tickets/_time', ['ts' => $t['last_activity_at']]) ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

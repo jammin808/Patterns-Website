@@ -32,6 +32,9 @@ abstract class Controller
         return Response::html($this->app->view()->page($template, $data, $layout), $status);
     }
 
+    /** Every portal page's description: true of each of them, signed in or not, and 50 to 160 characters long. */
+    public const PORTAL_DESCRIPTION = 'The client portal for Patterns Show Control: downloads, licence files, bug reports and feature requests.';
+
     /**
      * A portal page: the portal layout, never indexed.
      *
@@ -40,7 +43,7 @@ abstract class Controller
     protected function portal(string $template, array $data, string $title, int $status = 200): Response
     {
         $req = $this->app->request();
-        $seo = $this->app->seo($title . ' | Client portal | ' . $this->app->name(), 'The Patterns Show Control client portal.', $req?->path ?? '/portal/')->noindex();
+        $seo = $this->app->seo($title . ' | Client portal | ' . $this->app->name(), self::PORTAL_DESCRIPTION, $req?->path ?? '/portal/')->noindex();
         return $this->page($template, $data + ['title' => $title, 'section' => 'portal'], $seo, 'layouts/portal', $status);
     }
 

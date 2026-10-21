@@ -6,11 +6,11 @@
  * are missing, and runs inside its own guard so one failure never stops the others. Nothing here is needed to
  * read a page or follow a link: without JavaScript the navigation, FAQ, forms and tables all still work.
  *
- * Theme before first paint, without an inline script: the toggle stores the choice in localStorage AND in a
- * first-party cookie `psc_theme=light|dark` (no cookie = follow the system). The PHP layout reads that cookie and
- * renders <html data-theme="…"> on the server, so the first paint is already right. With no attribute the CSS
- * follows prefers-color-scheme. If the server does not render it, this module applies the stored choice as soon
- * as it runs (one frame later), which is the only case that can flash.
+ * Public pages are identical for every visitor (they are cached), so nothing a visitor chooses is rendered by the
+ * server. The theme choice (`psc-theme`) and dismissed announcements (`psc-dismissed`) live in this browser's
+ * localStorage only and are never sent to the server; theme-init.js, a classic script in <head>, applies them
+ * before the first paint, and this module keeps them in step afterwards. No stored theme means the CSS follows
+ * prefers-color-scheme. When storage is blocked the page simply follows the system and shows every announcement.
  */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -20,20 +20,13 @@ const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const store = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
   set(key, value) {
-    try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode: the choice lasts this visit */ }
+    try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* storage blocked: the choice holds on this page only */ }
   },
 };
-const cookie = {
-  get(name) {
-    const hit = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
-    return hit ? decodeURIComponent(hit.slice(name.length + 1)) : null;
-  },
-  set(name, value, days = 365) {
-    const secure = location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = value === null
-      ? `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
-      : `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${days * 86400}; SameSite=Lax${secure}`;
-  },
+/* Reads a cookie the server set; the only one read here is the portal's psc_li hint. */
+const readCookie = (name) => {
+  const hit = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
+  return hit ? decodeURIComponent(hit.slice(name.length + 1)) : null;
 };
 
 function guard(name, fn) {
@@ -67,7 +60,7 @@ function initTheme() {
   const effective = () => (valid(root.dataset.theme) ? root.dataset.theme : system.matches ? 'light' : 'dark');
 
   if (!valid(root.dataset.theme)) {
-    const saved = store.get(KEY) || cookie.get('psc_theme');
+    const saved = store.get(KEY);
     if (valid(saved)) root.dataset.theme = saved;
   }
 
@@ -92,7 +85,6 @@ function initTheme() {
     const commit = () => {
       if (valid(value)) root.dataset.theme = value; else delete root.dataset.theme;
       store.set(KEY, valid(value) ? value : null);
-      cookie.set('psc_theme', valid(value) ? value : null);
       sync();
     };
     if (document.startViewTransition && motionOK()) {
@@ -318,7 +310,7 @@ function initCopy() {
  * with an optional [data-account-text] child holding the words (so an icon beside them survives).
  */
 function initAccount() {
-  if (cookie.get('psc_li') !== '1') return;
+  if (readCookie('psc_li') !== '1') return;
   for (const link of $$('[data-account-link]')) {
     const words = $('[data-account-text]', link) || link;
     words.textContent = link.dataset.accountLabel || 'My account';
@@ -328,11 +320,12 @@ function initAccount() {
 
 /* ------------------------------------------------------------------------------- dismissibles */
 /*
- * [data-dismissible="id"] with a [data-dismiss] button inside. The id is remembered (localStorage and the cookie
- * psc_dismissed, a comma list) so the server can leave it out next time and nothing shifts on load.
+ * [data-dismissible="id"] with a [data-dismiss] button inside. The id is remembered in localStorage
+ * (`psc-dismissed`, a comma list); theme-init.js copies it to <html data-dismissed> before the first paint, so the
+ * CSS hides a dismissed strip without anything shifting on load.
  */
 function initDismiss() {
-  const read = () => (store.get('psc-dismissed') || cookie.get('psc_dismissed') || '').split(',').filter(Boolean);
+  const read = () => (store.get('psc-dismissed') || '').split(',').filter(Boolean);
   const seen = read();
   for (const box of $$('[data-dismissible]')) {
     if (box.dataset.dismissible && seen.includes(box.dataset.dismissible)) box.hidden = true;
@@ -344,36 +337,52 @@ function initDismiss() {
     box.hidden = true;
     const id = box.dataset.dismissible;
     if (id) {
-      const list = [...new Set([...read(), id])].slice(-12).join(',');
-      store.set('psc-dismissed', list);
-      cookie.set('psc_dismissed', list, 120);
+      store.set('psc-dismissed', [...new Set([...read(), id])].slice(-12).join(','));
     }
   });
 }
 
 /* ------------------------------------------------------------------ floating assistant launcher */
 /*
- * [data-chat-fab] tucks away while any [data-chat-tuck] element (the home hero, the inline support chat) is on
- * screen, so it never covers the picture or duplicates the chat in view. chat.js does the chat itself.
+ * [data-chat-fab] is rendered tucked away (is-tucked) and shows once this has measured the page, so a page that
+ * opens with a zone in view never flashes it. A zone is a [data-chat-tuck] element (the home hero), an inline
+ * assistant [data-chat-inline] or any other launcher [data-chat-open]: while one is on screen the launcher stays
+ * tucked, so it never covers the picture or repeats a way in that is already in view. It never tucks while its
+ * panel is open (aria-expanded, which chat.js keeps) or while it has focus. chat.js does the chat itself; without
+ * scripting the template's <noscript> link to the contact page stands in for it.
  */
 function initFab() {
   const fab = $('[data-chat-fab]');
-  const zones = $$('[data-chat-tuck], [data-chat-inline]');
-  if (!fab || !zones.length || !('IntersectionObserver' in window)) return;
-  const visible = new Set();
-  const io = new IntersectionObserver((entries) => {
-    for (const entry of entries) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); }
-    const tuck = visible.size > 0 && fab.getAttribute('aria-expanded') !== 'true';
-    fab.classList.toggle('is-tucked', tuck);
-    if (tuck && document.activeElement === fab) fab.blur();
-  }, { threshold: 0, rootMargin: '-64px 0px -96px 0px' });
-  zones.forEach((z) => io.observe(z));
+  if (!fab) return;
+  const zones = $$('[data-chat-tuck], [data-chat-inline], [data-chat-open]').filter((z) => z !== fab);
+  const watch = zones.length > 0 && 'IntersectionObserver' in window;
+  const inView = new Set();
+  let measured = !watch;
+  const update = () => {
+    if (!measured) return;
+    const open = fab.getAttribute('aria-expanded') === 'true';
+    fab.classList.toggle('is-tucked', inView.size > 0 && !open && document.activeElement !== fab);
+  };
+  if (watch) {
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) { if (entry.isIntersecting) inView.add(entry.target); else inView.delete(entry.target); }
+      measured = true;
+      update();
+    }, { threshold: 0, rootMargin: '-64px 0px -96px 0px' });
+    zones.forEach((z) => io.observe(z));
+  }
+  new MutationObserver(update).observe(fab, { attributes: true, attributeFilter: ['aria-expanded'] });
+  fab.addEventListener('blur', update);
+  update();
 }
 
 /* -------------------------------------------------------------------------- cue ladder (GO/Back) */
 /*
  * [data-ladder] with items [data-cue] (data-state done|standby|waiting), a [data-ladder-go] and [data-ladder-back]
  * button, an optional [data-ladder-status] (aria-live) and [data-cue-label] inside each cue for the state word.
+ * After GO or Back the cue now standing by is scrolled just into view: clear of the sticky header (the root's
+ * scroll-padding-top) and of the controls when they stick to the bottom of the screen; smooth only when motion is
+ * allowed.
  */
 function initLadder() {
   const words = { done: 'Done', standby: 'Standby', waiting: 'Waiting' };
@@ -383,6 +392,22 @@ function initLadder() {
     const back = $('[data-ladder-back]', ladder);
     const status = $('[data-ladder-status]', ladder);
     if (!cues.length || !go) continue;
+    const bar = go.parentElement;
+    // The nearest edge is chosen here because browsers skip a block: 'nearest' scroll when the cue is on screen
+    // but under the stuck controls; 'start' honours the root's scroll-padding-top, 'end' the cue's scroll-margin.
+    const reveal = (cue) => {
+      const stuck = bar && bar !== ladder && getComputedStyle(bar).position === 'sticky';
+      const floor = stuck ? Math.ceil(bar.getBoundingClientRect().height) + 12 : 0;
+      const top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      const bottom = document.documentElement.clientHeight - floor;
+      const r = cue.getBoundingClientRect();
+      let block = null;
+      if (r.top < top) block = 'start';
+      else if (r.bottom > bottom) block = r.height > bottom - top ? 'start' : 'end';
+      if (!block) return;
+      cue.style.scrollMarginBottom = floor ? `${floor}px` : '';
+      cue.scrollIntoView({ block, behavior: motionOK() ? 'smooth' : 'auto' });
+    };
     let standby = cues.findIndex((c) => c.dataset.state === 'standby');
     if (standby < 0) standby = cues.findIndex((c) => c.dataset.state !== 'done');
     if (standby < 0) standby = cues.length;
@@ -402,6 +427,7 @@ function initLadder() {
         const title = q ? ($('h3', q)?.textContent || '').trim() : '';
         status.textContent = q ? `Standing by: ${q.dataset.cue || `Q${standby + 1}`}, ${title}.` : 'All cues done.';
       }
+      if (speak && q) reveal(q);
     };
     go.addEventListener('click', () => { if (standby < cues.length) { standby += 1; render(true); } });
     back?.addEventListener('click', () => { if (standby > 0) { standby -= 1; render(true); } });

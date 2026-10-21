@@ -53,7 +53,7 @@ $time = static fn (mixed $ts): string => (int) $ts > 0
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Audit log<?= $prefix !== '' ? ', actions starting with ' . e($prefix) : '' ?>, newest first (<?= (int) $pager->total ?> in all)</caption>
             <thead>
                 <tr>
@@ -71,10 +71,10 @@ $time = static fn (mixed $ts): string => (int) $ts > 0
                     $subjectUrl = \Psc\Controllers\Admin\AdminController::subjectUrl($action, $subject);
                     $meta = \Psc\Controllers\Admin\AdminController::prettyMeta($a['meta'] !== null ? (string) $a['meta'] : null); ?>
                     <tr>
-                        <td><?= $time($a['created_at']) ?></td>
-                        <td>
+                        <td data-label="When"><?= $time($a['created_at']) ?></td>
+                        <td data-label="Who">
                             <?php if ($a['user_id'] !== null && $a['actor_email'] !== null): ?>
-                                <a href="/portal/admin/users/<?= (int) $a['user_id'] ?>/"><?= e($a['actor_name']) ?></a><br><span class="pt-small pt-muted"><?= e($a['actor_email']) ?></span>
+                                <a href="/portal/admin/users/<?= (int) $a['user_id'] ?>/"><?= e($a['actor_name']) ?></a> <small><?= e($a['actor_email']) ?></small>
                             <?php elseif ($a['user_id'] !== null): ?>
                                 <span class="pt-muted">Former account #<?= (int) $a['user_id'] ?></span>
                             <?php else: ?>
@@ -82,8 +82,8 @@ $time = static fn (mixed $ts): string => (int) $ts > 0
                             <?php endif; ?>
                         </td>
                         <th scope="row" class="pt-mono"><?= e($action) ?></th>
-                        <td class="pt-mono"><?php if ($subject === null): ?><span class="pt-muted">—</span><?php elseif ($subjectUrl !== null): ?><a href="<?= e($subjectUrl) ?>"><?= e($subject) ?></a><?php else: ?><?= e($subject) ?><?php endif; ?></td>
-                        <td><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
+                        <td class="pt-mono" data-label="Subject"><?php if ($subject === null): ?><span class="pt-muted">—</span><?php elseif ($subjectUrl !== null): ?><a href="<?= e($subjectUrl) ?>"><?= e($subject) ?></a><?php else: ?><?= e($subject) ?><?php endif; ?></td>
+                        <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

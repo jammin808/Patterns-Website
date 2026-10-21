@@ -46,7 +46,7 @@ $tabUrl = static function (string $status) use ($filters): string {
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Licence requests, the newest first (<?= (int) $pager->total ?> in all)</caption>
             <thead>
                 <tr>
@@ -64,12 +64,12 @@ $tabUrl = static function (string $status) use ($filters): string {
                     $status = (string) $l['status']; ?>
                     <tr>
                         <th scope="row"><a class="pt-mono" href="/portal/admin/licences/<?= (int) $l['id'] ?>/"><?= e($l['reference']) ?></a></th>
-                        <td>
+                        <td data-label="Licence">
                             <?= e(($products[$product] ?? $product) . ' ' . ($options[$product][(string) $l['tier']] ?? (string) $l['tier'])) ?>
                             <?php if ((int) $l['quantity'] > 1): ?><span class="pt-muted">× <?= (int) $l['quantity'] ?></span><?php endif; ?>
                             <?php if ((int) $l['nonprofit'] === 1): ?><span class="pt-small pt-muted">Nonprofit</span><?php endif; ?>
                         </td>
-                        <td>
+                        <td data-label="Client">
                             <?php if ($l['user_email'] !== null): ?>
                                 <a href="/portal/admin/users/<?= (int) $l['user_id'] ?>/"><?= e($l['user_name']) ?></a>
                                 <span class="pt-small pt-muted"><?= e($l['user_email']) ?></span>
@@ -77,9 +77,9 @@ $tabUrl = static function (string $status) use ($filters): string {
                                 <span class="pt-muted">Account deleted</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="pt-badge pt-badge--<?= e($status) ?>"><?= e($statuses[$status] ?? $status) ?></span></td>
-                        <td><?= $time($l['created_at']) ?></td>
-                        <td><?= $l['issued_at'] !== null ? $time($l['issued_at']) : '<span class="pt-muted">Not yet</span>' ?></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= e($status) ?>"><?= e($statuses[$status] ?? $status) ?></span></td>
+                        <td data-label="Requested"><?= $time($l['created_at']) ?></td>
+                        <td data-label="Issued"><?= $l['issued_at'] !== null ? $time($l['issued_at']) : '<span class="pt-muted">Not yet</span>' ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

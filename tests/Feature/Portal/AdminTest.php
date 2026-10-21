@@ -309,8 +309,8 @@ final class AdminTest extends TestCase
         $r = $this->request('GET', '/portal/admin/');
         self::assertSame(200, $r->status);
         // Today: 1 conversation, 3 requests, 1,200 in, 300 out; the week adds the row from three days ago only.
-        self::assertMatchesRegularExpression('#<th scope="row">Today</th>\s*<td class="pt-num">1</td>\s*<td class="pt-num">3</td>\s*<td class="pt-num">1,200</td>\s*<td class="pt-num">300</td>#', $r->body);
-        self::assertMatchesRegularExpression('#<th scope="row">Last 7 days</th>\s*<td class="pt-num">1</td>\s*<td class="pt-num">5</td>\s*<td class="pt-num">2,000</td>\s*<td class="pt-num">400</td>#', $r->body);
+        self::assertMatchesRegularExpression('#<th scope="row">Today</th>\s*<td class="pt-num" data-label="Conversations">1</td>\s*<td class="pt-num" data-label="Requests">3</td>\s*<td class="pt-num" data-label="Tokens in">1,200</td>\s*<td class="pt-num" data-label="Tokens out">300</td>#', $r->body);
+        self::assertMatchesRegularExpression('#<th scope="row">Last 7 days</th>\s*<td class="pt-num" data-label="Conversations">1</td>\s*<td class="pt-num" data-label="Requests">5</td>\s*<td class="pt-num" data-label="Tokens in">2,000</td>\s*<td class="pt-num" data-label="Tokens out">400</td>#', $r->body);
         self::assertStringContainsString('Untriaged bug', $r->body);
         self::assertStringNotContainsString('Planned idea', $r->body, 'only untriaged tickets are listed as new');
         self::assertStringContainsString('SW-AAAA-0001', $r->body);
@@ -717,7 +717,7 @@ final class AdminTest extends TestCase
         self::assertStringContainsString('href="/portal/admin/users/' . $client . '/"', $all->body);
         // The refused conversation: 3 turns, 90 tokens, 2 out of scope, 1 code, 0 others, 1 feedback.
         self::assertMatchesRegularExpression(
-            '#<td class="pt-num">3</td>\s*<td class="pt-num">90</td>\s*<td class="pt-num">2</td>\s*<td class="pt-num">1</td>\s*<td class="pt-num"><span class="pt-muted">0</span></td>\s*<td class="pt-num"><span class="pt-muted">0</span></td>\s*<td class="pt-num"><span class="pt-muted">0</span></td>\s*<td class="pt-num">1</td>#',
+            '#<td class="pt-num" data-label="Turns">3</td>\s*<td class="pt-num" data-label="Tokens">90</td>\s*<td class="pt-num" data-label="[^"]+">2</td>\s*<td class="pt-num" data-label="[^"]+">1</td>\s*<td class="pt-num" data-label="[^"]+"><span class="pt-muted">0</span></td>\s*<td class="pt-num" data-label="[^"]+"><span class="pt-muted">0</span></td>\s*<td class="pt-num" data-label="[^"]+"><span class="pt-muted">0</span></td>\s*<td class="pt-num" data-label="Feedback">1</td>#',
             $all->body
         );
 
@@ -752,9 +752,31 @@ final class AdminTest extends TestCase
         sort($sorted);
         self::assertSame($sorted, $order, 'in the order they were stored');
         self::assertStringNotContainsString('<strong>answer</strong>', $body, 'chat text is never rendered as Markdown');
-        self::assertStringContainsString('Thumbs down for the answer above.', $body);
+        self::assertStringContainsString('<p><strong>Rated not helpful</strong>: not what I asked</p>', $body, 'feedback reads as words');
         self::assertStringContainsString('pt-badge--declined">Code or internals</span>', $body);
         self::assertStringContainsString('pt-comment pt-comment--internal', $body, 'feedback is shown apart from the messages');
+    }
+
+    /** Feedback is read out in words whatever form it was stored in, the visitor's note escaped; never as JSON. */
+    public function testFeedbackReadsAsWordsWhateverItsStoredForm(): void
+    {
+        self::assertSame(['rating' => 'up', 'note' => 'Clear answer.'], AdminController::feedback('{"rating":"up","note":"Clear answer."}'));
+        self::assertSame(['rating' => 'down', 'note' => ''], AdminController::feedback('{"rating":"down"}'));
+        self::assertSame(['rating' => '', 'note' => 'Odd'], AdminController::feedback('{"rating":"sideways","note":"Odd"}'));
+        self::assertSame(['rating' => 'up', 'note' => 'fine'], AdminController::feedback('up: fine'));
+
+        $this->signInAsAdmin();
+        $id = self::CONVERSATION;
+        $this->conversation($id);
+        $this->chatMessage($id, 'user', 'How do I install a licence?');
+        $this->chatMessage($id, 'assistant', 'Open Help, then License.', 'in_scope');
+        $this->chatMessage($id, 'feedback', '{"rating":"up","note":"Clear <b>answer</b>."}');
+        $this->chatMessage($id, 'feedback', 'down');
+
+        $body = $this->request('GET', $this->transcriptUrl($id))->body;
+        self::assertStringContainsString('<p><strong>Rated helpful</strong>: Clear &lt;b&gt;answer&lt;/b&gt;.</p>', $body);
+        self::assertStringContainsString('<p><strong>Rated not helpful</strong></p>', $body);
+        self::assertStringNotContainsString('rating', $this->mainOf($this->request('GET', $this->transcriptUrl($id))), 'no stored JSON reaches the page');
     }
 
     public function testAnUnknownConversationIsNotFound(): void
@@ -907,6 +929,95 @@ final class AdminTest extends TestCase
         self::assertStringContainsString('5.0.0', $r->body);
         self::assertStringContainsString('For licence holders.', $r->body);
         self::assertLessThan(strpos($r->body, '1.1.0'), strpos($r->body, '5.0.0'), 'products in ecosystem order');
+    }
+
+    /** A release card shows its title under the heading only when the title says more than the heading. */
+    public function testTheDashboardLeavesOutAReleaseTitleThatRepeatsTheHeading(): void
+    {
+        $base = ['channel' => 'stable', 'notes' => null, 'file_name' => 'x.exe', 'file_path' => 'a/x.exe', 'file_size' => 10, 'access' => 'registered', 'is_published' => 1, 'published_at' => time() - 60, 'created_at' => time(), 'updated_at' => time()];
+        $this->db->insert('releases', $base + ['product' => 'patterns', 'version' => '3.2.1', 'title' => 'Patterns  3.2.1']);
+        $this->db->insert('releases', $base + ['product' => 'agmessage', 'version' => '1.4.0', 'title' => 'v1.4.0']);
+        $this->db->insert('releases', $base + ['product' => 'stagewatch', 'version' => '2.16.0', 'title' => 'Faster start-up']);
+        $this->signInAsClient();
+
+        $body = $this->request('GET', '/portal/')->body;
+        self::assertStringContainsString('<h3 class="pt-card-title">Patterns 3.2.1</h3>', $body);
+        self::assertStringContainsString('<h3 class="pt-card-title">AGMessage 1.4.0</h3>', $body);
+        self::assertSame(1, substr_count($body, '<p class="pt-card-body">'), 'only the release whose title adds something has a title line');
+        self::assertStringContainsString('<p class="pt-card-body">Faster start-up</p>', $body);
+    }
+
+    /**
+     * Every portal and admin table of four or more columns stacks on a phone (pt-table--stack), and each of its
+     * cells is labelled with its column's heading; a narrower table keeps its columns.
+     */
+    public function testWideTablesStackWithEveryCellLabelledByItsColumn(): void
+    {
+        $client = $this->makeUser('client@example.test', self::PASSWORD);
+        $ticket = $this->ticket($client, 'Clock drifts');
+        $this->db->exec("UPDATE tickets SET severity = 'high' WHERE id = ?", [$ticket]);
+        $idea = $this->ticket($client, 'Import a running order', 'open', 'feature');
+        $this->db->exec("UPDATE tickets SET visibility = 'public' WHERE id = ?", [$idea]);
+        $this->licence($client, 'SW-TEST-0001');
+        $this->conversation(self::CONVERSATION, $client);
+        $this->chatMessage(self::CONVERSATION, 'user', 'Hello');
+        $this->chatMessage(self::CONVERSATION, 'assistant', 'Hi there', 'in_scope', 10, 5);
+        $this->db->insert('releases', ['product' => 'stagewatch', 'version' => '2.16.0', 'channel' => 'stable', 'title' => 'Faster start-up', 'notes' => null, 'file_name' => 'x.exe', 'file_path' => 'a/x.exe', 'file_size' => 10, 'access' => 'registered', 'is_published' => 1, 'published_at' => time(), 'created_at' => time(), 'updated_at' => time()]);
+
+        $this->signIn('client@example.test', self::PASSWORD);
+        $pages = ['/portal/', '/portal/tickets/', '/portal/ideas/'];
+        $tables = 0;
+        foreach ($pages as $path) {
+            $tables += $this->assertWideTablesStack($path);
+        }
+        $this->freshBrowser();
+        $this->signInAsAdmin();
+        foreach (['/portal/admin/', '/portal/admin/tickets/', '/portal/admin/licences/', '/portal/admin/releases/', '/portal/admin/users/', '/portal/admin/users/' . $client . '/', '/portal/admin/chats/', '/portal/admin/audit/'] as $path) {
+            $tables += $this->assertWideTablesStack($path);
+        }
+        self::assertGreaterThanOrEqual(14, $tables, 'every wide table was found and checked');
+    }
+
+    /** Checks one page's tables; returns how many wide tables it has. */
+    private function assertWideTablesStack(string $path): int
+    {
+        $r = $this->request('GET', $path);
+        self::assertSame(200, $r->status, $path);
+        $doc = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="utf-8">' . $this->mainOf($r) . '</main>');
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new \DOMXPath($doc);
+        $wide = 0;
+        foreach ($xpath->query('//table') ?: [] as $table) {
+            $headings = [];
+            foreach ($xpath->query('./thead/tr/th', $table) ?: [] as $th) {
+                $headings[] = trim((string) preg_replace('/\s+/u', ' ', $th->textContent));
+            }
+            $classes = explode(' ', (string) $table->getAttribute('class'));
+            if (count($headings) < 4) {
+                self::assertNotContains('pt-table--stack', $classes, $path . ': a narrow table keeps its columns');
+                continue;
+            }
+            $wide++;
+            self::assertContains('pt-table--stack', $classes, $path . ': ' . implode(', ', $headings));
+            $rows = $xpath->query('./tbody/tr', $table) ?: [];
+            self::assertGreaterThan(0, $rows->length, $path . ' has rows to check');
+            foreach ($rows as $tr) {
+                $i = 0;
+                foreach ($tr->childNodes as $cell) {
+                    if (!$cell instanceof \DOMElement || !in_array($cell->nodeName, ['td', 'th'], true)) {
+                        continue;
+                    }
+                    if ($cell->nodeName === 'td') {
+                        self::assertSame($headings[$i] ?? null, $cell->getAttribute('data-label'), $path . ': column ' . ($i + 1));
+                    }
+                    $i++;
+                }
+            }
+        }
+        return $wide;
     }
 
     public function testEmptyDashboardSaysWhatToDoNext(): void

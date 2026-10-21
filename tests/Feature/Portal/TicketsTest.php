@@ -727,6 +727,36 @@ final class TicketsTest extends TestCase
         self::assertSame($a, (int) $this->ticket($id)['user_id']);
     }
 
+    /**
+     * The ticket page joins the status and what it means as one phrase, so the meaning carries on in lower case;
+     * the email keeps the meaning as a sentence of its own. Severity is a badge with its word, on the ticket and in
+     * the administrators' list.
+     */
+    public function testTheStatusReadsAsOnePhraseAndSeverityIsABadge(): void
+    {
+        $this->actAs(self::A);
+        $id = $this->open(self::bug());
+        $this->actAs(self::ADMIN, 'admin');
+        $this->post("/portal/admin/tickets/{$id}/", ['status' => 'in_progress', 'visibility' => 'private', 'severity' => 'show_stopper']);
+        self::assertSame('in_progress', $this->ticket($id)['status']);
+        self::assertStringContainsString('<p>Being worked on now.</p>', $this->lastMailTo(self::A)['html'], 'the email keeps the sentence');
+
+        $list = $this->request('GET', '/portal/admin/tickets/')->body;
+        self::assertStringContainsString('<td data-label="Severity"><span class="pt-badge pt-badge--show_stopper">Show-stopper</span></td>', $list);
+
+        $this->actAs(self::A);
+        $page = $this->request('GET', "/portal/tickets/{$id}/")->body;
+        self::assertStringContainsString('<dd>In progress — being worked on now.</dd>', $page);
+        self::assertStringContainsString('<dd><span class="pt-badge pt-badge--show_stopper">Show-stopper</span></dd>', $page);
+
+        $this->actAs(self::ADMIN, 'admin');
+        $this->post("/portal/admin/tickets/{$id}/", ['status' => 'closed', 'visibility' => 'private', 'severity' => 'low']);
+        $this->actAs(self::A);
+        $closed = $this->request('GET', "/portal/tickets/{$id}/")->body;
+        self::assertStringContainsString('<dd>Closed — add a reply if you need to pick it up again.</dd>', $closed, 'a first sentence that repeats the status goes');
+        self::assertStringContainsString('<dd><span class="pt-badge pt-badge--low">Low</span></dd>', $closed);
+    }
+
     public function testAnInternalNoteWithTheUpdateIsNotEmailed(): void
     {
         $this->actAs(self::A);

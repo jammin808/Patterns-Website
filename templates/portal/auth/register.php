@@ -101,7 +101,6 @@ $termsError = $errors['terms'] ?? null;
                 <button type="submit" class="pt-btn pt-btn--primary">Create account</button>
             </div>
         </form>
-
-        <p class="pt-small">Already have an account? <a href="/portal/login/">Sign in</a>.</p>
+        <?php /* Sign-in is offered by the portal's Sign in / Create an account switch above the card, so not again here. */ ?>
     <?php endif; ?>
 </div>

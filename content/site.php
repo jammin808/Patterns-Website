@@ -38,7 +38,7 @@ return [
                     'links' => [
                         ['label' => 'Overview', 'href' => '/stagewatch/'],
                         ['label' => 'Features', 'href' => '/stagewatch/features/'],
-                        ['label' => 'Pricing', 'href' => '/stagewatch/licensing/'],
+                        ['label' => 'Licensing', 'href' => '/stagewatch/licensing/'],
                         ['label' => 'Help', 'href' => '/support/stagewatch/'],
                     ],
                 ],

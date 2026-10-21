@@ -356,16 +356,27 @@ final class AdminController extends Controller
     }
 
     /**
-     * A feedback row's content ("up" or "down", optionally ": note") as its rating and note.
+     * A feedback row's content as its rating ("up", "down", or "" when it names neither) and note. The content is
+     * "up" or "down" with an optional ": note", or a JSON object {"rating": …, "note": …}; a JSON object never
+     * reaches the page as JSON.
      *
      * @return array{rating: string, note: string}
      */
     public static function feedback(string $content): array
     {
+        $content = trim($content);
+        if (str_starts_with($content, '{')) {
+            $data = json_decode($content, true);
+            if (is_array($data)) {
+                $rating = is_string($data['rating'] ?? null) ? trim($data['rating']) : '';
+                $note = is_string($data['note'] ?? null) ? trim($data['note']) : '';
+                return ['rating' => in_array($rating, ['up', 'down'], true) ? $rating : '', 'note' => $note];
+            }
+        }
         $parts = explode(':', $content, 2);
         $rating = trim($parts[0]);
         if (!in_array($rating, ['up', 'down'], true)) {
-            return ['rating' => '', 'note' => trim($content)];
+            return ['rating' => '', 'note' => $content];
         }
         return ['rating' => $rating, 'note' => trim($parts[1] ?? '')];
     }

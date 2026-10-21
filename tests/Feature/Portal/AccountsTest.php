@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Tests\Feature\Portal;
 
+use Psc\Controllers\Controller;
 use Psc\Http\Response;
 use Psc\Tests\TestCase;
 
@@ -188,6 +189,36 @@ final class AccountsTest extends TestCase
         self::assertRedirect($r, '/portal/register/');
         self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM users'));
         self::assertSame([], $this->mails());
+    }
+
+    /**
+     * The portal's Sign in / Create an account switch is the one route between the two forms, so neither card
+     * repeats it; when accounts are by invitation the sign-in card says how to get one and offers no sign-up.
+     */
+    public function testTheAuthCardsDoNotRepeatTheSwitch(): void
+    {
+        $login = $this->request('GET', '/portal/login/')->body;
+        self::assertStringContainsString('<a href="/portal/register/"', $login, 'the switch offers sign-up');
+        self::assertStringNotContainsString('New here?', $login);
+        $register = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<a href="/portal/login/"', $register, 'the switch offers sign-in');
+        self::assertStringNotContainsString('Already have an account?', $register);
+
+        $this->bootApp(['security' => ['registration' => 'invite']]);
+        $invite = $this->request('GET', '/portal/login/')->body;
+        self::assertStringContainsString('New here? Accounts are by invitation. <a href="/contact/">Contact us</a> if you need one.', $invite);
+        self::assertStringNotContainsString('New here? <a href="/portal/register/">', $invite);
+    }
+
+    /** Every portal page carries the same description, of a length search engines and link previews show whole. */
+    public function testPortalPagesHaveADescriptionOfAUsableLength(): void
+    {
+        $length = mb_strlen(Controller::PORTAL_DESCRIPTION);
+        self::assertGreaterThanOrEqual(50, $length);
+        self::assertLessThanOrEqual(160, $length);
+        foreach (['/portal/login/', '/portal/register/', '/portal/forgot/'] as $path) {
+            self::assertStringContainsString('<meta name="description" content="' . Controller::PORTAL_DESCRIPTION . '">', $this->request('GET', $path)->body, $path);
+        }
     }
 
     public function testApprovalModeKeepsTheAccountWaitingAndEmailsTheAdministrator(): void

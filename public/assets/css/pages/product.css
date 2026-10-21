@@ -13,8 +13,6 @@
   .c-pd-definition { max-width: 48ch; color: var(--text); }
   .c-pd-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 34rem; & dd { overflow-wrap: anywhere; }
     & > .c-pd-spec-wide { grid-column: 1 / -1; } }
-  /* The layout's breadcrumbs sit above the product hero: give them the hero's breathing room. */
-  main[data-product] > .l-wrap:first-child > .c-crumbs { padding-block: 16px 14px; }
   .c-hero--product .c-shots { margin-top: clamp(8px, 2vw, 24px); }
 
   /* ===== Stacked heading beside a long list: the heading stays in view while the list scrolls past ===== */
@@ -225,9 +223,6 @@
     .c-tier .c-price-amount { font-size: 1.75rem; }
   }
 
-  /* The header row sticks under the site header only while the table fits; inside a sideways scroller a sticky
-     top would push the row down over the next one, so it stays put there. */
-  .c-pd-compare:not([data-overflow="none"]) .c-compare-table thead tr:first-child th { top: auto; }
   @container compare (width >= 50rem) { .c-pd-compare .c-compare-table thead tr:first-child th:first-child { width: 28%; } }
   .c-pd-compare-remind { display: none; }
   .c-pd-compare .c-compare-group td { background: var(--s2); vertical-align: bottom; }

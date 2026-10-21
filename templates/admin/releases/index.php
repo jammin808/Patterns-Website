@@ -33,7 +33,7 @@ $time = fn (mixed $ts): string => $this->render('portal/licences/_time', ['ts' =
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Releases, the newest first (<?= (int) $counts['total'] ?> in all)</caption>
             <thead>
                 <tr>
@@ -55,12 +55,12 @@ $time = fn (mixed $ts): string => $this->render('portal/licences/_time', ['ts' =
                             <a href="/portal/admin/releases/<?= (int) $r['id'] ?>/"><?= e(($products[(string) $r['product']] ?? $r['product']) . ' ' . $r['version']) ?></a>
                             <span class="pt-small pt-muted"><?= e($r['title']) ?></span>
                         </th>
-                        <td><span class="pt-badge pt-badge--<?= e($channel) ?>"><?= e($channels[$channel] ?? $channel) ?></span></td>
-                        <td><span class="pt-badge pt-badge--<?= $published ? 'public' : 'private' ?>"><?= $published ? 'Published' : 'Draft' ?></span></td>
-                        <td><?= e($access[(string) $r['access']] ?? $r['access']) ?></td>
-                        <td class="pt-num"><?= e(filesize_human((int) $r['file_size'])) ?></td>
-                        <td class="pt-num"><?= (int) $r['download_count'] ?></td>
-                        <td><?= $published ? $time($r['published_at']) : '<span class="pt-muted">Not yet</span>' ?></td>
+                        <td data-label="Channel"><span class="pt-badge pt-badge--<?= e($channel) ?>"><?= e($channels[$channel] ?? $channel) ?></span></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= $published ? 'public' : 'private' ?>"><?= $published ? 'Published' : 'Draft' ?></span></td>
+                        <td data-label="Access"><?= e($access[(string) $r['access']] ?? $r['access']) ?></td>
+                        <td class="pt-num" data-label="Size"><?= e(filesize_human((int) $r['file_size'])) ?></td>
+                        <td class="pt-num" data-label="Downloads"><?= (int) $r['download_count'] ?></td>
+                        <td data-label="Published"><?= $published ? $time($r['published_at']) : '<span class="pt-muted">Not yet</span>' ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

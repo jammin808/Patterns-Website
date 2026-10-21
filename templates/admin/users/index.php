@@ -78,7 +78,7 @@ $oldRole = isset($roles[$old['role'] ?? '']) ? (string) $old['role'] : 'client';
     </div>
 <?php else: ?>
     <div class="pt-table-wrap">
-        <table class="pt-table">
+        <table class="pt-table pt-table--stack">
             <caption class="u-visually-hidden">Accounts, the newest first (<?= (int) $pager->total ?> in all)</caption>
             <thead>
                 <tr>
@@ -99,14 +99,14 @@ $oldRole = isset($roles[$old['role'] ?? '']) ? (string) $old['role'] : 'client';
                     $uStatus = (string) $u['status']; ?>
                     <tr<?= $uStatus === 'approval' ? ' class="is-unread"' : '' ?>>
                         <th scope="row"><a href="/portal/admin/users/<?= (int) $u['id'] ?>/"><?= e($u['name']) ?></a></th>
-                        <td><?= e($u['email']) ?></td>
-                        <td><?= ($u['company'] ?? '') !== '' ? e($u['company']) : '<span class="pt-muted">—</span>' ?></td>
-                        <td><span class="pt-badge pt-badge--<?= e($uRole) ?>"><?= e($roles[$uRole] ?? $uRole) ?></span></td>
-                        <td><span class="pt-badge pt-badge--<?= e($uStatus) ?>"><?= e($statuses[$uStatus] ?? $uStatus) ?></span></td>
-                        <td class="pt-num"><?= (int) $u['ticket_count'] ?></td>
-                        <td class="pt-num"><?= (int) $u['licence_count'] ?></td>
-                        <td><?= $time($u['created_at'], true) ?></td>
-                        <td><?= (int) ($u['last_login_at'] ?? 0) > 0 ? $time($u['last_login_at']) : '<span class="pt-muted">Never</span>' ?></td>
+                        <td data-label="Email"><?= e($u['email']) ?></td>
+                        <td data-label="Company"><?= ($u['company'] ?? '') !== '' ? e($u['company']) : '<span class="pt-muted">—</span>' ?></td>
+                        <td data-label="Role"><span class="pt-badge pt-badge--<?= e($uRole) ?>"><?= e($roles[$uRole] ?? $uRole) ?></span></td>
+                        <td data-label="Status"><span class="pt-badge pt-badge--<?= e($uStatus) ?>"><?= e($statuses[$uStatus] ?? $uStatus) ?></span></td>
+                        <td class="pt-num" data-label="Tickets"><?= (int) $u['ticket_count'] ?></td>
+                        <td class="pt-num" data-label="Licences"><?= (int) $u['licence_count'] ?></td>
+                        <td data-label="Joined"><?= $time($u['created_at'], true) ?></td>
+                        <td data-label="Last sign-in"><?= (int) ($u['last_login_at'] ?? 0) > 0 ? $time($u['last_login_at']) : '<span class="pt-muted">Never</span>' ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

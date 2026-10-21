@@ -102,8 +102,9 @@ final class SeoController extends Controller
             'start_url' => '/',
             'scope' => '/',
             'display' => 'browser',
-            'background_color' => '#07080b',
-            'theme_color' => '#07080b',
+            // The dark theme's page colour (--bg in site.css), the same as the layout's theme-color meta.
+            'background_color' => '#090C10',
+            'theme_color' => '#090C10',
             'icons' => [
                 ['src' => '/assets/img/brand/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png'],
                 ['src' => '/assets/img/brand/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png'],

@@ -15,8 +15,23 @@ $bare ??= false;
 $section ??= null;
 $productKey ??= null;
 $chatInline = (bool) $this->shared('chatInline', false);
-$home = ($app->request()?->path ?? '/') === '/';
+$home = $seo->path === '/';
 $sprite = PSC_ROOT . '/public/assets/img/icons.svg';
+
+// The trail opens the page hero (docs/DESIGN.md 8.4, 8.9): it is the first thing inside the hero's .l-wrap, so it
+// shares the hero's width, backdrop and product bar and keeps one rhythm on every page. A page that does not start
+// with a hero, or whose wrap is itself the hero grid (the trail would become a grid cell), gets the trail as a strip
+// of its own above the content.
+$crumbs = !$bare && !$home && count($seo->breadcrumbs) > 1 ? $this->partial('crumbs', ['crumbs' => $seo->breadcrumbs]) : '';
+$crumbsInHero = false;
+if ($crumbs !== '') {
+    $hero = '/\A\s*<section\b[^>]*\bclass="(?:[^"]*\s)?c-hero(?:\s[^"]*)?"[^>]*>\s*<div\b[^>]*\bclass="(?![^"]*\bc-hero-grid\b)(?:[^"]*\s)?l-wrap(?:\s[^"]*)?"[^>]*>/';
+    $placed = preg_replace_callback($hero, static fn (array $m): string => $m[0] . $crumbs, $content, 1, $count);
+    if (is_string($placed) && $count === 1) {
+        $content = $placed;
+        $crumbsInHero = true;
+    }
+}
 ?><!doctype html>
 <html lang="en-GB">
 <head>
@@ -50,11 +65,11 @@ $sprite = PSC_ROOT . '/public/assets/img/icons.svg';
 <?= $content ?>
 <?php else: ?>
 <main id="main"<?= $productKey !== null ? ' data-product="' . e($productKey) . '"' : '' ?>>
-    <?php if (!$home && count($seo->breadcrumbs) > 1): ?>
-        <div class="l-wrap"><?= $this->partial('crumbs', ['crumbs' => $seo->breadcrumbs]) ?></div>
-    <?php endif; ?>
     <?php if (!empty($flashes)): ?>
-        <div class="l-wrap"><?= $this->partial('flashes', ['flashes' => $flashes]) ?></div>
+        <div class="l-wrap c-flashes"><?= $this->partial('flashes', ['flashes' => $flashes]) ?></div>
+    <?php endif; ?>
+    <?php if ($crumbs !== '' && !$crumbsInHero): ?>
+        <div class="l-wrap c-crumbs-bar"><?= $crumbs ?></div>
     <?php endif; ?>
     <?= $content ?>
 </main>

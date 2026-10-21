@@ -1,7 +1,8 @@
 <?php
 /**
  * One assistant conversation, in order: the visitor's messages, the assistant's answers with their verdict, and
- * any thumbs up or down the visitor left, shown as feedback. Everything is plain text (nl2br(e())).
+ * any thumbs up or down the visitor left, shown as feedback in words ("Rated helpful", with the visitor's note).
+ * Everything is plain text (nl2br(e())).
  *
  * @var array<string, mixed> $conversation with user_name and user_email (null for a visitor)
  * @var list<array<string, mixed>> $messages
@@ -77,8 +78,7 @@ $roles = ['user' => 'Visitor', 'assistant' => 'Assistant', 'feedback' => 'Feedba
                     <div class="pt-comment-body">
                         <?php if ($role === 'feedback'):
                             $fb = \Psc\Controllers\Admin\AdminController::feedback((string) $m['content']); ?>
-                            <p><?= e(match ($fb['rating']) { 'up' => 'Thumbs up for the answer above.', 'down' => 'Thumbs down for the answer above.', default => 'Feedback on the answer above.' }) ?></p>
-                            <?php if ($fb['note'] !== ''): ?><p><?= nl2br(e($fb['note'])) ?></p><?php endif; ?>
+                            <p><strong><?= e(match ($fb['rating']) { 'up' => 'Rated helpful', 'down' => 'Rated not helpful', default => 'Feedback on the answer above' }) ?></strong><?php if ($fb['note'] !== ''): ?>: <?= nl2br(e($fb['note'])) ?><?php endif; ?></p>
                         <?php else: ?>
                             <p><?= nl2br(e($m['content'])) ?></p>
                         <?php endif; ?>

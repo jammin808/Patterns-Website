@@ -25,7 +25,8 @@ $name = (string) $product['name'];
             </div>
         </div>
         <div class="c-pd-cta-help">
-            <a class="c-launcher" href="/contact/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+            <?php /* A link to the contact page without scripting; chat.js makes it the assistant's button. */ ?>
+            <a class="c-launcher" href="/contact/" data-chat-open>
                 <span class="c-launcher-icon"><?= icon('chat') ?></span>
                 <span><b>Ask the assistant</b> <small>Setup, licences and show-day questions about <?= e($name) ?></small></span>
             </a>

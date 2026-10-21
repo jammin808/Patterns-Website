@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Tests\Feature;
 
+use Psc\Chat\AnthropicGateway;
 use Psc\Chat\ChatService;
 use Psc\Chat\Prompts;
 use Psc\Controllers\ChatController;
@@ -40,6 +41,61 @@ final class ChatTest extends TestCase
         $r = $this->ask('What is StageWatch?');
         self::assertSame(503, $r->status);
         self::assertSame('unavailable', json_decode($r->body, true)['error']);
+    }
+
+    /** @return array{status: string, scope: string, fab: string, html: string} the panel's parts on a public page */
+    private function panel(string $path): array
+    {
+        $r = $this->request('GET', $path);
+        self::assertSame(200, $r->status);
+        self::assertSame([], $r->cookies(), 'the panel adds no cookie to a public page');
+        self::assertMatchesRegularExpression('/^public,/', (string) $r->getHeader('Cache-Control'));
+        preg_match('#<span class="c-chat-status">(.*?)</span>#s', $r->body, $status);
+        preg_match('#<p class="c-chat-scope">(.*?)</p>#s', $r->body, $scope);
+        preg_match('#<a class="c-chat-fab[^"]*"[^>]*data-chat-fab[^>]*>(.*?)</a>#s', $r->body, $fab);
+        return ['status' => $status[1] ?? '', 'scope' => $scope[1] ?? '', 'fab' => $fab[1] ?? '', 'html' => $r->body];
+    }
+
+    public function testThePanelSaysOfflineWhenTheAssistantCannotAnswer(): void
+    {
+        foreach ([[], ['chat' => ['api_key' => 'sk-test', 'enabled' => false]]] as $config) {
+            $this->bootApp($config);
+            self::assertFalse(ChatController::online($this->app->config));
+            foreach (['/stagewatch/', '/support/'] as $path) {
+                $p = $this->panel($path);
+                self::assertStringContainsString('c-lamp--off', $p['status'], $path);
+                self::assertStringContainsString('Offline', $p['status'], $path);
+                self::assertStringNotContainsString('c-lamp--go', $p['status'], $path);
+                self::assertStringContainsString("The assistant isn't available right now.", $p['scope'], $path);
+                self::assertStringContainsString('href="/contact/"', $p['scope'], $path);
+                self::assertStringNotContainsString('data-chat-suggest', $p['html'], $path);
+            }
+            self::assertStringNotContainsString('c-lamp', $this->panel('/stagewatch/')['fab'], 'no live lamp on the launcher');
+        }
+    }
+
+    public function testThePanelSaysOnlineWhenConfigured(): void
+    {
+        self::assertTrue(AnthropicGateway::available(), 'the SDK is installed');
+        $this->bootApp(['chat' => ['api_key' => 'sk-test']]);
+        self::assertTrue(ChatController::online($this->app->config));
+        foreach (['/stagewatch/', '/support/'] as $path) {
+            $p = $this->panel($path);
+            self::assertStringContainsString('c-lamp--go', $p['status'], $path);
+            self::assertStringContainsString('Online', $p['status'], $path);
+            self::assertStringContainsString('I can help with', $p['scope'], $path);
+            self::assertStringContainsString('data-chat-suggest', $p['html'], $path);
+        }
+        self::assertStringContainsString('c-lamp', $this->panel('/stagewatch/')['fab']);
+    }
+
+    public function testTheFloatingLauncherStartsTuckedWithAPlainLinkForNoScript(): void
+    {
+        $html = $this->panel('/stagewatch/')['html'];
+        self::assertMatchesRegularExpression('#<a class="c-chat-fab is-tucked" href="/contact/" data-chat-open data-chat-fab>#', $html);
+        self::assertMatchesRegularExpression('#<noscript><a class="c-chat-fab" href="/contact/">#', $html);
+        self::assertStringNotContainsString('<noscript><a class="c-chat-fab"', $this->request('GET', '/contact/')->body, 'no link to the page you are on');
+        self::assertStringNotContainsString('data-chat-fab', $this->panel('/support/')['html'], 'the support page has the inline panel only');
     }
 
     public function testCrossSiteOrHeaderlessRequestsAreRefused(): void

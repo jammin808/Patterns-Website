@@ -23,6 +23,13 @@ $time = static fn (mixed $ts, bool $date = false): string => (int) $ts > 0
     ? '<time datetime="' . e(date(DATE_ATOM, (int) $ts)) . '">' . e($date ? date_short((int) $ts) : ago((int) $ts)) . '</time>'
     : '';
 $count = static fn (int $n, string $one, string $many): string => $n . ' ' . ($n === 1 ? $one : $many);
+// A release card's title line is shown only when it says more than the card's heading: a title that only repeats
+// the product and version ("Patterns 3.2.1", "v3.2.1"), in any case or spacing, is left out.
+$plain = static fn (string $text): string => (string) preg_replace('/[^\p{L}\p{N}.]+/u', '', mb_strtolower($text));
+$addsToHeading = static function (string $title, string $product, string $version) use ($plain): bool {
+    $t = $plain($title);
+    return $t !== '' && !in_array($t, [$plain($product . ' ' . $version), $plain($product . ' v' . $version), $plain($version), $plain('v' . $version)], true);
+};
 $actions = [
     ['/portal/tickets/new/?type=bug', 'Report a bug', 'Something not working as it should? Tell us what happened.'],
     ['/portal/tickets/new/?type=feature', 'Request a feature', 'An idea that would help your shows? Suggest it.'],
@@ -93,7 +100,7 @@ $actions = [
         </div>
     <?php else: ?>
         <div class="pt-table-wrap">
-            <table class="pt-table">
+            <table class="pt-table pt-table--stack">
                 <caption class="u-visually-hidden">Your open tickets, the most recently active first</caption>
                 <thead>
                     <tr>
@@ -112,9 +119,9 @@ $actions = [
                                 <a href="/portal/tickets/<?= (int) $t['id'] ?>/"><span class="pt-muted pt-mono">#<?= (int) $t['id'] ?></span> <?= e($t['title']) ?></a>
                                 <?php if ($t['has_reply']): ?> <span class="pt-badge pt-badge--new">New reply</span><?php endif; ?>
                             </th>
-                            <td><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($ticketTypes[$tType] ?? $tType) ?></span></td>
-                            <td><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($ticketStatuses[$tStatus] ?? $tStatus) ?></span></td>
-                            <td><?= $time($t['last_activity_at']) ?></td>
+                            <td data-label="Type"><span class="pt-badge pt-badge--<?= e($tType) ?>"><?= e($ticketTypes[$tType] ?? $tType) ?></span></td>
+                            <td data-label="Status"><span class="pt-badge pt-badge--<?= e($tStatus) ?>"><?= e($ticketStatuses[$tStatus] ?? $tStatus) ?></span></td>
+                            <td data-label="Last activity"><?= $time($t['last_activity_at']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -135,7 +142,7 @@ $actions = [
         </div>
     <?php else: ?>
         <div class="pt-table-wrap">
-            <table class="pt-table">
+            <table class="pt-table pt-table--stack">
                 <caption class="u-visually-hidden">Your licences and licence requests, the newest first</caption>
                 <thead>
                     <tr>
@@ -151,9 +158,9 @@ $actions = [
                         $lProduct = (string) $l['product']; ?>
                         <tr>
                             <th scope="row"><a href="/portal/licences/<?= (int) $l['id'] ?>/"><?= e(($products[$lProduct] ?? $lProduct) . ' ' . ($licenceNames[(int) $l['id']] ?? $l['tier'])) ?><span class="u-visually-hidden">, reference <?= e($l['reference']) ?></span></a><?php if ((int) $l['quantity'] > 1): ?> <span class="pt-muted">× <?= (int) $l['quantity'] ?></span><?php endif; ?></th>
-                            <td class="pt-mono"><?= e($l['reference']) ?></td>
-                            <td><span class="pt-badge pt-badge--<?= e($lStatus) ?>"><?= e($licenceStatuses[$lStatus] ?? $lStatus) ?></span></td>
-                            <td><?= $time($l['created_at'], true) ?></td>
+                            <td class="pt-mono" data-label="Reference"><?= e($l['reference']) ?></td>
+                            <td data-label="Status"><span class="pt-badge pt-badge--<?= e($lStatus) ?>"><?= e($licenceStatuses[$lStatus] ?? $lStatus) ?></span></td>
+                            <td data-label="Requested"><?= $time($l['created_at'], true) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -176,14 +183,17 @@ $actions = [
         <div class="pt-grid pt-grid--2">
             <?php foreach ($releases as $r):
                 $rProduct = (string) $r['product'];
+                $rName = (string) ($products[$rProduct] ?? $rProduct);
                 $rChannel = (string) $r['channel']; ?>
                 <article class="pt-card">
-                    <h3 class="pt-card-title"><?= e($products[$rProduct] ?? $rProduct) ?> <?= e($r['version']) ?></h3>
+                    <h3 class="pt-card-title"><?= e($rName) ?> <?= e($r['version']) ?></h3>
                     <p class="pt-card-meta">
                         <span class="pt-badge pt-badge--<?= e($rChannel) ?>"><?= e($channels[$rChannel] ?? $rChannel) ?></span>
                         <?php if ((int) $r['published_at'] > 0): ?>Released <?= $time($r['published_at'], true) ?><?php endif; ?>
                     </p>
-                    <p class="pt-card-body"><?= e($r['title']) ?></p>
+                    <?php if ($addsToHeading((string) $r['title'], $rName, (string) $r['version'])): ?>
+                        <p class="pt-card-body"><?= e($r['title']) ?></p>
+                    <?php endif; ?>
                     <?php if (!$r['may_download']): ?>
                         <p class="pt-small pt-muted">For licence holders. Request a licence to download it.</p>
                     <?php endif; ?>

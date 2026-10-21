@@ -621,6 +621,29 @@ final class DownloadsLicencesTest extends TestCase
         }
     }
 
+    /**
+     * A launch price reads as the licensing page shows it: the launch price first, then the list price struck through
+     * with a hidden "was" for screen readers. Other prices keep their own label.
+     */
+    public function testALaunchPriceLeadsWithTheListPriceStruckThrough(): void
+    {
+        $this->makeUser(self::CLIENT);
+        $this->signInAs(self::CLIENT);
+        $launch = '<strong>£59</strong> <s class="pt-muted"><span class="u-visually-hidden">was </span>£79</s> launch price';
+
+        $form = $this->request('GET', '/portal/licences/request/?product=stagewatch&tier=production')->body;
+        self::assertStringContainsString('<dd>' . $launch . '</dd>', $form);
+        self::assertStringNotContainsString('Launch price £59', $form, 'the content\'s note is not printed beside the list price');
+
+        $choose = $this->request('GET', '/portal/licences/request/?product=stagewatch')->body;
+        self::assertStringContainsString('<span class="pt-card-meta">' . $launch . '</span>', $choose);
+        self::assertStringContainsString('<span class="pt-card-meta">£15 for 30 days</span>', $choose, 'a price without a launch offer keeps its label');
+        self::assertStringContainsString('<span class="pt-card-meta">£29</span>', $choose);
+
+        $pass = $this->request('GET', '/portal/licences/request/?product=stagewatch&tier=event-pass')->body;
+        self::assertStringContainsString('<dd>£15 for 30 days</dd>', $pass);
+    }
+
     public function testALicenceRequestIsValidated(): void
     {
         $this->makeUser(self::CLIENT);
