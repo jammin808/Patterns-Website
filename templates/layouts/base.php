@@ -18,10 +18,8 @@ $chatInline = (bool) $this->shared('chatInline', false);
 $home = $seo->path === '/';
 $sprite = PSC_ROOT . '/public/assets/img/icons.svg';
 // The Google tag, first in <head> on every page but those whose address carries a one-time token.
-$app ??= \Psc\App::get();
-$gaId = \Psc\View\Analytics::id($app->config->string('analytics.ga_id'));
-$request = $app->request();
-$gaTag = $gaId !== '' && ($request === null || \Psc\View\Analytics::allowedOn($request)) ? \Psc\View\Analytics::snippet($gaId) : '';
+$gaId = \Psc\View\Analytics::forPage($app ?? \Psc\App::get());
+$gaTag = $gaId !== '' ? \Psc\View\Analytics::snippet($gaId) : '';
 
 // The trail opens the page hero (docs/DESIGN.md 8.4, 8.9): it is the first thing inside the hero's .l-wrap, so it
 // shares the hero's width, backdrop and product bar and keeps one rhythm on every page. A page that does not start
@@ -65,6 +63,9 @@ if ($crumbs !== '') {
 <body class="l-page">
 <?php if (is_file($sprite)) { readfile($sprite); } ?>
 <a class="c-skip" href="#main">Skip to content</a>
+<?php if ($gaTag !== ''): ?>
+<?= $this->partial('consent', ['gaId' => $gaId]) ?>
+<?php endif; ?>
 <?= $this->partial('announce') ?>
 <?= $this->partial('header', ['section' => $section]) ?>
 <?php if ($bare): ?>

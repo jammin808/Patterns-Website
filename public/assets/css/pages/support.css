@@ -9,6 +9,7 @@
   .support-legal-date { margin-top: var(--sp-4); font-size: var(--fs-1); color: var(--text-3); }
   .support-legal-nav { border-top: 0; margin-inline: -14px; }
   .support-legal-body { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+  .support-legal-consent { margin-top: var(--sp-5); }
   .support-legal-help { display: grid; gap: var(--sp-5); padding: clamp(20px, 3vw, 28px); border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
     & h2 { font-size: var(--fs-5); } & p { margin-top: var(--sp-2); max-width: 56ch; font-size: var(--fs-2); color: var(--text-2); } }
 
