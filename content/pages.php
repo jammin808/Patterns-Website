@@ -447,7 +447,7 @@ return [
     '/legal/cookies/' => [
         'template' => 'pages/legal/cookies',
         'title' => 'Cookies | Patterns Show Control',
-        'description' => 'The few cookies this site uses: none on the pages you read, and only essential ones for the contact form, the client portal and the assistant.',
+        'description' => 'The cookies this site uses: Google Analytics cookies on the pages you read, and essential ones for the contact form, the client portal and the assistant.',
         'crumb' => 'Cookies',
         'parent' => '/',
         'section' => 'legal',

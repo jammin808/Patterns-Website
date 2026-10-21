@@ -9,16 +9,39 @@ use Psc\Controllers\Controller;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Support\Audit;
+use Psc\Support\FormGuard;
 
 /**
  * Signing in and out, creating an account, confirming an email address and setting a password from a reset or
  * invite link. Every flow that takes an email address answers the same way whether or not it has an account; only
  * a correct password earns a message about the account's state (unconfirmed, waiting for approval, disabled).
+ *
+ * The three forms a stranger can use to have the site send mail (sign-up, a reset link, a new confirmation link)
+ * carry FormGuard's honeypot and signed showing time, and are rate limited per network address and per email
+ * address. A filled honeypot gets the answer a person would and nothing is done; a send faster than a person fills
+ * the form in comes back with the input kept and a request to press the button again.
  */
 final class AuthController extends Controller
 {
     /** Account states a correct password may be told about on the sign-in page. */
     private const LOGIN_NOTICES = ['unverified', 'approval', 'disabled'];
+
+    /** A password is never kept for a form shown again, so the sign-up's request says to type it once more. */
+    public const REGISTER_QUICK = 'That was quick. Please type your password again, then press Create account.';
+    public const FORGOT_QUICK = 'That was quick. Please check the address, then press Send reset link again.';
+    public const RESEND_QUICK = 'That was quick. Please check the address, then press Send a new link again.';
+
+    /** The one answer to a request for a new confirmation link, whatever the address. */
+    public const RESEND_ANSWER = 'If that address has an account waiting to be confirmed, a new link is on its way. It works for 48 hours.';
+
+    /**
+     * Sign-ups accepted for one email address in an hour. Past it the answer is the same "check your email" page and
+     * nothing is done, so the limit says nothing about whether the address has an account.
+     */
+    public const REGISTER_PER_ADDRESS_PER_HOUR = 3;
+
+    /** Sign-ups accepted from one network address in an hour. */
+    public const REGISTER_PER_IP_PER_HOUR = 10;
 
     private const REGISTRATION_MODES = ['open', 'approval', 'invite'];
 
@@ -86,6 +109,7 @@ final class AuthController extends Controller
             'registration' => $this->registrationMode(),
             'old' => $session->takeOld(),
             'errors' => $this->takeErrors(),
+            'quick' => $this->takeQuick('register'),
             'minLength' => $this->app->config->int('security.password_min_length', 10),
         ], 'Create an account');
     }
@@ -94,6 +118,11 @@ final class AuthController extends Controller
     {
         if ($this->registrationMode() === 'invite') {
             return $this->redirect('/portal/register/', 'info', 'Accounts are by invitation only. Please contact us if you need one.');
+        }
+        $verdict = (new FormGuard($this->app))->check('register', $request);
+        if ($verdict === FormGuard::BOT) {
+            // The page a sign-up gets, and nothing is stored or sent.
+            return $this->checkYourEmail($request->input('email'));
         }
         $input = [
             'name' => Auth::cleanLine($request->input('name')),
@@ -109,15 +138,30 @@ final class AuthController extends Controller
         if ($errors !== []) {
             return $this->backWithErrors('/portal/register/', $request, $errors);
         }
-        if (!$this->app->limiter()->hit('register-ip:' . $this->app->clientIp(), 10, 3600)) {
+        // Only a sign-up that would go through is timed: what to fix is said first, however fast the send.
+        if ($verdict === FormGuard::QUICK) {
+            return $this->tooQuick('/portal/register/', $request, 'register', self::REGISTER_QUICK);
+        }
+        $limiter = $this->app->limiter();
+        if (!$limiter->hit('register-ip:' . $this->app->clientIp(), self::REGISTER_PER_IP_PER_HOUR, 3600)) {
             return $this->backWithErrors('/portal/register/', $request, [], 'Several accounts have been created from here recently. Please wait an hour, then try again.');
+        }
+        // Counted before the password is hashed, so a flood at one address costs neither mail nor work.
+        if (!$limiter->hit('register-addr:' . Auth::normaliseEmail($input['email']), self::REGISTER_PER_ADDRESS_PER_HOUR, 3600)) {
+            return $this->checkYourEmail($input['email']);
         }
         $result = $this->app->auth()->register($input);
         if (!$result['ok']) {
             return $this->backWithErrors('/portal/register/', $request, $result['errors']);
         }
         // The same page whether the address was new or already had an account (that one gets a notice instead).
-        $this->app->session()->set('registered_email', Auth::normaliseEmail($input['email']));
+        return $this->checkYourEmail($input['email']);
+    }
+
+    /** The "check your email" page after a sign-up: the one answer, whatever happened to the address. */
+    private function checkYourEmail(string $email): Response
+    {
+        $this->app->session()->set('registered_email', Auth::normaliseEmail($email));
         return Response::redirect('/portal/register/', 303);
     }
 
@@ -143,12 +187,36 @@ final class AuthController extends Controller
         ], $titles[$state]);
     }
 
+    /**
+     * The request for a new confirmation link on a page of its own: where a refused request comes back to (the form
+     * also sits on the sign-in, check-your-email and expired-link pages).
+     */
+    public function resendForm(Request $request): Response
+    {
+        $session = $this->app->session();
+        return $this->portal('portal/auth/resend', [
+            'old' => $session->takeOld(),
+            'errors' => $this->takeErrors(),
+            'quick' => $this->takeQuick('resend'),
+        ], 'New confirmation link');
+    }
+
     public function resend(Request $request): Response
     {
+        $verdict = (new FormGuard($this->app))->check('resend', $request);
+        if ($verdict === FormGuard::BOT) {
+            return $this->redirect('/portal/login/', 'info', self::RESEND_ANSWER);
+        }
         $email = Auth::normaliseEmail($request->input('email'));
+        // Only the form of the address is judged here, never whether it has an account.
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+            return $this->backWithErrors('/portal/verify/resend/', $request, ['email' => $email === '' ? 'Enter the email address you created your account with.' : self::EMAIL_FORMAT]);
+        }
+        if ($verdict === FormGuard::QUICK) {
+            return $this->tooQuick('/portal/verify/resend/', $request, 'resend', self::RESEND_QUICK);
+        }
         $limiter = $this->app->limiter();
-        if (filter_var($email, FILTER_VALIDATE_EMAIL)
-            && $limiter->hit('verify-resend-ip:' . $this->app->clientIp(), 10, 3600)
+        if ($limiter->hit('verify-resend-ip:' . $this->app->clientIp(), 10, 3600)
             && $limiter->hit('verify-resend:' . $email, 3, 3600)) {
             $row = $this->app->auth()->findByEmail($email);
             if ($row !== null && $row['status'] === 'pending') {
@@ -157,7 +225,7 @@ final class AuthController extends Controller
             }
         }
         // One answer for every address, known or not, and for every rate-limited attempt.
-        return $this->redirect('/portal/login/', 'info', 'If that address has an account waiting to be confirmed, a new link is on its way. It works for 48 hours.');
+        return $this->redirect('/portal/login/', 'info', self::RESEND_ANSWER);
     }
 
     public function forgotForm(Request $request): Response
@@ -169,15 +237,29 @@ final class AuthController extends Controller
             'sent' => $sent,
             'old' => $session->takeOld(),
             'errors' => $this->takeErrors(),
+            'quick' => $this->takeQuick('forgot'),
         ], 'Reset your password');
     }
 
     public function forgot(Request $request): Response
     {
+        $verdict = (new FormGuard($this->app))->check('forgot', $request);
+        if ($verdict === FormGuard::BOT) {
+            // The answer every address gets, and nothing is sent.
+            $this->app->session()->set('forgot_sent', true);
+            return Response::redirect('/portal/forgot/', 303);
+        }
         $email = trim($request->input('email'));
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+        if ($email === '') {
             return $this->backWithErrors('/portal/forgot/', $request, ['email' => 'Enter the email address you use to sign in.']);
         }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
+            return $this->backWithErrors('/portal/forgot/', $request, ['email' => self::EMAIL_FORMAT]);
+        }
+        if ($verdict === FormGuard::QUICK) {
+            return $this->tooQuick('/portal/forgot/', $request, 'forgot', self::FORGOT_QUICK);
+        }
+        // Rate limited per address and per network address inside requestReset(), silently: the answer is the same.
         $this->app->auth()->requestReset($email);
         $this->app->session()->set('forgot_sent', true);
         return Response::redirect('/portal/forgot/', 303);

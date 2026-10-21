@@ -28,7 +28,6 @@ $principles = [
     ['icon' => 'approve', 'title' => 'People stay in charge', 'text' => implode(' ', array_slice(preg_split('/(?<=\.)\s+/', (string) $aiFirst) ?: [], 0, 3))],
     ['icon' => 'check', 'title' => 'Confirmed, not hopeful', 'text' => $arch['Confirmed, not hopeful'] ?? ''],
 ];
-$email = (string) ($site['email'] ?? '');
 $apps = array_map(static fn (string $k): string => (string) (product($k)['name'] ?? $k), Content::PRODUCTS);
 ?>
 <section class="c-hero c-hero--page" aria-labelledby="about-title">
@@ -111,7 +110,6 @@ $apps = array_map(static fn (string $k): string => (string) (product($k)['name']
             </div>
         </div>
         <dl class="c-specs c-specs--rows hub-rates">
-            <?php if ($email !== ''): ?><div><dt>Email</dt><dd><p><a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></p></dd></div><?php endif; ?>
             <div><dt>Contact form</dt><dd><p>For sales, support, rental and partnership questions. <a href="/contact/">Open the contact form</a></p></dd></div>
             <div><dt>Support</dt><dd><p>Guides, troubleshooting and answers for each app. <a href="/support/">Go to support</a></p></dd></div>
             <div><dt>Client portal</dt><dd><p>Downloads, licence files, bug reports and feature requests. <a href="/portal/login/">Sign in to the client portal</a></p></dd></div>

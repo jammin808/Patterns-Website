@@ -9,8 +9,21 @@
  * @var array{licences: int, tickets: int} $kept
  * @var string $deleteWord
  * @var bool $soleAdmin the only active administrator (the account cannot be deleted until there is another)
+ * @var list<array{type: string, message: string}> $flashes
  */
 $soleAdmin ??= false;
+// Which of the three forms was sent last (its hidden "form" field comes back with the kept input), so a refusal no
+// field explains is said in that form's error summary and nowhere else.
+$posted = (string) ($old['form'] ?? '');
+$summary = fn (string $form, array $fields, string $action, string $failed): string => $this->partial('error-summary', [
+    'errors' => $errors,
+    'fields' => $fields,
+    'flashes' => $flashes ?? [],
+    'own' => $posted === $form,
+    'id' => $form . '-errors',
+    'action' => $action,
+    'failed' => $failed,
+]);
 // Values typed into the details form win after a validation error; otherwise the saved ones.
 $fromProfile = array_key_exists('name', $old);
 $name = $fromProfile ? $old['name'] : (string) $account['name'];
@@ -41,8 +54,10 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
         <?php endif; ?>
     </dl>
 
-    <form method="post" action="/portal/account/profile/" class="pt-form">
+    <form method="post" action="/portal/account/profile/" class="pt-form" novalidate>
         <?= csrf_field() ?>
+        <input type="hidden" name="form" value="profile">
+        <?= $summary('profile', ['name' => 'profile-name', 'company' => 'profile-company'], 'before saving', 'Your details were not saved') ?>
         <?= $this->render('portal/auth/_field', [
             'id' => 'profile-name',
             'name' => 'name',
@@ -68,7 +83,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
             <p class="pt-help" id="profile-marketing-help">Untick this at any time to stop them.</p>
         </div>
         <div class="pt-actions">
-            <button type="submit" class="pt-btn pt-btn--primary">Save details</button>
+            <button type="submit" class="pt-btn pt-btn--primary" data-busy="Saving…">Save details</button>
         </div>
     </form>
 </section>
@@ -76,8 +91,10 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
 <section class="pt-section" id="password" aria-labelledby="password-title">
     <h2 class="pt-h2" id="password-title">Password</h2>
     <p>Changing your password signs out any other browsers that are signed in to this account. This one stays signed in.</p>
-    <form method="post" action="/portal/account/password/" class="pt-form">
+    <form method="post" action="/portal/account/password/" class="pt-form" novalidate>
         <?= csrf_field() ?>
+        <input type="hidden" name="form" value="password">
+        <?= $summary('password', ['current_password' => 'password-current', 'new_password' => 'password-new', 'new_password_confirm' => 'password-confirm'], 'before saving', 'Your password was not changed') ?>
         <input type="email" name="username" value="<?= e($account['email']) ?>" autocomplete="username" readonly hidden>
         <?= $this->render('portal/auth/_field', [
             'id' => 'password-current',
@@ -112,7 +129,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
             'error' => $errors['new_password_confirm'] ?? null,
         ]) ?>
         <div class="pt-actions">
-            <button type="submit" class="pt-btn pt-btn--primary">Change password</button>
+            <button type="submit" class="pt-btn pt-btn--primary" data-busy="Changing password…">Change password</button>
         </div>
     </form>
 </section>
@@ -143,8 +160,10 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
         <p><strong>You are the only administrator.</strong> To delete this account, first make another account an administrator on the <a href="/portal/admin/users/">Users</a> page.</p>
     </div>
     <?php else: ?>
-    <form method="post" action="/portal/account/delete/" class="pt-form">
+    <form method="post" action="/portal/account/delete/" class="pt-form" novalidate>
         <?= csrf_field() ?>
+        <input type="hidden" name="form" value="delete">
+        <?= $summary('delete', ['delete_password' => 'delete-password', 'delete_confirm' => 'delete-confirm'], 'to delete your account', 'Your account was not deleted') ?>
         <fieldset class="pt-fieldset">
             <legend>Confirm deletion</legend>
             <input type="email" name="username" value="<?= e($account['email']) ?>" autocomplete="username" readonly hidden>
@@ -171,7 +190,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
             ]) ?>
         </fieldset>
         <div class="pt-actions">
-            <button type="submit" class="pt-btn pt-btn--danger">Delete my account</button>
+            <button type="submit" class="pt-btn pt-btn--danger" data-busy="Deleting…">Delete my account</button>
         </div>
     </form>
     <?php endif; ?>

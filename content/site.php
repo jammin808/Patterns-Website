@@ -11,7 +11,6 @@ return [
     'tagline' => 'Four show apps. One network. Every decision stays yours.',
     'description' => 'Test patterns, stage timers, back-room messaging and projection mapping for live events: four Windows apps that work together on one show network.',
     'publisher' => ['name' => 'Ben Rohleder', 'country' => 'United Kingdom'],
-    'email' => 'support@patternsshowcontrol.co.uk',
 
     'nav' => [
         ['label' => 'Ecosystem', 'href' => '/ecosystem/'],

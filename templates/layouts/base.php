@@ -17,6 +17,11 @@ $productKey ??= null;
 $chatInline = (bool) $this->shared('chatInline', false);
 $home = $seo->path === '/';
 $sprite = PSC_ROOT . '/public/assets/img/icons.svg';
+// The Google tag, first in <head> on every page but those whose address carries a one-time token.
+$app ??= \Psc\App::get();
+$gaId = \Psc\View\Analytics::id($app->config->string('analytics.ga_id'));
+$request = $app->request();
+$gaTag = $gaId !== '' && ($request === null || \Psc\View\Analytics::allowedOn($request)) ? \Psc\View\Analytics::snippet($gaId) : '';
 
 // The trail opens the page hero (docs/DESIGN.md 8.4, 8.9): it is the first thing inside the hero's .l-wrap, so it
 // shares the hero's width, backdrop and product bar and keeps one rhythm on every page. A page that does not start
@@ -35,6 +40,7 @@ if ($crumbs !== '') {
 ?><!doctype html>
 <html lang="en-GB">
 <head>
+<?= $gaTag ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark light">

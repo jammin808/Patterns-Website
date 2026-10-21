@@ -13,6 +13,7 @@
  * @var list<string> $allowed
  * @var int $maxMb
  * @var int $maxFiles
+ * @var list<array{type: string, message: string}> $flashes
  */
 $old ??= [];
 $errors ??= [];
@@ -35,6 +36,12 @@ $sevError = $err('severity');
 $fileError = $err('attachments');
 $accept = implode(',', array_map(static fn (string $x): string => '.' . $x, $allowed));
 $fileHelp = 'Up to ' . $maxFiles . ' files, ' . $maxMb . ' MB each. Accepted: ' . implode(', ', $allowed) . '.';
+// The summary's links, in the order the fields appear for this type; a severity error links to the first choice.
+$summaryFields = ['title' => 'f-title', 'product' => 'f-product'] + match ($type) {
+    'bug' => ['app_version' => 'f-app_version', 'environment' => 'f-environment', 'severity' => 'severity-' . (string) array_key_first($severities), 'what_happened' => 'f-what_happened', 'expected' => 'f-expected', 'steps' => 'f-steps', 'attachments' => 'f-attachments'],
+    'feature' => ['problem' => 'f-problem', 'idea' => 'f-idea'],
+    default => ['question' => 'f-question'],
+};
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow">New ticket</p>
@@ -46,6 +53,13 @@ $fileHelp = 'Up to ' . $maxFiles . ' files, ' . $maxMb . ' MB each. Accepted: ' 
 <form class="pt-form" id="form" method="post" action="/portal/tickets/"<?= $type === 'bug' ? ' enctype="multipart/form-data"' : '' ?> novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="type" value="<?= e($type) ?>">
+    <?= $this->partial('error-summary', [
+        'errors' => $errors,
+        'fields' => $summaryFields,
+        'flashes' => $flashes ?? [],
+        'action' => 'before sending',
+        'failed' => 'Your ticket was not sent',
+    ]) ?>
 
     <?= $field(['name' => 'title', 'label' => 'Title', 'value' => $v('title'), 'error' => $err('title'), 'help' => $titleHelp[$type], 'required' => true, 'attrs' => ['maxlength' => 150, 'autocomplete' => 'off']]) ?>
 
@@ -93,7 +107,7 @@ $fileHelp = 'Up to ' . $maxFiles . ' files, ' . $maxMb . ' MB each. Accepted: ' 
     <p class="pt-small pt-muted">You can use simple formatting: **bold**, *italic*, lists and links.</p>
 
     <div class="pt-actions">
-        <button type="submit" class="pt-btn pt-btn--primary"><?= e($submit[$type]) ?></button>
+        <button type="submit" class="pt-btn pt-btn--primary" data-busy="Sending…"><?= e($submit[$type]) ?></button>
         <a class="pt-btn pt-btn--ghost" href="/portal/tickets/">Cancel</a>
     </div>
 </form>

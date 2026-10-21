@@ -120,6 +120,7 @@ function init(root) {
   const counter = root.querySelector('[data-chat-count]');
   const openers = Array.from(document.querySelectorAll('[data-chat-open]'));
   if (!panel || !log || !form || !input) return;
+  const sendButton = form.querySelector('[type="submit"]');
 
   const inlinePanel = root.hasAttribute('data-chat-inline');
   const maxChars = Number(input.getAttribute('maxlength')) || 1200;
@@ -226,11 +227,13 @@ function init(root) {
   }
 
   async function send(text) {
-    if (busy) return;
+    // One question at a time, and never an empty one: either way the status says why nothing was sent.
+    if (busy) { say('The assistant is still answering. Your next question can go when it has finished.'); return; }
     const message = text.trim();
-    if (!message) return;
+    if (!message) { say('Type a question first.'); input.focus(); return; }
     busy = true;
     form.setAttribute('aria-busy', 'true');
+    if (sendButton) sendButton.setAttribute('aria-disabled', 'true');
     input.value = '';
     updateCount();
     bubble('user', message);
@@ -316,6 +319,7 @@ function init(root) {
     } finally {
       busy = false;
       form.removeAttribute('aria-busy');
+      if (sendButton) sendButton.removeAttribute('aria-disabled');
       input.focus();
     }
   }

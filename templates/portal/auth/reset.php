@@ -9,6 +9,7 @@
  * @var string $token
  * @var array<string, string> $errors
  * @var int $minLength
+ * @var list<array{type: string, message: string}> $flashes
  */
 ?>
 <div class="pt-auth">
@@ -39,10 +40,17 @@
             <a class="pt-btn pt-btn--ghost" href="/portal/login/">Sign in</a>
         </div>
     <?php else: ?>
-        <form method="post" action="/portal/reset/" class="pt-form">
+        <form method="post" action="/portal/reset/" class="pt-form" novalidate>
             <?= csrf_field() ?>
             <input type="hidden" name="token" value="<?= e($token) ?>">
             <input type="hidden" name="purpose" value="<?= e($purpose) ?>">
+            <?= $this->partial('error-summary', [
+                'errors' => $errors,
+                'fields' => ['password' => 'reset-password', 'password_confirm' => 'reset-password-confirm'],
+                'flashes' => $flashes ?? [],
+                'action' => 'before saving',
+                'failed' => 'Your password was not saved',
+            ]) ?>
             <?= $this->render('portal/auth/_field', [
                 'id' => 'reset-password',
                 'name' => 'password',
@@ -66,7 +74,7 @@
                 'error' => $errors['password_confirm'] ?? null,
             ]) ?>
             <div class="pt-actions">
-                <button type="submit" class="pt-btn pt-btn--primary"><?= $invite ? 'Set password' : 'Save new password' ?></button>
+                <button type="submit" class="pt-btn pt-btn--primary" data-busy="Saving…"><?= $invite ? 'Set password' : 'Save new password' ?></button>
             </div>
         </form>
     <?php endif; ?>

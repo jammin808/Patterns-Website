@@ -159,6 +159,16 @@ $statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb
         <form class="pt-form" method="post" action="<?= e($path) ?>comments/"<?= $canAttach ? ' enctype="multipart/form-data"' : '' ?> novalidate>
             <?= csrf_field() ?>
             <input type="hidden" name="form" value="comment">
+            <?php /* A refusal no field explains (too many replies in an hour) is this form's when it was the one posted. */ ?>
+            <?= $this->partial('error-summary', [
+                'errors' => $errors,
+                'fields' => ['body' => 'reply-body', 'attachments' => 'reply-attachments'],
+                'flashes' => $flashes ?? [],
+                'own' => ($oldComment ?? []) !== [],
+                'id' => 'reply-errors',
+                'action' => 'before posting',
+                'failed' => 'Your reply was not posted',
+            ]) ?>
             <?= $field(['name' => 'body', 'id' => 'reply-body', 'label' => 'Your reply', 'kind' => 'textarea', 'value' => (string) ($oldComment['body'] ?? ''), 'error' => $err('body'), 'help' => $replyHelp, 'required' => true, 'attrs' => ['rows' => 6, 'maxlength' => 5000]]) ?>
             <?php if ($canAttach): ?>
                 <div class="pt-field">
@@ -175,7 +185,7 @@ $statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb
                 </div>
             <?php endif; ?>
             <div class="pt-actions">
-                <button type="submit" class="pt-btn pt-btn--primary">Post reply</button>
+                <button type="submit" class="pt-btn pt-btn--primary" data-busy="Posting…">Post reply</button>
             </div>
         </form>
     <?php else: ?>
@@ -189,6 +199,15 @@ $statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb
         <form class="pt-form" method="post" action="/portal/admin/tickets/<?= $id ?>/" novalidate>
             <?= csrf_field() ?>
             <input type="hidden" name="form" value="manage">
+            <?= $this->partial('error-summary', [
+                'errors' => $errors,
+                'fields' => ['status' => 'manage-status', 'visibility' => 'manage-visibility', 'severity' => 'manage-severity', 'reply' => 'manage-reply'],
+                'flashes' => $flashes ?? [],
+                'own' => ($oldManage ?? []) !== [],
+                'id' => 'manage-errors',
+                'action' => 'before saving',
+                'failed' => 'The ticket was not changed',
+            ]) ?>
             <?= $field(['name' => 'status', 'id' => 'manage-status', 'label' => 'Status', 'kind' => 'select', 'value' => $m('status', $status), 'error' => $err('status'), 'help' => 'The owner gets an email when the status changes.', 'required' => true, 'options' => $statuses]) ?>
             <?= $field(['name' => 'visibility', 'id' => 'manage-visibility', 'label' => 'Who can see it', 'kind' => 'select', 'value' => $m('visibility', $visibility), 'error' => $err('visibility'), 'help' => 'Public: every signed-in client can read the ticket, its replies and its files. Public feature requests also appear on the board.', 'required' => true, 'options' => ['private' => 'Private — the owner and staff', 'public' => 'Public — every signed-in client']]) ?>
             <?php if ($type === 'bug'): ?>
@@ -200,7 +219,7 @@ $statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb
                 <label for="manage-internal">Internal note: only staff will see the message, and it is never emailed</label>
             </div>
             <div class="pt-actions">
-                <button type="submit" class="pt-btn pt-btn--primary">Save changes</button>
+                <button type="submit" class="pt-btn pt-btn--primary" data-busy="Saving…">Save changes</button>
             </div>
         </form>
     </section>

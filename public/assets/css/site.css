@@ -174,13 +174,8 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   ::selection { background: color-mix(in srgb, var(--lamp-standby) 40%, transparent); }
   ::placeholder { color: var(--text-3); opacity: 1; }
-  /* Page navigations cross-fade; a theme switch wipes left to right (site.js sets data-theme-switch). */
-  @media (prefers-reduced-motion: no-preference) {
-    @view-transition { navigation: auto; }
-    html[data-theme-switch]::view-transition-old(root) { animation: none; }
-    html[data-theme-switch]::view-transition-new(root) { animation: psc-wipe 420ms var(--e-cut) both; }
-  }
-  @keyframes psc-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+  /* No view transitions: a theme change and a page load paint the live page at once, so what is on screen is
+     always the page's own state, never a snapshot of it. */
   @keyframes psc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes psc-blink { 50% { opacity: 0.25; } }
   @keyframes psc-rise { from { opacity: 0; translate: 0 12px; } }
@@ -387,7 +382,7 @@
   /* ===== Site header, navigation, Products mega-menu, mobile drawer ===== */
   .c-header {
     --accent: var(--text); --accent-ink: var(--text); --accent-line: var(--text-2); --accent-on: var(--bg);
-    position: sticky; top: 0; z-index: 50; view-transition-name: site-header;
+    position: sticky; top: 0; z-index: 50;
     background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(14px) saturate(1.2);
     border-bottom: 1px solid var(--line); transition: box-shadow var(--d-2) var(--e-std);
     &.is-scrolled { box-shadow: var(--shadow-2); }
@@ -950,6 +945,18 @@
     & p { flex: 1 1 240px; font-size: var(--fs-0); color: var(--text-3); } }
   .c-error-summary { --a: var(--lamp-pgm); --a-ink: var(--ink-pgm); }
   .c-error-summary:focus { outline: 2px solid var(--ink-pgm); outline-offset: 3px; }
+  /* Each link to a field is a target of its own, at least 24px tall even when its message is short (WCAG 2.5.8). */
+  .c-error-summary li > a { display: inline-block; vertical-align: top; min-height: 24px; padding-block: 2px; }
+  /* A form's error summary says why a send was refused, so the flash strip does not say it again above the form. */
+  main:has(.c-error-summary) > .c-flashes > .pt-alert--danger,
+  .pt-main:has(.c-error-summary) > .pt-alert--danger { display: none; }
+  /* The answer to a send (a flash, "Message sent") takes focus on load (site.js) so it is read first; it is a
+     message, not a control, so it draws no focus ring (the contact page's success panel set the precedent). */
+  :is(.c-callout, .pt-alert)[tabindex="-1"]:not(.c-error-summary):focus { outline: none; }
+  /* A field the error summary links to stops with its label in view (html's scroll-padding clears the header). */
+  :where(.c-form, .pt-form) :is(input, select, textarea) { scroll-margin-top: 44px; }
+  /* A form on its way (site.js marks it busy until the next page): its button says so and takes no second press. */
+  form[aria-busy="true"] :is(button, input[type="submit"])[aria-disabled="true"] { cursor: progress; }
   .c-search, .pt-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 18px; font-size: var(--fs-1);
     & > label { align-self: center; font-weight: 600; } & :is(input, select) { width: auto; min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; } }
   .c-search-field { position: relative; flex: 1 1 14rem; max-width: 22rem;

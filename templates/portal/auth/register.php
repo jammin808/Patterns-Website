@@ -5,8 +5,11 @@
  * @var string $registration open | approval | invite
  * @var array<string, string> $old
  * @var array<string, string> $errors
+ * @var bool $quick the last send came faster than a person fills the form in: nothing was done, the input is back
  * @var int $minLength
+ * @var list<array{type: string, message: string}> $flashes
  */
+$quick ??= false;
 $termsError = $errors['terms'] ?? null;
 ?>
 <div class="pt-auth">
@@ -34,8 +37,16 @@ $termsError = $errors['terms'] ?? null;
             </div>
         <?php endif; ?>
 
-        <form method="post" action="/portal/register/" class="pt-form">
+        <form method="post" action="/portal/register/" class="pt-form" novalidate>
             <?= csrf_field() ?>
+            <?= form_guard('register', $old) ?>
+            <?= $this->partial('error-summary', [
+                'errors' => $errors,
+                'fields' => ['name' => 'register-name', 'email' => 'register-email', 'company' => 'register-company', 'password' => 'register-password', 'terms' => 'register-terms'],
+                'flashes' => $flashes ?? [],
+                'action' => 'before creating your account',
+                'failed' => $quick ? 'Your account is not created yet' : 'Your account was not created',
+            ]) ?>
             <?= $this->render('portal/auth/_field', [
                 'id' => 'register-name',
                 'name' => 'name',
@@ -98,7 +109,7 @@ $termsError = $errors['terms'] ?? null;
             </fieldset>
 
             <div class="pt-actions">
-                <button type="submit" class="pt-btn pt-btn--primary">Create account</button>
+                <button type="submit" class="pt-btn pt-btn--primary" data-busy="Creating account…">Create account</button>
             </div>
         </form>
         <?php /* Sign-in is offered by the portal's Sign in / Create an account switch above the card, so not again here. */ ?>
