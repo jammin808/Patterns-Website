@@ -264,10 +264,12 @@ Two OFL families, both variable and self-hosted: **Archivo** (wght 400–800, wd
   press), `--d-2` 200ms (toggles, rows), `--d-3` 320ms (panels, timer colour). Easing: `--e-cut`
   `cubic-bezier(.2,0,0,1)` (settles like a fader) and `--e-std`. Every keyframe animation sits behind the same media
   query, so reduced motion stops everything.
-- Progressive enhancements: a left-to-right wipe when the theme changes (a view transition), a cross-fade
-  between pages (`@view-transition`), the SMPTE scroll-progress line under the header (`animation-timeline:
-  scroll()`), the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening with
-  `interpolate-size`, and reveal-on-scroll (`data-reveal`).
+- Progressive enhancements: the SMPTE scroll-progress line under the header (`animation-timeline: scroll()`),
+  the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening with `interpolate-size`, and
+  reveal-on-scroll (`data-reveal`).
+- No view transitions, for a theme change or between pages. A theme change sets `data-theme` at once, and a
+  page restored from the back/forward cache (or open in another tab) re-reads the stored choice. Snapshots could
+  show one theme while the live page painted the other.
 - Anything that updates by itself has a visible pause control (WCAG 2.2.2): the mixer's **Auto** key and the
   countdown's **Pause**. Both stop when off screen or when the tab is hidden. Under reduced motion the mixer never
   auto-takes, TAKE is a cut, and the timecode shows whole seconds. The countdown keeps ticking because the numbers

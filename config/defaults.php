@@ -68,6 +68,11 @@ return [
         'turnstile_secret' => '',
     ],
 
+    'analytics' => [
+        // Google Analytics 4 measurement ID, tagged on every page right after <head>; '' turns it off.
+        'ga_id' => 'G-0C7QKZTNF7',
+    ],
+
     'chat' => [
         'enabled' => true,
         'api_key' => '',                  // Anthropic API key; the assistant is off until it is set

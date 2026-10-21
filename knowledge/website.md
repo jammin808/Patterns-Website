@@ -73,7 +73,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 
 - Account lets a signed-in client change their name, company and email preferences and their password, download a copy of their data, and delete their account.
 - Licence records are kept after an account is deleted, for as long as the licence may be used and for the period accounting law requires. Tickets remain under "Deleted user".
-- The privacy policy explains what is collected and for how long; the cookies page explains that public pages use no cookies and the portal uses only the essential ones that keep you signed in.
+- The privacy policy explains what is collected and for how long; the cookies page lists the Google Analytics cookies the pages use (and how to block them) and the essential ones the contact form, the portal and the assistant use.
 
 ## What the assistant can and cannot do
 

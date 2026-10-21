@@ -2,7 +2,7 @@ This policy explains what personal data the Patterns Show Control website and cl
 
 ## Who is responsible
 
-Patterns Show Control is run by Ben Rohleder in the United Kingdom, who is the controller of the personal data described here. Contact: [the contact form](/contact/) or support@patternsshowcontrol.co.uk.
+Patterns Show Control is run by Ben Rohleder in the United Kingdom, who is the controller of the personal data described here. Contact: [the contact form](/contact/).
 
 ## What we collect and why
 
@@ -11,14 +11,16 @@ Patterns Show Control is run by Ben Rohleder in the United Kingdom, who is the c
 - **Bug reports, questions, feature requests, comments, votes and attachments**: to support the software and plan improvements. Feature requests and their comments are visible to other signed-in clients; bug reports and questions are private to you and us unless we agree otherwise. Lawful basis: contract and our legitimate interest in improving the products.
 - **Contact form messages** (name, email, optional company, your message): to reply to you. Lawful basis: legitimate interest in answering enquiries, or steps before a contract.
 - **Support assistant conversations** (the questions you type and the answers): to answer you and to improve the assistant. Lawful basis: legitimate interest. Please do not type personal or confidential information into the assistant.
+- **Site analytics** (the pages viewed, the referring site, device and browser type and an approximate location, collected by Google Analytics cookies on the pages you read): to understand which pages help people and to improve the site. Lawful basis: legitimate interest in running a useful website. We cannot identify you from it and do not link it to your account. The [cookie notice](/legal/cookies/) explains how to refuse these cookies.
 - **Security and service records** (a keyed hash of your IP address for rate limits and fraud prevention, sign-in events, download counts, server logs): to keep the site secure and working. Lawful basis: legitimate interest.
 
-We do not use advertising or analytics trackers, and we do not sell personal data.
+We use no advertising trackers, and we do not sell personal data.
 
 ## Who processes it for us
 
 - **Hostinger** hosts the website, the database and our email.
 - **Anthropic** provides the AI model behind the support assistant. Your questions and the conversation so far are sent to Anthropic's API to produce an answer. Anthropic acts as our processor and does not use API data to train its models by default; its data may be processed outside the UK under appropriate safeguards.
+- **Google** (Google Analytics) measures how the site is used. It does not store IP addresses; its data may be processed outside the UK, including in the United States, under appropriate safeguards.
 - **Cloudflare Turnstile**, if it is enabled on the contact form, checks that a person is sending the message.
 
 ## How long we keep it
@@ -29,6 +31,7 @@ We do not use advertising or analytics trackers, and we do not sell personal dat
 - Assistant conversations: 30 days.
 - Contact messages: as long as needed to deal with your enquiry, and no longer than two years.
 - Security records and logs: up to 90 days for logs; sign-in and audit records up to 13 months.
+- Site analytics: kept by Google for the retention period set in our Google Analytics account, at most 14 months.
 
 ## Your rights
 
@@ -36,7 +39,7 @@ Under UK data protection law you can ask for a copy of your data, ask us to corr
 
 ## Cookies
 
-See the [cookie notice](/legal/cookies/). The pages you read set no cookies; only the contact form, the client portal and the support assistant set essential ones.
+See the [cookie notice](/legal/cookies/). Google Analytics sets cookies on the pages you read; the contact form, the client portal and the support assistant set essential ones.
 
 ## Changes
 

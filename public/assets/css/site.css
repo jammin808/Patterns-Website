@@ -174,13 +174,8 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   ::selection { background: color-mix(in srgb, var(--lamp-standby) 40%, transparent); }
   ::placeholder { color: var(--text-3); opacity: 1; }
-  /* Page navigations cross-fade; a theme switch wipes left to right (site.js sets data-theme-switch). */
-  @media (prefers-reduced-motion: no-preference) {
-    @view-transition { navigation: auto; }
-    html[data-theme-switch]::view-transition-old(root) { animation: none; }
-    html[data-theme-switch]::view-transition-new(root) { animation: psc-wipe 420ms var(--e-cut) both; }
-  }
-  @keyframes psc-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+  /* No view transitions: a theme change and a page load paint the live page at once, so what is on screen is
+     always the page's own state, never a snapshot of it. */
   @keyframes psc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes psc-blink { 50% { opacity: 0.25; } }
   @keyframes psc-rise { from { opacity: 0; translate: 0 12px; } }
@@ -387,7 +382,7 @@
   /* ===== Site header, navigation, Products mega-menu, mobile drawer ===== */
   .c-header {
     --accent: var(--text); --accent-ink: var(--text); --accent-line: var(--text-2); --accent-on: var(--bg);
-    position: sticky; top: 0; z-index: 50; view-transition-name: site-header;
+    position: sticky; top: 0; z-index: 50;
     background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(14px) saturate(1.2);
     border-bottom: 1px solid var(--line); transition: box-shadow var(--d-2) var(--e-std);
     &.is-scrolled { box-shadow: var(--shadow-2); }

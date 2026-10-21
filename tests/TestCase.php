@@ -47,6 +47,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'mail' => ['driver' => 'log', 'admin_to' => 'owner@example.test'],
             'db' => ['auto_migrate' => false],
             'chat' => ['api_key' => ''],
+            // The Google tag is off in tests (no page reaches Google); tests that need it switch it on.
+            'analytics' => ['ga_id' => ''],
         ];
         $merged = array_replace_recursive($base, $config);
         $this->app = App::boot($this->shadowRoot !== null ? $this->shadowedConfig($merged) : Config::fromArray(PSC_ROOT, $merged));

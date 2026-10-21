@@ -15,6 +15,7 @@ use Psc\Mail\Mailer;
 use Psc\Support\Logger;
 use Psc\Support\RateLimiter;
 use Psc\Support\Storage;
+use Psc\View\Analytics;
 use Psc\View\Seo;
 use Psc\View\View;
 
@@ -371,13 +372,15 @@ final class App
         }
         $type = $response->getHeader('Content-Type') ?? '';
         if (str_starts_with($type, 'text/html') && !$response->hasHeader('Content-Security-Policy')) {
+            $ga = Analytics::id($this->config->string('analytics.ga_id'));
+            $tag = $ga !== '' ? Analytics::csp($ga) : ['script' => '', 'img' => '', 'connect' => ''];
             $response->header('Content-Security-Policy', implode('; ', [
                 "default-src 'self'",
-                "script-src 'self'",
+                trim("script-src 'self' " . $tag['script']),
                 "style-src 'self'",
-                "img-src 'self' data:",
+                trim("img-src 'self' data: " . $tag['img']),
                 "font-src 'self'",
-                "connect-src 'self'",
+                trim("connect-src 'self' " . $tag['connect']),
                 "media-src 'self'",
                 "frame-src 'none'",
                 "frame-ancestors 'none'",

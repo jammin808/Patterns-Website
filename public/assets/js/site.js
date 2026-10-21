@@ -59,11 +59,6 @@ function initTheme() {
   const choice = () => (valid(root.dataset.theme) ? root.dataset.theme : 'system');
   const effective = () => (valid(root.dataset.theme) ? root.dataset.theme : system.matches ? 'light' : 'dark');
 
-  if (!valid(root.dataset.theme)) {
-    const saved = store.get(KEY);
-    if (valid(saved)) root.dataset.theme = saved;
-  }
-
   const controls = $$('[data-theme-toggle]');
   const meta = $('meta[name="theme-color"]');
   const sync = () => {
@@ -81,19 +76,14 @@ function initTheme() {
     if (meta) meta.setAttribute('content', effective() === 'dark' ? '#090C10' : '#F3F4F6');
   };
 
+  /* The page shows exactly the stored choice: the attribute is set at once, never inside a transition. */
+  const show = (value) => {
+    if (valid(value)) root.dataset.theme = value; else delete root.dataset.theme;
+    sync();
+  };
   const apply = (value) => {
-    const commit = () => {
-      if (valid(value)) root.dataset.theme = value; else delete root.dataset.theme;
-      store.set(KEY, valid(value) ? value : null);
-      sync();
-    };
-    if (document.startViewTransition && motionOK()) {
-      root.setAttribute('data-theme-switch', '');
-      const t = document.startViewTransition(commit);
-      t.finished.finally(() => root.removeAttribute('data-theme-switch'));
-    } else {
-      commit();
-    }
+    store.set(KEY, valid(value) ? value : null);
+    show(value);
     announce(valid(value) ? `${value[0].toUpperCase()}${value.slice(1)} theme` : 'Theme follows your system');
   };
 
@@ -105,7 +95,10 @@ function initTheme() {
     });
   }
   system.addEventListener('change', sync);
-  sync();
+  // A page restored from the back/forward cache, or one open in another tab, shows the choice made since.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) show(store.get(KEY)); });
+  window.addEventListener('storage', (e) => { if (e.key === KEY || e.key === null) show(store.get(KEY)); });
+  show(store.get(KEY));
 }
 
 /* ---------------------------------------------------------------------------------- mobile drawer */
