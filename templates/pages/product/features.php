@@ -65,11 +65,20 @@ if (!empty($product['glossary'])) {
 </section>
 
 <div class="l-wrap c-pd-layout">
+    <?php /* Beside the groups from 64rem; above them on narrower screens, folded so the first group starts on the first screen. */ ?>
     <nav class="c-pd-index" aria-labelledby="index-title">
         <p class="c-pd-index-title" id="index-title">On this page</p>
         <ol role="list">
             <?php foreach ($index as $it): ?><li><a href="#<?= e($it['id']) ?>"><?= e($it['title']) ?></a></li><?php endforeach; ?>
         </ol>
+    </nav>
+    <nav class="c-pd-index-sm" aria-labelledby="index-sm-title">
+        <details>
+            <summary><span id="index-sm-title">On this page</span> <span class="c-pd-index-count"><?= e(count($index)) ?> sections</span><?= icon('chevron', 'c-icon--sm') ?></summary>
+            <ol role="list">
+                <?php foreach ($index as $it): ?><li><a href="#<?= e($it['id']) ?>"><?= e($it['title']) ?></a></li><?php endforeach; ?>
+            </ol>
+        </details>
     </nav>
 
     <div class="c-pd-groups">
@@ -120,12 +129,12 @@ if (!empty($product['glossary'])) {
             <section class="c-pd-group" id="workflows" aria-labelledby="workflows-title">
                 <div class="c-pd-group-head">
                     <?= icon('play') ?>
-                    <h2 id="workflows-title">Put it to work</h2>
+                    <h2 id="workflows-title">Workflows with <?= e($name) ?></h2>
                     <p class="c-lede">Step-by-step workflows that use these features on show day.</p>
                 </div>
                 <ul class="c-support-links c-pd-flowlinks" role="list">
                     <?php foreach ($flows as $f): ?>
-                        <li><a href="/workflows/<?= e($f['slug']) ?>/"><span class="c-swatch"></span><span><?= e($f['title']) ?><small><?= e($f['duration'] ?? 'Step by step') ?></small></span></a></li>
+                        <li><a href="/workflows/<?= e($f['slug']) ?>/"><span class="c-swatch"></span><span><?= e($f['title']) ?> <small><?= e($f['duration'] ?? 'Step by step') ?></small></span></a></li>
                     <?php endforeach; ?>
                 </ul>
             </section>

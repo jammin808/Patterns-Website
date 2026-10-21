@@ -15,6 +15,8 @@
  * @var \Psc\View\Seo $seo
  * @var string $h1
  * @var array{title: string, text: string, actions: list<array{label: string, href: string, primary?: bool}>} $closing
+ * @var list<array{label: string, href: string, primary?: bool}>|null $heroActions  in the hero (default: none with live
+ *                                                                                prices, else the closing actions)
  * @var list<array{label: string, href: string, primary?: bool}>|null $tierActions  under a coming-soon ladder
  * @var list<array{label: string, href: string, primary?: bool}>|null $buyActions   under the how-to-buy steps
  */
@@ -55,6 +57,10 @@ foreach ($licensing['tiers'] as $i => $t) {
     }
 }
 $hasMatrix = $live && !empty($licensing['matrix']['groups']);
+// The first screen answers "how much?" or says what to do next: live prices as a row of links to the cards
+// (phones and tablets, where the cards start below the fold), otherwise the page's next step.
+$glance = $live ? $cards : [];
+$heroActions ??= $live ? [] : ($closing['actions'] ?? []);
 $extras = $licensing['extras'] ?? [];
 $pass = null;
 $deals = [];
@@ -89,8 +95,20 @@ $btn = static function (array $a, string $size = ''): string {
         <div class="c-hero-grid">
             <p class="c-eyebrow"><?= e($name) ?></p>
             <h1 class="c-hero-title" id="l-title"><?= $h['nowrap']($h1) ?></h1>
-            <div>
+            <div class="c-pd-hero-main">
                 <p class="c-hero-lede"><?= e($licensing['model']) ?></p>
+                <?php if ($glance !== []): ?>
+                    <nav class="c-pd-glance" aria-label="<?= e($name) ?> licences at a glance">
+                        <ul role="list">
+                            <?php foreach ($glance as $t): $p = $h['tier']($t); ?>
+                                <li><a href="#<?= e($t['id']) ?>"><span class="c-pd-glance-name"><?= e($t['name']) ?></span> <span class="c-price"><span class="c-price-amount"><?= e($p['amount']) ?></span><?php if ($p['was'] !== null): ?> <s class="c-price-was"><span class="u-visually-hidden">was </span><?= e($p['was']) ?></s><?php endif; ?></span></a></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </nav>
+                <?php endif; ?>
+                <?php if ($heroActions !== []): ?>
+                    <div class="c-hero-actions"><?php foreach ($heroActions as $a): ?><?= $btn($a) ?><?php endforeach; ?></div>
+                <?php endif; ?>
                 <p class="c-hero-note"><?= e($product['definition']) ?></p>
             </div>
             <p class="c-pd-hero-aside"><?= e($licensing['intro']) ?></p>
@@ -102,7 +120,7 @@ $btn = static function (array $a, string $size = ''): string {
 <section class="l-section l-section--flush c-pd-tiers" aria-labelledby="tiers-title">
     <div class="l-wrap">
         <div class="c-section-head c-section-head--stack">
-            <h2 id="tiers-title"><?= e(match (true) { is_array($selfRun) => 'Delivered for each AGM', $live => 'Choose a licence', default => 'The licences planned' }) ?></h2>
+            <h2 id="tiers-title"><?= e(match (true) { is_array($selfRun) => 'Delivered for each AGM', $live => 'Choose a licence', default => 'The planned licences' }) ?></h2>
         </div>
         <div class="c-tiers">
             <?php foreach ($cards as $t): ?><?= $this->partial('product/tier', ['tier' => $t, 'cta' => $live || is_array($selfRun), 'compact' => !$live && !is_array($selfRun)]) ?><?php endforeach; ?>
@@ -122,7 +140,7 @@ $btn = static function (array $a, string $size = ''): string {
         <?php endforeach; ?>
         <?php if (!$live && !is_array($selfRun)): ?>
             <div class="c-pd-tiers-note">
-                <p>Prices and what each licence includes will be announced together. Register your interest to hear first.</p>
+                <p>Tell us about your shows, and you will hear from us when prices are announced.</p>
                 <div class="l-cluster"><?php foreach ($tierActions as $a): ?><?= $btn($a) ?><?php endforeach; ?></div>
             </div>
         <?php endif; ?>

@@ -53,11 +53,12 @@ $licenceLine = match (true) {
     ($licensing['pricing_status'] ?? '') === 'coming-soon' && ($first['price_label'] ?? '') === 'Coming soon' => 'Coming soon',
     default => trim((string) ($first['price_label'] ?? '') . ', ' . (string) ($first['period'] ?? ''), ', '),
 };
+// "Licences: Coming soon" rather than "Pricing", so a product that can be downloaded today never reads as unavailable.
 $specs = array_filter([
     'Runs on' => $product['os'] ?? null,
-    'Install' => $product['distribution'] ?? null,
+    'Setup' => $product['distribution'] ?? null,
     'Version' => $product['version'] ?? null,
-    'Pricing' => $licenceLine,
+    ($licenceLine === 'Coming soon' ? 'Licences' : 'Pricing') => $licenceLine,
 ]);
 
 // Feature groups for the bento: a wide one with a picture, a tall one with its first facts, then five more.
@@ -85,7 +86,7 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
     <div class="l-wrap">
         <div class="c-hero-grid">
             <div>
-                <p class="c-product-tag"><span class="c-swatch"></span><span class="c-role"><?= e($product['role']) ?></span><span class="c-pd-roleline"><?= e($product['role_line']) ?></span>
+                <p class="c-product-tag"><span class="c-role"><?= e($product['role']) ?></span><span class="c-pd-roleline"><?= e($product['role_line']) ?></span>
                     <?php if (($product['status'] ?? '') === 'early-access'): ?><span class="c-tag">Early access</span><?php endif; ?>
                 </p>
                 <h1 class="c-hero-title c-pd-title" id="p-title"><?php if ($h1Name !== null): ?><span class="c-pd-title-name"><?= e($h1Name) ?></span> <span class="c-pd-title-line"><?= $h['nowrap']($h1Line) ?></span><?php else: ?><?= $h['nowrap']($h1) ?><?php endif; ?></h1>
@@ -143,7 +144,7 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
     <div class="l-wrap">
         <div class="c-section-head">
             <h2 id="features-title">Key features</h2>
-            <p class="c-lede"><?= e(ucfirst($h['words'](count($bento)))) ?> of the <?= e($h['words'](count($groups))) ?> feature groups at a glance, each linked to its full detail.</p>
+            <p class="c-lede">A first look at <?= e($name) ?> on show day. Each title opens the full list on the features page.</p>
         </div>
         <div class="c-bento c-pd-bento">
             <?php foreach ($bento as $i => $g):
@@ -252,9 +253,9 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
         </div>
         <ul class="c-support-links c-pd-siblings" role="list">
             <?php foreach ($related as $rk): $rp = product($rk); ?>
-                <li data-product="<?= e($rk) ?>"><a href="/<?= e($rk) ?>/"><span class="c-swatch"></span><span><?= e($anchor[$rk] ?? $rp['name']) ?><small><?= e($rp['role_line']) ?></small></span></a></li>
+                <li data-product="<?= e($rk) ?>"><a href="/<?= e($rk) ?>/"><span class="c-swatch"></span><span><?= e($anchor[$rk] ?? $rp['name']) ?> <small><?= e($rp['role_line']) ?></small></span></a></li>
             <?php endforeach; ?>
-            <li data-product="ecosystem"><a href="/ecosystem/"><span class="c-swatch"></span><span>How the apps work together<small>Four apps, one show network</small></span></a></li>
+            <li data-product="ecosystem"><a href="/ecosystem/"><span class="c-swatch"></span><span>How the apps work together <small>Four apps, one show network</small></span></a></li>
         </ul>
     </div>
 </section>

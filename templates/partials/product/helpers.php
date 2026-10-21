@@ -9,7 +9,8 @@ declare(strict_types=1);
  *   $h = require PSC_ROOT . '/templates/partials/product/helpers.php';
  *   $h['words'](6)            "six"
  *   $h['mark']('OSC')         ['mark' => 'OSC', 'product' => null]   the integration chip's abbreviation (no logos)
- *   $h['tier']($tier)         ['amount', 'was', 'unit', 'flag', 'flagOutline', 'free', 'tbc'] for a price line
+ *   $h['tier']($tier)         ['amount', 'figure', 'was', 'unit', 'flag', 'flagOutline', 'free', 'tbc'] for a price line
+ *                             (amount reads "Free" for a free tier on a card; figure keeps "£0" for tables)
  *   $h['lead']($pitch, $def)  the pitch without a first sentence that repeats the definition
  *   $h['related']($text, $k)  the other products a sentence names, in the site's order
  *   $h['nowrap']($heading)    the heading escaped, hyphenated words kept on one line
@@ -54,11 +55,19 @@ return (static function (): array {
     $tier = static function (array $t): array {
         $price = isset($t['price']) && is_numeric($t['price']) ? (string) $t['price'] : null;
         $label = (string) ($t['price_label'] ?? '');
+        $name = (string) ($t['name'] ?? '');
         $launch = null;
         if (!empty($t['price_note']) && preg_match('/£\s?(\d+(?:\.\d+)?)/', (string) $t['price_note'], $m)) {
             $launch = $m[1];
         }
-        $amount = $launch !== null ? price($launch) : ($price !== null ? price($price) : ($label !== '' ? $label : 'Coming soon'));
+        $figure = $launch !== null ? price($launch) : ($price !== null ? price($price) : null);
+        $free = $price !== null && (float) $price === 0.0;
+        // A free tier reads "Free" on its card, unless its name already says so; tables keep the figure (£0).
+        $amount = match (true) {
+            $free => strcasecmp($name, 'Free') === 0 ? (string) $figure : 'Free',
+            $figure !== null => $figure,
+            default => $label !== '' ? $label : 'Coming soon',
+        };
         $machines = isset($t['machines']) && is_numeric($t['machines']) ? (int) $t['machines'] : null;
         $backup = (bool) preg_grep('/backup/i', array_map('strval', $t['includes'] ?? []));
         $where = match (true) {
@@ -68,8 +77,12 @@ return (static function (): array {
             default => $machines . ' PCs',
         };
         $period = trim((string) ($t['period'] ?? ''));
-        if ($price !== null && (float) $price === 0.0) {
-            $unit = $label !== '' && $label !== $amount ? $label : '';
+        if ($free) {
+            // "Free for 14 days" under "Free" becomes "For 14 days"; a label that only repeats the name goes.
+            $unit = strcasecmp($label, $name) === 0 || $label === $amount ? '' : $label;
+            if ($amount === 'Free') {
+                $unit = (string) preg_replace('/^free\b\s*/i', '', $unit);
+            }
             if ($period !== '' && stripos($unit, $period) === false) {
                 $unit = trim($unit . ' ' . $period);
             }
@@ -81,11 +94,12 @@ return (static function (): array {
         }
         return [
             'amount' => $amount,
+            'figure' => $figure ?? $amount,
             'was' => $launch !== null && $price !== null ? price($price) : null,
-            'unit' => $unit !== '' ? $unit : null,
+            'unit' => $unit !== null && $unit !== '' ? $unit : null,
             'flag' => $t['badge'] ?? ($launch !== null ? 'Launch price' : null),
             'flagOutline' => empty($t['badge']) && $launch !== null,
-            'free' => $price !== null && (float) $price === 0.0,
+            'free' => $free,
             'tbc' => $price === null,
         ];
     };

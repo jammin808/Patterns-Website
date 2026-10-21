@@ -953,6 +953,8 @@
       linear-gradient(90deg, var(--edge), transparent) 0 0 / 12px 100% no-repeat scroll, linear-gradient(270deg, var(--edge), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--s1); }
   .c-table, .pt-table { width: 100%; border-collapse: collapse; font-size: var(--fs-1); font-variant-numeric: tabular-nums;
     & caption { padding: 14px 16px 4px; caption-side: top; text-align: left; font-weight: 650; }
+    /* A visible caption stays in view and wraps to the wrapper while the columns scroll under it. */
+    & caption:not(.u-visually-hidden) { position: sticky; left: 0; max-width: 100cqi; }
     & th { padding: 10px 14px; text-align: left; vertical-align: bottom; border-bottom: 1px solid var(--line-2); background: var(--s2); font: 620 var(--fs-0)/1.3 var(--font-sans); font-stretch: var(--wd-ui); color: var(--text-2); white-space: nowrap; }
     & tbody th { background: none; border-bottom-color: var(--line); font-size: var(--fs-1); color: var(--text); vertical-align: middle; white-space: normal; }
     & td { padding: 12px 14px; vertical-align: middle; border-bottom: 1px solid var(--line); }

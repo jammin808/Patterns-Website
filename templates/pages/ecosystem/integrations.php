@@ -90,15 +90,15 @@ $seo->add(Schema::itemList($seo->canonical(), 'Integration categories', $list));
         </div>
         <div class="hub-cats">
             <?php foreach ($eco['integration_categories'] as $c): $items = $byCat[$c['title']] ?? []; if ($items === []) { continue; } ?>
-                <section class="hub-cat" id="<?= e($anchor($c['id'])) ?>" aria-labelledby="<?= e($anchor($c['id'])) ?>-title">
-                    <h3 id="<?= e($anchor($c['id'])) ?>-title"><?= e($c['title']) ?></h3>
+                <div class="hub-cat" id="<?= e($anchor($c['id'])) ?>">
+                    <h3><?= e($c['title']) ?></h3>
                     <p><?= e($c['text']) ?></p>
                     <ul class="c-chips" role="list">
                         <?php foreach ($items as $i): ?>
                             <li class="c-chip"><span class="c-chip-mark" aria-hidden="true"><?= e($marks[$i['name']] ?? strtoupper(substr((string) $i['name'], 0, 3))) ?></span><span><?= e($i['name']) ?><small><?= e(implode(', ', array_map($name, $i['products']))) ?></small></span></li>
                         <?php endforeach; ?>
                     </ul>
-                </section>
+                </div>
             <?php endforeach; ?>
         </div>
     </div>
@@ -110,7 +110,7 @@ $seo->add(Schema::itemList($seo->canonical(), 'Integration categories', $list));
             <div><p class="c-eyebrow">The matrix</p><h2 id="matrix-title">Which app supports what</h2></div>
             <p class="c-lede">Every integration with what it does, and a tick for each app that supports it today. The product pages have the detail.</p>
         </div>
-        <div class="c-table-wrap hub-matrix-wrap">
+        <div class="c-table-wrap">
             <table class="c-table c-table--stack hub-matrix" role="table">
                 <caption class="u-visually-hidden">Integrations and the apps that support them</caption>
                 <thead role="rowgroup">
@@ -187,11 +187,11 @@ $seo->add(Schema::itemList($seo->canonical(), 'Integration categories', $list));
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">In each app</p><h2 id="features-title">Every integration, in its app's own detail</h2></div>
-            <p class="c-lede">Each app's features page goes deeper into what it connects to and how.</p>
+            <p class="c-lede">Each app's features page lists what it connects to, and what each connection does.</p>
         </div>
         <ul class="l-grid l-grid--4 hub-plain" role="list">
             <?php foreach ($products as $key): $p = product($key); ?>
-                <li><a class="c-card c-card--link" data-product="<?= e($key) ?>" href="/<?= e($key) ?>/features/"><span class="c-card-meta"><?= e($p['role_line'] ?? '') ?></span><span class="c-card-title"><?= e($p['name']) ?> features</span><span class="c-card-body">The full feature list, including <?= e(count($p['integrations'] ?? [])) ?> integrations.</span></a></li>
+                <li><a class="c-card c-card--link" data-product="<?= e($key) ?>" href="/<?= e($key) ?>/features/#works-with"><span class="c-card-title"><?= e($p['name']) ?> integrations</span><span class="c-card-meta hub-tag-first"><?= e($p['role_line'] ?? '') ?></span><span class="c-card-body"><?= e(count($p['integrations'] ?? [])) ?> integrations, each with what it does.</span></a></li>
             <?php endforeach; ?>
         </ul>
     </div>

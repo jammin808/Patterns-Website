@@ -34,7 +34,7 @@ $how = [
         'available' => 'PlayMap is in early access. Today\'s portable build is in the client portal, so you can put it through its paces on your own rig while licences are prepared.',
         'get' => 'Create a free client account and download the build from the portal\'s Downloads. Register your interest and you will be among the first to hear about pricing and trials.',
         'cta' => ['label' => 'Get early access', 'href' => '/portal/downloads/'],
-        'more' => ['label' => 'PlayMap early access', 'href' => '/playmap/licensing/'],
+        'more' => ['label' => 'How PlayMap will be licensed', 'href' => '/playmap/licensing/'],
     ],
 ];
 $short = [
@@ -133,7 +133,7 @@ foreach ($products as $key => $p) {
 <section class="l-section l-section--tight l-section--tint support-dl-app" id="companion" data-product="companion" aria-labelledby="companion-title">
     <div class="l-wrap l-split l-split--even">
         <div class="support-dl-main">
-            <h2 class="support-dl-name" id="companion-title"><span class="c-swatch" aria-hidden="true"></span>Bitfocus Companion modules</h2>
+            <h2 class="support-dl-name support-dl-name--wrap" id="companion-title"><span class="c-swatch" aria-hidden="true"></span><span>Bitfocus Companion modules</span></h2>
             <p class="c-lede u-mt-4">Patterns, StageWatch and PlayMap each have their own Companion module. Load all three into one Companion and one Stream Deck carries the picture, the clock and the playback.</p>
             <div class="c-hero-actions">
                 <a class="c-btn c-btn--primary" href="/portal/downloads/">Sign in for the modules</a>
@@ -156,13 +156,13 @@ foreach ($products as $key => $p) {
             <p class="c-lede">Two things Windows may ask, and what to choose.</p>
         </div>
         <div class="l-grid l-grid--2">
-            <div class="c-callout support-dl-note" role="note">
-                <?= icon('alert') ?>
+            <div class="c-callout c-callout--info support-dl-note" role="note">
+                <?= icon('shield') ?>
                 <strong class="c-callout-title">Windows SmartScreen asks you to confirm</strong>
                 <p>That can happen the first time you open an app downloaded from the internet. If you downloaded it from the client portal, choose More info, then Run anyway.</p>
             </div>
-            <div class="c-callout support-dl-note" role="note">
-                <?= icon('info') ?>
+            <div class="c-callout c-callout--info support-dl-note" role="note">
+                <?= icon('network') ?>
                 <strong class="c-callout-title">Windows Firewall asks about an app</strong>
                 <p>Allow it on private networks. The apps talk to each other, to phones and tablets and to Companion over the venue network, and other devices cannot connect until Windows lets them.</p>
             </div>

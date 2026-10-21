@@ -136,6 +136,13 @@
   .og-tier p { font: 720 48px/1 var(--font-display); font-stretch: 112%; letter-spacing: -0.03em; font-variant-numeric: lining-nums tabular-nums; }
   .og-tier small { font-size: 16px; line-height: 1.3; color: var(--text-2); }
   .og-tier .og-flagline { position: absolute; top: -15px; left: 12px; padding: 5px 9px; border-radius: 3px; background: var(--accent); color: var(--on-lamp); font: 700 15px/1 var(--font-sans); font-stretch: 106%; white-space: nowrap; }
+  .og-tier .og-flagline--outline { background: var(--bg); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+  .og-tier p s { margin-left: 10px; font: 560 22px/1 var(--font-sans); letter-spacing: 0; color: var(--text-3); text-decoration-thickness: 2px; }
+
+  /* The workflows' legend: every swatch on the card is named here. */
+  .og-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 16px; padding-inline: 4px; font: 560 17px/1.2 var(--font-sans); font-stretch: 100%; color: var(--text-2); }
+  .og-legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .og-legend .c-swatch { width: 13px; height: 13px; }
 
   /* A licence file, a fact sheet. */
   .og-sheet { border: 1px solid var(--line-2); border-radius: 8px; background: var(--s1); overflow: hidden; }
@@ -146,6 +153,10 @@
   .og-sheet dt { color: var(--text-3); font-weight: 560; padding-right: 8px; }
   .og-sheet dd { font-weight: 600; font-stretch: 106%; }
   .og-sheet dl > :nth-last-child(-n+2) { border-bottom: 0; }
+  .og-list { list-style: none; margin: 0; padding: 0; }
+  .og-list li { display: flex; align-items: center; gap: 16px; min-height: 66px; padding: 0 22px; border-bottom: 1px solid var(--line); font: 600 23px/1.15 var(--font-sans); font-stretch: 106%; }
+  .og-list li:last-child { border-bottom: 0; }
+  .og-list .c-icon { width: 30px; height: 30px; color: var(--text-2); }
 
   /* The assistant, the contact form. */
   .og-chat { border: 1px solid var(--line-2); border-radius: 8px; background: var(--s1); overflow: hidden; }

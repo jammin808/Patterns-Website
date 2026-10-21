@@ -10,6 +10,7 @@
  * @var bool $sent
  * @var string $turnstileKey
  * @var array<string, mixed> $page
+ * @var list<array{type: string, message: string}> $flashes
  */
 $topics ??= [];
 $old ??= [];
@@ -26,6 +27,17 @@ $val = static fn (string $k): string => is_scalar($old[$k] ?? null) ? (string) $
 $err = static fn (string $k): ?string => isset($errors[$k]) && is_string($errors[$k]) ? $errors[$k] : null;
 $labels = ['name' => 'Name', 'email' => 'Email address', 'company' => 'Company', 'topic' => 'Topic', 'product' => 'Product', 'message' => 'Message', 'turnstile' => 'Security check'];
 $fieldErrors = array_filter($errors, static fn ($m, $k): bool => is_string($m) && isset($labels[$k]), ARRAY_FILTER_USE_BOTH);
+// A send refused for a reason no field explains (too many messages in an hour, for one) comes back only as a flash at
+// the top of the page, above where the redirect lands. It is shown at the form instead, where the visitor is.
+$formAlert = null;
+if ($fieldErrors === []) {
+    foreach ((array) ($flashes ?? []) as $f) {
+        if (is_array($f) && ($f['type'] ?? '') === 'danger' && is_string($f['message'] ?? null)) {
+            $formAlert = $f['message'];
+        }
+    }
+}
+$email = (string) ($site['email'] ?? '');
 // aria-describedby for a field: its hint (if any) and its error (if any).
 $describe = static function (string $k, ?string $help = null) use ($err): string {
     $ids = array_filter([$help, $err($k) !== null ? $k . '-err' : null]);
@@ -44,7 +56,7 @@ $maxMessage = 5000;
                 <p class="c-hero-lede">Questions about licences, an AGM, rental packs or a show next week? Send a message, or ask the assistant first. Based in the UK, replies in English.</p>
             </div>
             <?php if (!$sent): ?>
-                <div class="c-callout support-showday" role="note">
+                <div class="c-callout c-callout--info support-showday" role="note">
                     <?= icon('clock') ?>
                     <strong class="c-callout-title">Show in the next 48 hours?</strong>
                     <p>Choose Help with the software as the topic and put the show date at the top of your message, so it is clear how soon you need an answer.</p>
@@ -68,7 +80,7 @@ $maxMessage = 5000;
                 <h2 class="support-contact-title" id="form-title">Send a message</h2>
                 <?php /* After a failed POST the redirect lands on #form: the error summary carries that id then, so the
                        fragment focuses it instead of clearing the focus site.js gave it. */ ?>
-                <form class="c-form c-form--panel"<?= $fieldErrors === [] ? ' id="form"' : '' ?> method="post" action="/contact/#form" novalidate>
+                <form class="c-form c-form--panel"<?= $fieldErrors === [] && $formAlert === null ? ' id="form"' : '' ?> method="post" action="/contact/#form" novalidate>
                     <?= csrf_field() ?>
                     <?php if ($fieldErrors !== []): $n = count($fieldErrors); ?>
                         <div class="c-callout c-callout--danger c-error-summary" id="form" data-error-summary tabindex="-1" role="alert" aria-labelledby="error-title">
@@ -79,6 +91,13 @@ $maxMessage = 5000;
                                     <li><a href="#<?= e($k === 'turnstile' ? 'turnstile' : $k) ?>"><?= e($m) ?></a></li>
                                 <?php endforeach; ?>
                             </ul>
+                        </div>
+                    <?php elseif ($formAlert !== null): ?>
+                        <div class="c-callout c-callout--danger c-error-summary" id="form" data-error-summary tabindex="-1" role="alert" aria-labelledby="error-title">
+                            <?= icon('alert') ?>
+                            <strong class="c-callout-title" id="error-title">Your message was not sent</strong>
+                            <p><?= e($formAlert) ?></p>
+                            <?php if ($email !== ''): ?><p>Email <a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></p><?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -128,7 +147,9 @@ $maxMessage = 5000;
                         <label for="message">Message</label>
                         <p class="c-help" id="message-help">What you are running, on which machines, and what you need. For a show, include its date.</p>
                         <textarea id="message" name="message" minlength="10" maxlength="<?= e($maxMessage) ?>" required data-count="#message-count"<?= $invalid('message') ?><?= $describe('message', 'message-help message-count') ?>><?= e($val('message')) ?></textarea>
-                        <p class="c-count" id="message-count" aria-live="polite"><?= e(mb_strlen($val('message'))) ?> / <?= e($maxMessage) ?></p>
+                        <?php /* No live region: a count announced on every keystroke drowns out the typing echo. The
+                               field's description carries it, so it is read when the field takes focus. */ ?>
+                        <p class="c-count" id="message-count"><?= e(mb_strlen($val('message'))) ?> / <?= e($maxMessage) ?></p>
                         <?= $errorMsg('message') ?>
                     </div>
 
@@ -153,13 +174,13 @@ $maxMessage = 5000;
         </section>
 
         <div class="support-contact-aside">
-            <section class="support-contact-block" aria-labelledby="ask-title">
-                <h2 class="support-contact-h" id="ask-title">Ask the assistant</h2>
+            <section class="support-contact-block support-js-only" aria-labelledby="ask-title">
+                <h2 class="support-contact-h" id="ask-title">Ask the assistant first</h2>
                 <p>It answers from this site's pages for all four apps, and it can point you to a person.</p>
-                <a class="c-launcher" href="/support/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+                <button class="c-launcher" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
                     <span class="c-launcher-icon"><?= icon('chat') ?></span>
                     <span><b>Ask the assistant</b><small>Setup, licences, downloads and first fixes</small></span>
-                </a>
+                </button>
             </section>
             <section class="support-contact-block" aria-labelledby="ticket-title">
                 <h2 class="support-contact-h" id="ticket-title">Already a client?</h2>
@@ -169,12 +190,12 @@ $maxMessage = 5000;
             <section class="support-contact-block" aria-labelledby="next-title">
                 <h2 class="support-contact-h" id="next-title">What happens next</h2>
                 <ol class="support-contact-next">
-                    <li>Your message reaches us straight away, and it is kept even if an email goes astray.</li>
-                    <li>You get an email receipt with the topic you chose.</li>
+                    <li>Your message reaches us as soon as you send it. It is saved on this site too, in case an email goes astray.</li>
+                    <li>You get an email receipt that names the topic you chose.</li>
                     <li>The reply comes to the email address you gave.</li>
                 </ol>
                 <dl class="c-kv u-mt-4">
-                    <dt>Email</dt><dd><a href="mailto:<?= e($site['email'] ?? '') ?>"><?= e($site['email'] ?? '') ?></a></dd>
+                    <dt>Email</dt><dd><a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></dd>
                     <dt>Based in</dt><dd><?= e($site['publisher']['country'] ?? 'United Kingdom') ?></dd>
                     <dt>Replies in</dt><dd>English</dd>
                 </dl>

@@ -82,11 +82,11 @@ $count = count($workflows);
                 <p class="c-lede u-mt-4">The assistant knows every workflow and the four apps behind them. For anything it cannot answer, a person can help.</p>
             </div>
             <div class="support-closer-actions">
-                <a class="c-launcher" href="/support/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+                <button class="c-launcher support-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
                     <span class="c-launcher-icon"><?= icon('chat') ?></span>
                     <span><b>Ask the assistant</b><small>Setup, line-up, licences and show-day fixes</small></span>
-                </a>
-                <p class="l-cluster"><a href="/support/">Support and help pages</a><a href="/downloads/">Downloads</a><a href="/ecosystem/">How the apps work together</a></p>
+                </button>
+                <p class="l-cluster"><a href="/support/">Support and help pages</a><a href="/contact/?topic=support">Contact us</a><a href="/ecosystem/">How the apps work together</a></p>
             </div>
         </div>
     </div>

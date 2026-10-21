@@ -873,8 +873,10 @@ How the portal's markup is laid out (everything below is CSS; the templates keep
   under the label. `input.pt-mono` (hardware IDs) is mono at 14px. `abbr[title]` has a dotted underline.
 - **Tables.** Edge shadows appear only where columns are scrolled out of view. A table narrower than 40rem without
   `--stack` keeps its columns: cells stop wrapping, the row title (`tbody th`) keeps 12.5rem, and the wrapper
-  scrolls. Give every `td` a `data-label` and add `pt-table--stack` to get one card per row instead. `pre` in a
-  cell (audit details) wraps at 30rem.
+  scrolls, with a visible caption staying in view above the moving columns. A table of nine or more columns (the
+  admin lists) is set compact (13px, tighter cells) and the row title never drops below 11rem. Give every `td` a
+  `data-label` and add `pt-table--stack` to get one card per row instead. `pre` in a cell (audit details) wraps at
+  30rem.
 - **Files.** Each `pt-files` item without an icon gets a document glyph; the size, or a small delete `form.pt-actions`,
   sits at the end of the row.
 - **Flashes and empty states.** `pt-alert` flows as a block (text and links on one line). `pt-empty` puts its words on

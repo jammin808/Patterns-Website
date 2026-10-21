@@ -118,7 +118,7 @@ $sharedText = count($shared) > 1 ? implode(', ', array_slice($shared, 0, -1)) . 
     <div class="l-wrap">
         <div class="c-section-head">
             <div><h2 id="steps-title">Step by step</h2></div>
-            <p class="c-lede">Each step is a cue with the app that does it. Press GO as you finish one, and the next one stands by.</p>
+            <p class="c-lede">Each step is a cue with the app that does it.<span class="support-js-only"> Press GO as you finish one, and the next one stands by.</span></p>
         </div>
         <div class="c-ladder support-ladder-app" data-ladder>
             <div class="c-ladder-head" aria-hidden="true"><span>Cue</span><span>Step</span><span>App</span><span>State</span></div>
@@ -134,7 +134,7 @@ $sharedText = count($shared) > 1 ? implode(', ', array_slice($shared, 0, -1)) . 
                     </li>
                 <?php endforeach; ?>
             </ol>
-            <div class="c-ladder-controls">
+            <div class="c-ladder-controls support-js-only">
                 <button class="c-go" type="button" data-ladder-go>GO <small data-ladder-go-q>Q1</small></button>
                 <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-ladder-back>Back</button>
                 <p class="c-ladder-status" data-ladder-status aria-live="polite">Standing by: Q1, <?= e($firstTitle) ?>.</p>

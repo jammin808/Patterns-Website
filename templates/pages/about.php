@@ -37,6 +37,7 @@ $principles = [
     ['icon' => 'check', 'title' => 'Confirmed, not hopeful', 'text' => $arch['Confirmed, not hopeful'] ?? ''],
 ];
 $email = (string) ($site['email'] ?? '');
+$apps = array_map(static fn (string $k): string => (string) (product($k)['name'] ?? $k), Content::PRODUCTS);
 ?>
 <section class="c-hero c-hero--page" aria-labelledby="about-title">
     <div class="l-wrap">
@@ -44,6 +45,10 @@ $email = (string) ($site['email'] ?? '');
             <p class="c-eyebrow"><?= e($site['name'] ?? 'Patterns Show Control') ?></p>
             <h1 class="c-hero-title" id="about-title">About</h1>
             <p class="c-hero-lede"><?= e($page['description'] ?? '') ?></p>
+            <div class="c-hero-actions">
+                <a class="c-btn c-btn--primary" href="/ecosystem/">How the four apps work together</a>
+                <a class="c-btn c-btn--secondary" href="#contact">Get in touch</a>
+            </div>
         </div>
     </div>
 </section>
@@ -56,13 +61,13 @@ $email = (string) ($site['email'] ?? '');
         </div>
         <div class="l-stack">
             <div class="c-prose">
-                <?php foreach (array_slice($intro, 0, 2) as $s): ?><p><?= e($s) ?></p><?php endforeach; ?>
+                <?php foreach (array_slice($intro, 1, 1) as $line): ?><p><?= e($line) ?></p><?php endforeach; ?>
             </div>
             <dl class="c-kv">
                 <dt>Made by</dt><dd><?= e($publisher) ?></dd>
                 <dt>Based in</dt><dd><?= e($site['publisher']['country'] ?? 'United Kingdom') ?></dd>
                 <dt>Made for</dt><dd>The crews who run conferences, AGMs and live events</dd>
-                <dt>Built</dt><dd>At real show desks</dd>
+                <dt>The apps</dt><dd><?= e(implode(', ', array_slice($apps, 0, -1)) . ' and ' . end($apps)) ?>, for Windows</dd>
             </dl>
         </div>
     </div>
@@ -92,8 +97,8 @@ $email = (string) ($site['email'] ?? '');
             <?php foreach (Content::PRODUCTS as $key): $p = product($key); if ($p === null) { continue; } ?>
                 <li>
                     <a class="c-card c-card--link" data-product="<?= e($key) ?>" href="/<?= e($key) ?>/">
-                        <span class="hub-card-apps"><span class="c-role"><?= e($p['role']) ?></span></span>
                         <span class="c-card-title"><?= e($p['name']) ?></span>
+                        <span class="hub-card-apps hub-tag-first"><span class="c-role"><?= e($p['role']) ?></span></span>
                         <span class="c-card-body"><?= e($p['tagline'] ?? '') ?></span>
                     </a>
                 </li>
@@ -110,7 +115,7 @@ $email = (string) ($site['email'] ?? '');
             <p class="c-lede u-mt-4">Questions about a licence, an AGM or a show next week? Write in, or ask the assistant first.</p>
             <div class="c-hero-actions">
                 <a class="c-btn c-btn--primary" href="/contact/">Send a message</a>
-                <a class="c-btn c-btn--secondary" href="/contact/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><?= icon('chat') ?>Ask the assistant</a>
+                <button class="c-btn c-btn--secondary hub-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><?= icon('chat') ?>Ask the assistant</button>
             </div>
         </div>
         <dl class="c-specs c-specs--rows hub-rates">

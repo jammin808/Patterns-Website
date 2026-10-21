@@ -36,6 +36,9 @@ $trouble = array_values((array) ($product['troubleshooting'] ?? []));
 $questions = array_values(array_filter((array) ($product['faqs'] ?? []), static fn (array $f): bool => !preg_match('/licen[cs]|pric|cost|buy|trial|free mode|\bAI\b/i', (string) $f['q'])));
 $questions = array_slice($questions, 0, 6);
 $early = ($product['status'] ?? '') === 'early-access';
+// AGMessage runs meetings from a host laptop; the other three run shows from a show machine.
+$firstRun = $key === 'agmessage' ? 'your first meeting' : 'your first show';
+$machine = $key === 'agmessage' ? 'the host laptop' : 'the show machine';
 $bugUrl = '/portal/tickets/new/?type=bug&product=' . rawurlencode($key);
 $jump = [
     'getting-started' => 'Getting started',
@@ -81,7 +84,7 @@ if ($questions !== []) {
     <div class="l-wrap l-split l-split--aside">
         <div class="support-ph-side">
             <h2 id="start-title">Getting started</h2>
-            <p class="c-lede u-mt-4">From the download to running your first show, in <?= e(count($steps)) ?> steps.</p>
+            <p class="c-lede u-mt-4">From the download to <?= e($firstRun) ?>, in <?= e(count($steps)) ?> steps.</p>
         </div>
         <div class="c-ladder c-ladder--static support-ladder-plain">
             <ol class="c-ladder-list" role="list">
@@ -102,7 +105,7 @@ if ($questions !== []) {
     <div class="l-wrap l-split l-split--aside">
         <div class="support-ph-side">
             <h2 id="req-title">System requirements</h2>
-            <p class="c-lede u-mt-4">What <?= e($name) ?> needs on the show machine, and the extras that only some features use.</p>
+            <p class="c-lede u-mt-4">What <?= e($name) ?> needs on <?= e($machine) ?>, and the extras that only some features use.</p>
         </div>
         <dl class="c-specs c-specs--rows support-ph-reqs">
             <?php foreach ($requirements as $r): ?>
@@ -129,7 +132,7 @@ if ($questions !== []) {
     <div class="l-wrap">
         <div class="c-section-head">
             <div><h2 id="download-title">Download and report a bug</h2></div>
-            <p class="c-lede">Builds and bug reports both live in the client portal. A free account is enough for both.</p>
+            <p class="c-lede">Builds and bug reports both live in the client portal, and a free account is all you need to sign in.</p>
         </div>
         <div class="l-grid l-grid--2">
             <article class="c-card support-ph-card" aria-labelledby="where-title">
@@ -192,10 +195,10 @@ if ($questions !== []) {
                 <p class="support-ph-back u-mt-6"><a href="/<?= e($key) ?>/">Back to the <?= e($name) ?> overview</a></p>
             </div>
             <div class="support-closer-actions">
-                <a class="c-launcher" href="/contact/?topic=support&amp;product=<?= e(rawurlencode($key)) ?>" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+                <button class="c-launcher support-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
                     <span class="c-launcher-icon"><?= icon('chat') ?></span>
                     <span><b>Ask the assistant</b><small><?= e($name) ?> setup, licences and show-day fixes</small></span>
-                </a>
+                </button>
                 <p class="l-cluster"><a href="/contact/?topic=support&amp;product=<?= e(rawurlencode($key)) ?>">Contact us</a><a href="/support/">Support home</a><a href="/workflows/">Show workflows</a></p>
             </div>
         </div>

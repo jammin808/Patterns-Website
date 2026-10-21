@@ -1,8 +1,9 @@
 <?php
 /**
- * Ecosystem (/ecosystem/): the four pillars, Show Bus in plain words, the signal flow, what the apps do for each
- * other, control surfaces, reliability, AI with approval, what is coming and the ecosystem FAQ (FAQPage schema here).
- * Every fact is content/ecosystem.php; product names and roles come from content/products/.
+ * Ecosystem (/ecosystem/): the four pillars, then the picture before the detail: the signal flow, what the apps do
+ * for each other, Show Bus in plain words, control surfaces, reliability, AI with approval, what is coming and the
+ * ecosystem FAQ (FAQPage schema here). Every fact is content/ecosystem.php; product names and roles come from
+ * content/products/. The overview links use the anchors of the SEO brief's cannibalisation table.
  *
  * @var \Psc\View\Seo $seo
  */
@@ -22,6 +23,7 @@ foreach (Content::PRODUCTS as $key) {
 $seo->add(Schema::itemList($seo->canonical(), 'The apps in the Patterns ecosystem', $items));
 
 $name = static fn (string $key): string => (string) (product($key)['name'] ?? ucfirst($key));
+$overview = ['patterns' => 'Patterns test pattern generator', 'stagewatch' => 'StageWatch stage timer', 'agmessage' => 'AGMessage back-room messaging', 'playmap' => 'PlayMap projection mapping'];
 $chip = static fn (string $key): string => '<span class="c-app" data-product="' . e($key) . '"><i class="c-swatch" aria-hidden="true"></i>' . e((string) (product($key)['name'] ?? $key)) . '</span>';
 
 // Show Bus points: the content names an icon idea; these are the sprite's nearest symbols.
@@ -58,14 +60,17 @@ foreach ($ai['principles'] as $pr) {
 ?>
 <section class="c-hero c-hero--page" aria-labelledby="eco-title">
     <div class="l-wrap">
-        <div class="c-hero-grid">
-            <p class="c-eyebrow">Ecosystem</p>
-            <h1 class="c-hero-title" id="eco-title"><?= e($eco['h1']) ?></h1>
-            <p class="c-hero-lede"><?= e($eco['definition']) ?></p>
-            <div class="c-hero-actions">
-                <a class="c-btn c-btn--primary" href="#connections">See what they do together</a>
-                <a class="c-btn c-btn--secondary" href="/ecosystem/integrations/">Browse integrations</a>
+        <div class="c-hero-grid hub-hero-split">
+            <div>
+                <p class="c-eyebrow">Ecosystem</p>
+                <h1 class="c-hero-title" id="eco-title"><?= e($eco['h1']) ?></h1>
+                <p class="c-hero-lede"><?= e($eco['definition']) ?></p>
+                <div class="c-hero-actions">
+                    <a class="c-btn c-btn--primary" href="#connections">See what they do together</a>
+                    <a class="c-btn c-btn--secondary" href="/ecosystem/integrations/">Browse integrations</a>
+                </div>
             </div>
+            <p class="c-stops hub-stops"><span class="hub-stop">Every pixel<span data-product="patterns">.</span></span> <span class="hub-stop">Every second<span data-product="stagewatch">.</span></span> <span class="hub-stop">Every person<span data-product="agmessage">.</span></span> <span class="hub-stop">Every surface<span data-product="playmap">.</span></span></p>
         </div>
     </div>
 </section>
@@ -76,17 +81,50 @@ foreach ($ai['principles'] as $pr) {
             <div><p class="c-eyebrow">The four parts of a show</p><h2 id="pillars-title"><?= e($eco['principle']['title']) ?></h2></div>
             <p class="c-lede"><?= e($eco['principle']['text']) ?></p>
         </div>
-        <p class="c-stops hub-stops">Every pixel<span data-product="patterns">.</span> Every second<span data-product="stagewatch">.</span> Every person<span data-product="agmessage">.</span> Every surface<span data-product="playmap">.</span></p>
         <div class="c-features">
             <?php foreach ($eco['pillars'] as $pl): ?>
                 <article class="c-feature" data-product="<?= e($pl['product']) ?>">
                     <p><span class="c-role"><?= e($pl['role']) ?></span></p>
                     <h3><?= e($pl['line']) ?></h3>
                     <p><?= e($pl['text']) ?></p>
-                    <p class="c-links"><a href="<?= e($pl['href']) ?>"><?= e($name($pl['product'])) ?> overview</a></p>
+                    <p class="c-links"><a href="<?= e($pl['href']) ?>"><?= e($overview[$pl['product']] ?? $name($pl['product'])) ?></a></p>
                 </article>
             <?php endforeach; ?>
         </div>
+    </div>
+</section>
+
+<section class="l-section" id="flow" aria-labelledby="flow-title">
+    <div class="l-wrap">
+        <div class="c-section-head">
+            <div><p class="c-eyebrow">Signal flow</p><h2 id="flow-title">How they connect</h2></div>
+            <p class="c-lede">Controllers reach the apps, the apps share Show Bus, and each one feeds its part of the room. Out of the box, an AI's proposal stops at the amber gate.</p>
+        </div>
+        <?= $this->partial('hub/flow') ?>
+    </div>
+</section>
+
+<section class="l-section l-section--tint" id="connections" aria-labelledby="connections-title">
+    <div class="l-wrap">
+        <div class="c-section-head">
+            <div><p class="c-eyebrow">Working together</p><h2 id="connections-title">What the apps do for each other</h2></div>
+            <p class="c-lede">Each link below works today on the venue network. Where one needs a particular licence, it says so.</p>
+        </div>
+        <?php foreach ($groups as $gid => $g): if ($g['items'] === []) { continue; } ?>
+            <div class="hub-pair">
+                <h3 class="hub-pair-title"><span class="hub-pair-apps" aria-hidden="true"><?php foreach ($g['apps'] as $a): ?><i class="c-swatch" data-product="<?= e($a) ?>"></i><?php endforeach; ?></span><?= e($g['title']) ?></h3>
+                <div class="l-grid l-grid--3">
+                    <?php foreach ($g['items'] as $c): ?>
+                        <article class="c-card">
+                            <p class="hub-card-apps"><?= $chip($c['from']) ?><?php if ($c['to'] !== $c['from']): ?><span class="hub-wire" aria-hidden="true"></span><span class="u-visually-hidden"> with </span><?= $chip($c['to']) ?><?php endif; ?></p>
+                            <h4 class="c-card-title"><?= e($c['title']) ?></h4>
+                            <p class="c-card-body"><?= e($c['text']) ?></p>
+                            <?php if (!empty($c['needs'])): ?><p class="c-card-footer hub-needs"><?= icon('key', 'c-icon--sm') ?><span>Needs <?= e($c['needs']) ?></span></p><?php endif; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
     </div>
 </section>
 
@@ -110,46 +148,12 @@ foreach ($ai['principles'] as $pr) {
                 <ul class="c-tier-list u-mt-4" role="list" aria-labelledby="offline-title">
                     <?php foreach ($eco['show_bus']['offline']['works'] as $w): ?><li><?= icon('check') ?><?= e($w) ?></li><?php endforeach; ?>
                 </ul>
-                <h4 class="u-mt-6" id="online-title">What needs an internet connection</h4>
+                <h3 class="u-mt-6" id="online-title">What needs an internet connection</h3>
                 <ul class="c-facts u-mt-4" role="list" aria-labelledby="online-title">
                     <?php foreach ($eco['show_bus']['offline']['needs_internet'] as $w): ?><li><?= e($w) ?></li><?php endforeach; ?>
                 </ul>
             </div>
         </div>
-    </div>
-</section>
-
-<section class="l-section l-section--tint" id="flow" aria-labelledby="flow-title">
-    <div class="l-wrap">
-        <div class="c-section-head">
-            <div><p class="c-eyebrow">Signal flow</p><h2 id="flow-title">How they connect</h2></div>
-            <p class="c-lede">Controllers reach the apps, the apps share Show Bus, and each one feeds its part of the room. An AI's proposal stops at the amber gate.</p>
-        </div>
-        <?= $this->partial('hub/flow') ?>
-    </div>
-</section>
-
-<section class="l-section" id="connections" aria-labelledby="connections-title">
-    <div class="l-wrap">
-        <div class="c-section-head">
-            <div><p class="c-eyebrow">Working together</p><h2 id="connections-title">What the apps do for each other</h2></div>
-            <p class="c-lede">Each link below works today on the venue network. Where one needs a particular licence, it says so.</p>
-        </div>
-        <?php foreach ($groups as $gid => $g): if ($g['items'] === []) { continue; } ?>
-            <div class="hub-pair">
-                <h3 class="hub-pair-title"><span class="hub-pair-apps" aria-hidden="true"><?php foreach ($g['apps'] as $a): ?><i class="c-swatch" data-product="<?= e($a) ?>"></i><?php endforeach; ?></span><?= e($g['title']) ?></h3>
-                <div class="l-grid l-grid--3">
-                    <?php foreach ($g['items'] as $c): ?>
-                        <article class="c-card">
-                            <p class="hub-card-apps"><?= $chip($c['from']) ?><?php if ($c['to'] !== $c['from']): ?><span class="hub-wire" aria-hidden="true"></span><span class="u-visually-hidden"> with </span><?= $chip($c['to']) ?><?php endif; ?></p>
-                            <h4 class="c-card-title"><?= e($c['title']) ?></h4>
-                            <p class="c-card-body"><?= e($c['text']) ?></p>
-                            <?php if (!empty($c['needs'])): ?><p class="c-card-footer hub-needs"><?= icon('key', 'c-icon--sm') ?><span>Needs <?= e($c['needs']) ?></span></p><?php endif; ?>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endforeach; ?>
     </div>
 </section>
 
@@ -175,7 +179,7 @@ foreach ($ai['principles'] as $pr) {
             <div><p class="c-eyebrow">Reliability</p><h2 id="reliability-title"><?= e($eco['reliability']['title']) ?></h2></div>
             <p class="c-lede"><?= e($eco['reliability']['intro']) ?></p>
         </div>
-        <div class="l-grid l-grid--3 hub-grid-rows">
+        <div class="l-grid l-grid--3">
             <?php foreach ($eco['reliability']['points'] as $pt): ?>
                 <article class="c-feature"><h3><?= e($pt['title']) ?></h3><p><?= e($pt['text']) ?></p>
                     <p class="hub-card-apps"><?php foreach ($pt['products'] as $k) { echo $chip($k); } ?></p></article>

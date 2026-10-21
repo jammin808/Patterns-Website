@@ -1,8 +1,9 @@
 <?php
 /**
  * Home (/): the one bold thing is the live vision mixer (docs/DESIGN.md 8.11). Then the colour legend, the four apps
- * as a multiview, how they connect, one workflow as a cue ladder, the licensing status, help, a short FAQ and the
- * closing call to action. Facts come from content/; the FAQ questions carry their FAQPage schema here only.
+ * as a multiview, how they connect, one workflow as a cue ladder (the steps' titles only; the workflow page has the
+ * detail), the licensing status, help, a short FAQ and the closing call to action. Facts come from content/; the FAQ
+ * questions carry their FAQPage schema here only.
  *
  * @var \Psc\View\Seo $seo
  */
@@ -63,7 +64,7 @@ $faqs = array_values($faqs);
                 <a class="c-btn c-btn--primary" href="/ecosystem/">Explore the ecosystem</a>
                 <a class="c-btn c-btn--secondary" href="/downloads/#stagewatch">Start a free trial</a>
             </div>
-            <p class="c-hero-note">The free trial is 14 days of every StageWatch feature. All four apps run on the venue's own network, with no internet needed.</p>
+            <p class="c-hero-note">The free trial is StageWatch with every feature for 14 days. The apps work with Bitfocus Companion and Stream Deck, OSC, MIDI and NDI.</p>
         </div>
         <div class="c-hero-visual">
             <div class="c-mixer" data-hero role="group" aria-label="Test pattern preview and programme">
@@ -126,7 +127,7 @@ $faqs = array_values($faqs);
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">Ecosystem</p><h2 id="connect-title">How they connect</h2></div>
-            <p class="c-lede">On the same network the apps find each other, share live status and confirm every command. Anything an AI proposes waits for a person.</p>
+            <p class="c-lede">On the same network the apps find each other, share live status and confirm every command. Out of the box, anything an AI proposes waits for a person.</p>
         </div>
         <?= $this->partial('hub/flow') ?>
         <p class="hub-more"><a href="/ecosystem/">How the four apps work together</a><a href="/ecosystem/integrations/">Every integration, app by app</a></p>
@@ -149,7 +150,7 @@ $faqs = array_values($faqs);
                     $sp = product((string) $step['product']); ?>
                     <li class="c-cue" data-cue="<?= e($q) ?>" data-state="<?= e($state) ?>" data-product="<?= e($step['product']) ?>">
                         <span class="c-cue-q"><?= e($q) ?></span>
-                        <div class="c-cue-body"><h3><?= e($step['title']) ?></h3><p><?= e($step['text']) ?></p></div>
+                        <div class="c-cue-body"><h3><?= e($step['title']) ?></h3></div>
                         <div class="c-cue-meta"><span class="c-app"><i class="c-swatch" aria-hidden="true"></i><?= e($sp['name'] ?? $step['product']) ?></span><span class="c-cue-state"><i class="c-lamp" aria-hidden="true"></i><span data-cue-label><?= e(ucfirst($state)) ?></span></span></div>
                     </li>
                 <?php endforeach; ?>
@@ -181,9 +182,13 @@ $faqs = array_values($faqs);
                 <dt><span class="c-app"><i class="c-swatch" aria-hidden="true"></i>StageWatch</span><span class="c-badge c-badge--done">On sale now</span></dt>
                 <dd>
                     <?php if ($std && $pro && $prod): ?>
-                        <p class="hub-rate-prices"><span><?= e($std['name']) ?> <b><?= e(price((string) $std['price'])) ?></b></span><span><?= e($pro['name']) ?> <b><?= e(price((string) $pro['price'])) ?></b></span><span><?= e($prod['name']) ?> <b><?= e($launch ?? price((string) $prod['price'])) ?></b><?php if ($launch !== null): ?> <s><span class="u-visually-hidden">was </span><?= e(price((string) $prod['price'])) ?></s><?php endif; ?></span></p>
+                        <ul class="hub-rate-prices" role="list">
+                            <li><span><?= e($std['name']) ?></span><b><?= e(price((string) $std['price'])) ?></b></li>
+                            <li><span><?= e($pro['name']) ?></span><b><?= e(price((string) $pro['price'])) ?></b></li>
+                            <li><span><?= e($prod['name']) ?><?= $launch !== null ? ', launch price' : '' ?></span><b><?= e($launch ?? price((string) $prod['price'])) ?><?php if ($launch !== null): ?><s><span class="u-visually-hidden">was </span><?= e(price((string) $prod['price'])) ?></s><?php endif; ?></b></li>
+                        </ul>
                     <?php endif; ?>
-                    <p>One-off, in pounds sterling<?= $launch !== null ? ', with Production at its launch price' : '' ?>. <?= $trial ? 'Start with ' . e(strtolower((string) $trial['summary'])) : '' ?></p>
+                    <p>One-off, in pounds sterling.<?= $trial ? ' Try every feature free for ' . e((string) $trial['period']) . ', with no watermark.' : '' ?></p>
                     <p><a href="/stagewatch/licensing/">StageWatch pricing</a></p>
                 </dd>
             </div>
@@ -209,7 +214,7 @@ $faqs = array_values($faqs);
             <p class="c-eyebrow">Support</p>
             <h2 id="support-title">Help, before the doors open</h2>
             <p class="c-lede u-mt-4">The assistant answers from the support pages for all four apps, and points you to a person when it can't.</p>
-            <a class="c-launcher u-mt-6" href="/contact/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><span class="c-launcher-icon"><?= icon('chat') ?></span><span><b>Ask the assistant</b><small>What the apps do, licences, downloads and setup</small></span></a>
+            <button class="c-launcher u-mt-6 hub-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><span class="c-launcher-icon"><?= icon('chat') ?></span><span><b>Ask the assistant</b><small>What the apps do, licences, downloads and setup</small></span></button>
         </div>
         <div>
             <ul class="c-support-links hub-support-links" role="list">

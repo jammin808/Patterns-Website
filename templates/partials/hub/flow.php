@@ -7,7 +7,7 @@
 $apps = [
     'patterns' => ['line' => 'The picture: outputs, looks and cues', 'out' => 'LED walls, projectors, displays, NDI receivers'],
     'stagewatch' => ['line' => 'The time: the clock and the running order', 'out' => 'Confidence monitors, vision mixers, phones and TVs'],
-    'agmessage' => ['line' => 'The people: the back-room line to the stage', 'out' => 'Directors\' phones and tablets'],
+    'agmessage' => ['line' => 'The people: the back-room line to the stage', 'out' => 'The directors\' screens on stage'],
     'playmap' => ['line' => 'Playback and mapping: playlists and surfaces', 'out' => 'Walls, objects, buildings and LED fixtures'],
 ];
 ?>

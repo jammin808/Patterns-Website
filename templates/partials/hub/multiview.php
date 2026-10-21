@@ -1,7 +1,8 @@
 <?php
 /**
  * The four products as a multiview (docs/DESIGN.md 8.12): a drawn screen, the UMD strip with the name and the role,
- * the product's own category sentence, three facts and two links. Facts are short restatements of each product's
+ * the product's own category sentence, three facts and two links. The tiles share their rows (hub.css), so the facts
+ * and links line up across the wall. Facts are short restatements of each product's
  * highlights in content/products/; StageWatch's "from" price is read from its licensing file, never typed here.
  */
 $keys = \Psc\Content\Content::PRODUCTS;
@@ -15,6 +16,8 @@ foreach ((\Psc\Content\Content::licensing('stagewatch')['tiers'] ?? []) as $t) {
 
 $cards = [
     'patterns' => [
+        // The summary's first sentence without its last clause, which the first fact already says.
+        'line' => 'Pixel-exact test patterns and show content for LED walls, projectors, displays and NDI.',
         'facts' => ['Runs from a USB stick, with no install', 'Builds in a safe preview until you TAKE', 'Edge blends, gamma and mesh warp'],
         'overview' => 'Patterns test pattern generator',
     ],
@@ -32,11 +35,11 @@ $cards = [
     ],
 ];
 ?>
-<div class="c-multiview">
+<div class="c-multiview hub-multiview">
     <ul class="c-multiview-grid" role="list">
         <?php foreach ($keys as $key): $p = product($key); if ($p === null) { continue; } $c = $cards[$key];
             $summary = (string) ($p['summary'] ?? '');
-            $first = preg_match('/^(.+?[.!?])(\s|$)/u', $summary, $m) ? $m[1] : $summary; ?>
+            $first = $c['line'] ?? (preg_match('/^(.+?[.!?])(\s|$)/u', $summary, $m) ? $m[1] : $summary); ?>
             <li class="c-product-card" data-product="<?= e($key) ?>">
                 <div class="c-product-card-screen c-screen" aria-hidden="true"><?= $this->partial('hub/screen-' . $key) ?></div>
                 <div class="c-umd"><span class="c-umd-bar"></span><h3><?= e($p['name']) ?></h3><?php if (($p['status'] ?? '') === 'early-access'): ?><span class="c-tag hub-umd-tag">Early access</span><?php endif; ?><span class="c-umd-role"><?= e($p['role']) ?></span></div>

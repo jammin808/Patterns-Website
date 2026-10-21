@@ -42,6 +42,9 @@ $steps = [
             <p class="c-eyebrow">Ecosystem</p>
             <h1 class="c-hero-title" id="ai-title">AI in show control, with a person always approving</h1>
             <p class="c-hero-lede"><?= e($ai['intro']) ?></p>
+            <nav class="hub-jump u-mt-6" aria-label="On this page">
+                <a href="#gate">The approval gate</a><a href="#principles">The rules</a><a href="#apps">What each app sends</a><a href="#mcp">AI agents over MCP</a><a href="#assistant">This site's assistant</a>
+            </nav>
         </div>
     </div>
 </section>
@@ -50,7 +53,7 @@ $steps = [
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">The approval gate</p><h2 id="gate-title"><?= e($ai['title']) ?></h2></div>
-            <p class="c-lede">An AI's suggestion stops at an amber gate. It reaches the room only after a person says yes, and the app still runs its own checks.</p>
+            <p class="c-lede">Out of the box, an AI's suggestion stops at an amber gate. It reaches the room only after a person says yes, and the app still runs its own checks.</p>
         </div>
         <figure class="hub-gate">
             <div class="c-flow-node c-flow-node--ai"><h3>AI tools and assistants</h3><p>Read the show, propose a change</p></div>
@@ -133,8 +136,8 @@ $steps = [
         <div>
             <p class="c-eyebrow">This website</p>
             <h2 id="assistant-title">The assistant on this site</h2>
-            <p class="c-lede u-mt-4">The support assistant follows the same idea: it answers and points the way, and a person handles anything that matters.</p>
-            <a class="c-launcher u-mt-6" href="/contact/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><span class="c-launcher-icon"><?= icon('chat') ?></span><span><b>Ask the assistant</b><small>What the apps do, licences, downloads and setup</small></span></a>
+            <p class="c-lede u-mt-4">The support assistant works the same way: it answers questions and points you to the right page, and a person handles licences, refunds and anything stopping a show.</p>
+            <button class="c-launcher u-mt-6 hub-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false"><span class="c-launcher-icon"><?= icon('chat') ?></span><span><b>Ask the assistant</b><small>What the apps do, licences, downloads and setup</small></span></button>
         </div>
         <dl class="c-specs c-specs--rows hub-rates">
             <?php foreach (['What it helps with' => 'What can the support assistant help with?', 'What it can\'t do' => 'What can\'t the assistant do?', 'What not to share' => 'Should I share licence files, hardware IDs or passwords with it?', 'How long chats are kept' => 'Are my conversations with the assistant kept?', 'When to ask a person' => 'When should I ask a person instead?'] as $label => $q): if (!isset($assistant[$q])) { continue; } ?>

@@ -32,17 +32,17 @@ $seo->add(\Psc\View\Schema::faq($seo->canonical(), $all));
 <div class="l-section l-section--flush support-faq">
     <div class="l-wrap l-split l-split--aside support-faq-layout">
         <div class="support-faq-side">
-            <nav class="support-index" aria-labelledby="index-title">
-                <h2 class="support-index-title" id="index-title"><?= e($total) ?> questions in <?= e(count($groups)) ?> groups</h2>
+            <nav class="support-index" aria-label="Question groups">
+                <h2 class="support-index-title"><?= e($total) ?> questions in <?= e(count($groups)) ?> groups</h2>
                 <ol class="support-index-list" role="list">
                     <?php foreach ($groups as $g): ?>
                         <li><a href="#<?= e($g['id']) ?>"><span><?= e($g['title']) ?></span><span class="c-tabs-count"><?= e(count($g['items'])) ?><span class="u-visually-hidden"> questions</span></span></a></li>
                     <?php endforeach; ?>
                 </ol>
-                <a class="c-launcher support-index-ask" href="/support/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+                <button class="c-launcher support-index-ask support-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
                     <span class="c-launcher-icon"><?= icon('chat') ?></span>
                     <span><b>Ask the assistant</b><small>Ask in your own words</small></span>
-                </a>
+                </button>
             </nav>
         </div>
         <div class="support-faq-groups">
@@ -61,9 +61,13 @@ $seo->add(\Psc\View\Schema::faq($seo->canonical(), $all));
         <div class="support-closer">
             <div>
                 <h2 id="more-title">Didn't find your answer?</h2>
-                <p class="c-lede u-mt-4">Each app has a help page with getting started, requirements and troubleshooting. For anything else, send a message.</p>
+                <p class="c-lede u-mt-4">Ask the assistant in your own words, or open the help page for your app: getting started, requirements and troubleshooting. For anything else, send a message.</p>
             </div>
             <div class="support-closer-actions">
+                <button class="c-launcher support-js-only" type="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
+                    <span class="c-launcher-icon"><?= icon('chat') ?></span>
+                    <span><b>Ask the assistant</b><small>Setup, licences, downloads and first fixes</small></span>
+                </button>
                 <ul class="c-support-links support-links support-links--stack" role="list">
                     <?php foreach (\Psc\Content\Content::products() as $key => $p): ?>
                         <li data-product="<?= e($key) ?>"><a href="/support/<?= e($key) ?>/"><span class="c-swatch" aria-hidden="true"></span><span><?= e($p['name']) ?> help</span></a></li>

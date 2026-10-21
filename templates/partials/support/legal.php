@@ -6,11 +6,20 @@
  * @var string $name  privacy | terms | licence-terms | cookies
  * @var array<string, mixed> $page
  */
+// Each page's closing help points to the route that fits its questions (topics are ContactController::TOPICS).
 $docs = [
-    'privacy' => ['h1' => 'Privacy policy', 'path' => '/legal/privacy/', 'label' => 'Privacy'],
-    'terms' => ['h1' => 'Website and portal terms of use', 'path' => '/legal/terms/', 'label' => 'Website terms'],
-    'licence-terms' => ['h1' => 'Software licence terms', 'path' => '/legal/licence-terms/', 'label' => 'Licence terms'],
-    'cookies' => ['h1' => 'Cookies', 'path' => '/legal/cookies/', 'label' => 'Cookies'],
+    'privacy' => ['h1' => 'Privacy policy', 'path' => '/legal/privacy/', 'label' => 'Privacy',
+        'help' => 'Send a message and choose Something else as the topic. Signed in to the client portal, you can download your data or delete your account from the Account page.',
+        'contact' => '/contact/?topic=other', 'more' => ['label' => 'Account and data questions', 'href' => '/support/faq/#portal']],
+    'terms' => ['h1' => 'Website and portal terms of use', 'path' => '/legal/terms/', 'label' => 'Website terms',
+        'help' => 'Send a message and choose Something else as the topic.',
+        'contact' => '/contact/?topic=other', 'more' => ['label' => 'Client portal questions', 'href' => '/support/faq/#portal']],
+    'licence-terms' => ['h1' => 'Software licence terms', 'path' => '/legal/licence-terms/', 'label' => 'Licence terms',
+        'help' => 'Send a message and choose Buying a licence or pricing, or A licence I already have. Licence holders can also ask in a ticket in the client portal.',
+        'contact' => '/contact/?topic=licence', 'more' => ['label' => 'How licensing works', 'href' => '/licensing/']],
+    'cookies' => ['h1' => 'Cookies', 'path' => '/legal/cookies/', 'label' => 'Cookies',
+        'help' => 'Send a message and choose Something else as the topic.',
+        'contact' => '/contact/?topic=other', 'more' => ['label' => 'Read the privacy policy', 'href' => '/legal/privacy/']],
 ];
 $doc = $docs[$name] ?? $docs['privacy'];
 $file = PSC_ROOT . '/content/legal/' . $name . '.md';
@@ -46,11 +55,11 @@ $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages
         <div class="support-legal-help">
             <div>
                 <h2 id="legal-help">Questions about this page?</h2>
-                <p>Send a message and choose Something else as the topic. Licence questions can also go through a ticket in the client portal.</p>
+                <p><?= e($doc['help']) ?></p>
             </div>
             <div class="l-cluster">
-                <a class="c-btn c-btn--primary" href="/contact/?topic=other">Contact us</a>
-                <a class="c-btn c-btn--secondary" href="/licensing/">How licensing works</a>
+                <a class="c-btn c-btn--primary" href="<?= e($doc['contact']) ?>">Contact us</a>
+                <a class="c-btn c-btn--secondary" href="<?= e($doc['more']['href']) ?>"><?= e($doc['more']['label']) ?></a>
             </div>
         </div>
     </div>

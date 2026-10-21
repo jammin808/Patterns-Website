@@ -55,8 +55,8 @@ $model = [
 $status = [
     'stagewatch' => ['badge' => 'done', 'label' => 'On sale now', 'text' => (string) ($sw['model'] ?? ''), 'link' => 'StageWatch pricing'],
     'patterns' => ['badge' => 'planned', 'label' => 'Coming soon', 'text' => (string) ($lic['patterns']['model'] ?? ''), 'link' => 'Patterns licensing'],
-    'playmap' => ['badge' => 'planned', 'label' => 'Coming soon', 'text' => (string) ($lic['playmap']['model'] ?? ''), 'link' => 'PlayMap licensing and early access'],
-    'agmessage' => ['badge' => 'done', 'label' => 'Managed service', 'text' => (string) ($lic['agmessage']['model'] ?? ''), 'link' => 'AGMessage pricing and delivery'],
+    'playmap' => ['badge' => 'planned', 'label' => 'Coming soon', 'text' => (string) ($lic['playmap']['model'] ?? ''), 'link' => 'PlayMap licensing'],
+    'agmessage' => ['badge' => 'done', 'label' => 'Managed service', 'text' => (string) ($lic['agmessage']['model'] ?? ''), 'link' => 'AGMessage pricing'],
 ];
 
 $faqs = [];
@@ -98,8 +98,8 @@ $seo->add(Schema::itemList($seo->canonical(), 'Licensing for each app', $items))
             <?php foreach ($status as $key => $st): $p = product($key); ?>
                 <li>
                     <article class="c-card" data-product="<?= e($key) ?>">
-                        <span class="hub-card-apps"><span class="c-badge c-badge--<?= e($st['badge']) ?>"><?= e($st['label']) ?></span><?php if (($p['status'] ?? '') === 'early-access'): ?><span class="c-tag">Early-access build</span><?php endif; ?></span>
                         <h3 class="c-card-title"><?= e($p['name'] ?? $key) ?></h3>
+                        <p class="hub-card-apps hub-tag-first"><span class="c-badge c-badge--<?= e($st['badge']) ?>"><?= e($st['label']) ?></span><?php if (($p['status'] ?? '') === 'early-access'): ?><span class="c-tag">Early-access build</span><?php endif; ?></p>
                         <?php if ($key === 'stagewatch' && $from !== null): ?>
                             <p class="hub-from"><span>From</span> <b><?= e(price((string) $from)) ?></b><span>one-off</span></p>
                         <?php endif; ?>
@@ -115,8 +115,8 @@ $seo->add(Schema::itemList($seo->canonical(), 'Licensing for each app', $items))
 <section class="l-section l-section--tint" id="model" aria-labelledby="model-title">
     <div class="l-wrap">
         <div class="c-section-head">
-            <div><p class="c-eyebrow">The model</p><h2 id="model-title">One licence model for every app</h2></div>
-            <p class="c-lede">These are StageWatch's terms today. Patterns and PlayMap will follow the same model, with their prices and details announced at launch.</p>
+            <div><p class="c-eyebrow">The model</p><h2 id="model-title">One licence model, starting with StageWatch</h2></div>
+            <p class="c-lede">These are StageWatch's terms today. Patterns and PlayMap will follow the same model, and their prices and what each licence includes are still to be announced.</p>
         </div>
         <div class="l-split l-split--even">
             <?php foreach ($model as $title => $rows): $gid = 'model-' . md5($title); ?>

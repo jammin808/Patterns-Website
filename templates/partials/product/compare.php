@@ -44,7 +44,7 @@ $cell = static function (mixed $v): string {
                             <span class="c-tier-head">
                                 <?php if ($p['flag'] !== null): ?><span class="c-flag<?= $p['flagOutline'] ? ' c-flag--outline' : '' ?>"><?= e($p['flagOutline'] ? 'Launch' : $p['flag']) ?></span><?php endif; ?>
                                 <span class="c-tier-name"><?= e($t['name']) ?></span>
-                                <span class="c-price"><span class="c-price-amount"><?= e($p['amount']) ?></span><?php if ($p['was'] !== null): ?><s class="c-price-was"><span class="u-visually-hidden">was </span><?= e($p['was']) ?></s><?php endif; ?></span>
+                                <span class="c-price"><span class="c-price-amount"><?= e($p['figure']) ?></span><?php if ($p['was'] !== null): ?><s class="c-price-was"><span class="u-visually-hidden">was </span><?= e($p['was']) ?></s><?php endif; ?></span>
                             </span>
                         </th>
                     <?php endforeach; ?>

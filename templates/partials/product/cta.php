@@ -27,11 +27,11 @@ $name = (string) $product['name'];
         <div class="c-pd-cta-help">
             <a class="c-launcher" href="/contact/" role="button" data-chat-open aria-controls="chat-panel" aria-expanded="false">
                 <span class="c-launcher-icon"><?= icon('chat') ?></span>
-                <span><b>Ask the assistant</b><small>Setup, licences and show-day questions about <?= e($name) ?></small></span>
+                <span><b>Ask the assistant</b> <small>Setup, licences and show-day questions about <?= e($name) ?></small></span>
             </a>
             <ul class="c-support-links" role="list">
-                <li><a href="/support/<?= e($productKey) ?>/"><span class="c-swatch"></span><span><?= e($name) ?> help<small>Getting started and troubleshooting</small></span></a></li>
-                <li><a href="/downloads/#<?= e($productKey) ?>"><?= icon('download', 'c-icon--sm') ?><span>Downloads<small>The latest <?= e($name) ?> build</small></span></a></li>
+                <li><a href="/support/<?= e($productKey) ?>/"><span class="c-swatch"></span><span><?= e($name) ?> help <small>Getting started and troubleshooting</small></span></a></li>
+                <li><a href="/downloads/#<?= e($productKey) ?>"><?= icon('download', 'c-icon--sm') ?><span>Downloads <small>The latest <?= e($name) ?> build</small></span></a></li>
             </ul>
         </div>
     </div>

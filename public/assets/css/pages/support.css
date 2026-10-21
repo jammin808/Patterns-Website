@@ -16,6 +16,13 @@
   /* ===== Narrow phones: a long button label wraps inside its full-width button rather than overflowing ===== */
   @media (width < 30rem) { main .c-hero-actions > .c-btn { white-space: normal; text-align: center; padding-block: 10px; } }
 
+  /* ===== Controls that only work with scripting (the assistant's launchers, GO and Back): gone without it, so the
+     page never offers an action that cannot happen; the plain links beside them still reach the same help ===== */
+  @media (scripting: none) {
+    :root .support-js-only { display: none; }
+    .support-contact-block.support-js-only + .support-contact-block { padding-top: 0; border-top: 0; }
+  }
+
   /* ===== Breadcrumbs from the layout: breathing room under the header ===== */
   main > .l-wrap:has(> .c-crumbs:first-child) { padding-top: 22px; }
 
@@ -82,7 +89,6 @@
   .support-ladder-app .c-cue-body p { max-width: 68ch; font-size: var(--fs-2); line-height: 1.55; }
   /* GO stays under the hand while the steps scroll past (wide screens; the assistant's launcher sits to its right). */
   @media (width >= 40rem) { .support-ladder-app .c-ladder-controls { position: sticky; bottom: 0; z-index: 2; } }
-  @media (scripting: none) { .c-ladder[data-ladder] .c-ladder-controls > :is(button, .c-ladder-status) { display: none; } }
   .support-wf-outcome { margin-top: var(--sp-5); padding: 18px 20px; font-size: var(--fs-2);
     & .c-callout-title { font-size: var(--fs-3); } }
 
@@ -105,16 +111,25 @@
   .support-wf-all { font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui); }
 
   /* ===== Support hub: the assistant beside what it can help with ===== */
-  .support-help-hero .c-hero-grid { display: grid; align-items: start; }
-  @media (width >= 64rem) { .support-help-hero .c-hero-grid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); } }
+  .support-help-hero .support-help-grid { display: grid; gap: var(--sp-6); align-items: start; grid-template-areas: "intro" "chat" "can"; }
+  @media (width >= 64rem) {
+    .support-help-hero .support-help-grid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); grid-template-rows: auto 1fr; grid-template-areas: "intro chat" "can chat"; column-gap: clamp(40px, 5vw, 80px); row-gap: 0; }
+    .support-help-chat { align-self: start; }
+  }
+  .support-help-intro { grid-area: intro; }
+  .support-help-chat { grid-area: chat; }
   .support-help-hero .c-hero-title { max-width: none; }
-  .support-can { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--line);
+  .support-can { grid-area: can; padding-top: var(--sp-5); border-top: 1px solid var(--line);
     & .c-facts { margin-top: var(--sp-3); gap: 8px; font-size: var(--fs-2); color: var(--text); } & .c-facts li::before { translate: 0 -5px; } }
   .support-can-title { font: 650 var(--fs-2)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; }
   .support-can-note { margin-top: var(--sp-4); max-width: 52ch; font-size: var(--fs-1); color: var(--text-2); & a { color: var(--text); font-weight: 620; } }
+  @media (width >= 64rem) { .support-can { margin-top: var(--sp-6); } }
   .support-help-chat { min-width: 0; display: grid; }
   .support-help-chat .c-chat--inline { display: grid; }
   .support-help-chat .c-chat--inline .c-chat-panel { max-width: none; }
+  /* Before the first message the log holds nothing, so it takes no room: the suggestions and the input move up into
+     the first screen. It grows to its usual height with the first message, which the visitor has just sent. */
+  .support-help-chat .c-chat-log:empty { min-height: 0; padding-block: 0; }
   @media (width >= 64rem) { .support-help-chat .c-chat--inline .c-chat-panel { max-width: 500px; } }
 
   /* ===== Support hub: the help pages, the portal's actions, the account note ===== */
@@ -122,6 +137,10 @@
   .support-actions { list-style: none; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     & > li { display: grid; } }
   .support-action { height: 100%; & > .c-icon { color: var(--text-2); margin-bottom: 4px; } }
+  @media (width < 40rem) {
+    .support-action { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-content: start;
+      & > .c-icon { grid-row: 1 / span 2; margin: 2px 0 0; } & > :not(.c-icon) { grid-column: 2; } }
+  }
   .support-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4) var(--sp-6); margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--line);
     & > p { display: flex; gap: 10px; align-items: flex-start; max-width: 60ch; font-size: var(--fs-2); color: var(--text-2); }
     & > p .c-icon { margin-top: 4px; color: var(--text-3); } }
@@ -139,7 +158,8 @@
   .support-index-list { list-style: none; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s1);
     & li + li { border-top: 1px solid var(--line); }
     & a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 14px; font-size: var(--fs-2); font-weight: 600; font-stretch: var(--wd-ui); text-decoration: none; }
-    & a:hover { background: var(--s2); } }
+    & a:hover { background: var(--s2); }
+    & a:focus-visible { outline-offset: -3px; } }
   @media (width >= 40rem) and (width < 64rem) { .support-index-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); & li + li { border-top: 0; } & li { box-shadow: -1px -1px 0 var(--line); } } }
   .support-index-ask { margin-top: var(--sp-2); }
   @media (width < 64rem) { .support-index-ask { display: none; } }
@@ -147,6 +167,7 @@
   .support-faq-group { scroll-margin-top: calc(var(--header-h) + 24px);
     & > h2 { margin-bottom: var(--sp-5); font-size: var(--fs-5); } }
   .support-links--stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); width: 100%; }
+  @media (width >= 30rem) { .support-links--stack { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
   /* ===== Product help: the hero with an on-page index, numbered steps, requirements, the two portal cards ===== */
   .support-ph-hero .c-hero-grid { display: grid; align-items: start; padding-bottom: clamp(32px, 4vw, 48px); }
@@ -162,7 +183,7 @@
   .support-ph-first { padding-top: clamp(48px, 5vw, 80px); }
   @media (width >= 64rem) { .support-ph-side { position: sticky; top: calc(var(--header-h) + 32px); } }
   @container ladder (width >= 46rem) { .support-ladder-plain .c-cue { grid-template-columns: 56px minmax(0, 1fr); } }
-  @container ladder (width < 46rem) { .support-ladder-plain .c-cue { grid-template-areas: "q body"; } }
+  @container ladder (width < 46rem) { .support-ladder-plain .c-cue { grid-template-columns: 28px minmax(0, 1fr); grid-template-areas: "q body"; } }
   .support-ladder-plain .c-cue { align-items: start; }
   .support-ladder-plain .c-cue-q { padding-top: 2px; color: var(--accent-ink); }
   .support-ladder-plain .c-cue-body p { max-width: 72ch; font-size: var(--fs-2); line-height: 1.55; }
@@ -190,6 +211,8 @@
   .support-dl-app { scroll-margin-top: var(--header-h); border-top: 3px solid var(--accent); }
   .support-dl-name { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-6);
     & > .c-swatch { width: 16px; height: 16px; } & .c-role { font-size: 13px; } }
+  .support-dl-name--wrap { flex-wrap: nowrap; align-items: start;
+    & > .c-swatch { margin-top: calc(0.53em - 8px); } & > span:not(.c-swatch) { min-width: 0; } }
   .support-dl-specs { margin-top: var(--sp-5); }
   .support-dl-h { margin-top: var(--sp-6); font: 650 var(--fs-2)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; }
   .support-dl-reqs > .support-dl-h:first-child { margin-top: 0; margin-bottom: var(--sp-3); }
@@ -209,6 +232,7 @@
   .support-contact { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
   .support-contact-main { display: grid; gap: var(--sp-5); align-content: start; min-width: 0; }
   .support-contact-main :is(.c-form, .c-error-summary) { scroll-margin-top: calc(var(--header-h) + 16px); }
+  main:has(.support-contact .c-error-summary) > .l-wrap > .pt-alert--danger { display: none; }
   .support-sent:focus { outline: none; }
   .support-contact-title { font-size: var(--fs-5); }
   .support-sent { scroll-margin-top: calc(var(--header-h) + 16px); padding: 20px 22px;

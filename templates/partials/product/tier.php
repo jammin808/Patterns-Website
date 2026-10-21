@@ -2,7 +2,8 @@
 /**
  * One licence as a tier card (docs/DESIGN.md 8.21) from a content/licensing/<key>.php tier. The recommended tier
  * (highlight) takes the product's colour through .is-rec; a launch price shows the full price struck through.
- * Tiers without a price show their price label ("Coming soon", "Price on application") at a calmer size.
+ * Tiers without a price show their price label ("Price on application") at a calmer size; on a compact card of a
+ * ladder that is not on sale yet, the label ("Coming soon") is a neutral planned badge, never a price.
  *
  * @var array<string, mixed> $tier
  * @var bool|null $cta      false hides the button (a coming-soon ladder has one shared button)
@@ -21,11 +22,15 @@ $classes = 'c-tier' . ($rec ? ' is-rec' : '') . ($compact ? ' c-pd-tier--compact
 <article class="<?= e($classes) ?>" id="<?= e($id) ?>" aria-labelledby="tier-<?= e($id) ?>">
     <?php if ($p['flag'] !== null): ?><span class="c-flag<?= $p['flagOutline'] ? ' c-flag--outline' : '' ?>"><?= e($p['flag']) ?></span><?php endif; ?>
     <h3 class="c-tier-name" id="tier-<?= e($id) ?>"><?= e($tier['name']) ?></h3>
-    <p class="c-price">
-        <span class="c-price-amount<?= $p['tbc'] ? ' c-pd-price-tbc' : '' ?>"><?= e($p['amount']) ?></span>
-        <?php if ($p['was'] !== null): ?><s class="c-price-was"><span class="u-visually-hidden">was </span><?= e($p['was']) ?></s><?php endif; ?>
-        <?php if ($p['unit'] !== null): ?><span class="c-price-unit"><?= e($p['unit']) ?></span><?php endif; ?>
-    </p>
+    <?php if ($compact && $p['tbc']): ?>
+        <p class="c-pd-tier-soon"><span class="c-badge c-badge--planned"><?= e($p['amount']) ?></span><?php if ($p['unit'] !== null): ?><span class="c-price-unit"><?= e($p['unit']) ?></span><?php endif; ?></p>
+    <?php else: ?>
+        <p class="c-price">
+            <span class="c-price-amount<?= $p['tbc'] ? ' c-pd-price-tbc' : '' ?>"><?= e($p['amount']) ?></span>
+            <?php if ($p['was'] !== null): ?><s class="c-price-was"><span class="u-visually-hidden">was </span><?= e($p['was']) ?></s><?php endif; ?>
+            <?php if ($p['unit'] !== null): ?><span class="c-price-unit"><?= e($p['unit']) ?></span><?php endif; ?>
+        </p>
+    <?php endif; ?>
     <?php if (!empty($tier['summary'])): ?><p class="c-tier-sub"><?= e($tier['summary']) ?></p><?php endif; ?>
     <?php if (!$compact && !empty($tier['includes'])): ?>
         <ul class="c-tier-list" role="list">

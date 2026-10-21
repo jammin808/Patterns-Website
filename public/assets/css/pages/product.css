@@ -11,7 +11,8 @@
   .c-pd-roleline { font-size: var(--fs-2); font-weight: 600; font-stretch: var(--wd-ui); letter-spacing: 0; color: var(--text-2); }
   .c-product-tag .c-tag { font-size: var(--fs-0); letter-spacing: 0; }
   .c-pd-definition { max-width: 48ch; color: var(--text); }
-  .c-pd-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 34rem; & dd { overflow-wrap: anywhere; } }
+  .c-pd-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 34rem; & dd { overflow-wrap: anywhere; }
+    & > div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
   /* The layout's breadcrumbs sit above the product hero: give them the hero's breathing room. */
   main[data-product] > .l-wrap:first-child > .c-crumbs { padding-block: 16px 14px; }
   .c-hero--product .c-shots { margin-top: clamp(8px, 2vw, 24px); }
@@ -19,8 +20,11 @@
   /* ===== Stacked heading beside a long list: the heading stays in view while the list scrolls past ===== */
   @media (width >= 64rem) { .c-pd-sticky { position: sticky; top: calc(var(--header-h) + 32px); } }
   .c-pd-minor { font-size: var(--fs-1); font-stretch: var(--wd-ui); letter-spacing: 0; color: var(--text-2); }
-  .c-pd-audience { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
-    & li { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: var(--r-1); font-size: var(--fs-1); font-stretch: var(--wd-ui); color: var(--text-2); } }
+  /* Who it is for: a plain list with hairlines, so nothing here looks like a button or a filter. */
+  .c-pd-audience { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); column-gap: 24px; margin-top: 8px;
+    & li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); font-size: var(--fs-1); line-height: 1.4; color: var(--text-2); }
+    & li::before { content: ""; flex: none; width: 6px; height: 1.5px; translate: 0 -4px; background: var(--accent-line); } }
+  @media (width >= 64rem) { .c-pd-audience { grid-template-columns: minmax(0, 1fr); } }
   .c-pd-highlights { grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
   .c-pd-highlights .c-feature h3 { font-size: var(--fs-3); font-stretch: 110%; }
   .c-pd-more { margin-top: var(--sp-6); font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui);
@@ -31,6 +35,8 @@
   /* ===== Feature groups on the overview (bento): titles are the links to each group ===== */
   .c-pd-bento .c-bento-item { gap: 12px; padding: 22px; }
   .c-pd-bento .c-bento-media { margin: -22px -22px 8px; }
+  /* A capture is shown whole, letterboxed on the monitor's black like a picture of another shape, never cropped. */
+  .c-pd-bento .c-bento-media > img { object-fit: contain; }
   .c-pd-bento h3 { font-size: var(--fs-3); font-stretch: 110%;
     & a { text-decoration: none; background: linear-gradient(var(--accent-line), var(--accent-line)) 0 100% / 0 2px no-repeat; transition: background-size var(--d-2) var(--e-cut); }
     & a:hover, & a:focus-visible { background-size: 100% 2px; } }
@@ -138,11 +144,19 @@
   .c-pd-index ol { list-style: none; padding: 0; display: grid; border-left: 1px solid var(--line); }
   .c-pd-index a { display: block; margin-left: -1px; padding: 7px 0 7px 14px; border-left: 2px solid transparent; font-size: var(--fs-1); line-height: 1.35; font-stretch: var(--wd-ui); color: var(--text-2); text-decoration: none; }
   .c-pd-index a:hover { color: var(--text); border-left-color: var(--accent-line); }
-  @media (width < 64rem) {
-    .c-pd-index { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); }
-    .c-pd-index ol { grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); column-gap: 20px; border-left: 0; }
-    .c-pd-index a { margin-left: 0; padding-left: 0; border-left: 0; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 0.25em; }
-  }
+  /* Narrower screens: the same index folded into one row, so the first group starts on the first screen. */
+  .c-pd-index-sm { border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
+    & summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 16px; cursor: pointer; list-style: none; font-size: var(--fs-2); font-weight: 620; font-stretch: var(--wd-ui); }
+    & summary::-webkit-details-marker { display: none; }
+    & summary .c-icon { margin-left: auto; color: var(--text-2); transition: rotate var(--d-2) var(--e-cut); }
+    & details[open] summary .c-icon { rotate: 180deg; }
+    & summary:focus-visible { outline-offset: -2px; border-radius: var(--r-3); }
+    & ol { list-style: none; padding: 4px 16px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); column-gap: 20px; border-top: 1px solid var(--line); }
+    & a { display: block; padding: 9px 0; font-size: var(--fs-1); line-height: 1.35; font-stretch: var(--wd-ui); color: var(--text-2); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 0.25em; }
+    & a:hover { color: var(--text); text-decoration-color: var(--accent-line); } }
+  .c-pd-index-count { font-size: var(--fs-0); font-weight: 500; color: var(--text-3); }
+  @media (width < 64rem) { .c-pd-index { display: none; } }
+  @media (width >= 64rem) { .c-pd-index-sm { display: none; } }
   .c-pd-group { display: grid; gap: 18px; padding-block: clamp(36px, 4.5vw, 64px); border-top: 1px solid var(--line); }
   .c-pd-group:first-child { padding-top: 0; border-top: 0; }
   .c-pd-group-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; align-items: start;
@@ -165,22 +179,36 @@
     & dd { margin-top: 3px; font-size: var(--fs-1); color: var(--text-2); } }
 
   /* ===== Sub-page heroes (features, licensing): a compact title so the page's content starts on the first screen ===== */
-  .c-pd-hero .c-hero-grid { display: grid; gap: 0 var(--gap); grid-template-columns: minmax(0, 1fr); padding-block: clamp(16px, 2vw, 28px) clamp(28px, 3.5vw, 48px); }
-  .c-pd-hero .c-hero-title { font-size: clamp(2.25rem, 1.35rem + 2.7vw, 3.5rem); max-width: 26ch; }
+  .c-pd-hero .c-hero-grid { padding-block: clamp(16px, 2vw, 28px) clamp(28px, 3.5vw, 44px); }
+  .c-pd-hero .c-hero-title { font-size: clamp(2rem, 1.2rem + 2.9vw, 3.5rem); max-width: 26ch; }
   .c-pd-hero .c-hero-lede { max-width: 52ch; }
-  .c-pd-hero .c-hero-note { max-width: 58ch; }
+  .c-pd-hero .c-hero-note { max-width: 62ch; }
+  .c-pd-hero .c-hero-actions { margin-top: var(--sp-5); }
+  /* Licensing: the terms and the next step on the left, the plan in a few sentences beside them from 64rem. */
   .c-pd-hero-aside { margin-top: var(--sp-5); max-width: 52ch; padding-left: 18px; border-left: 2px solid var(--accent-line); font-size: var(--fs-2); color: var(--text-2); }
   @media (width >= 64rem) {
-    .c-pd-hero .c-hero-grid:has(> .c-pd-hero-aside) { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: start; }
+    .c-pd-hero .c-hero-grid:has(> .c-pd-hero-aside) { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0 var(--gap); align-items: start; }
     .c-pd-hero .c-hero-grid > :is(.c-eyebrow, .c-hero-title) { grid-column: 1 / -1; }
     .c-pd-hero .c-hero-grid > .c-pd-hero-aside { grid-column: 2; }
   }
 
+  /* Live prices at a glance: one hairline row of links to the cards, for screens where the cards start below the fold. */
+  .c-pd-glance { margin-top: var(--sp-5); max-width: 40rem;
+    & ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s1); }
+    & li { box-shadow: -1px -1px 0 var(--line); }
+    & a { display: grid; gap: 4px; min-height: 64px; align-content: center; padding: 10px 14px; color: var(--text); text-decoration: none; }
+    & a:hover .c-pd-glance-name { text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 0.2em; }
+    & .c-pd-glance-name { font-size: var(--fs-0); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); }
+    & .c-price-amount { font-size: 1.375rem; }
+    & .c-price-was { font-size: var(--fs-1); } }
+  @media (width >= 40rem) { .c-pd-glance ul { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); } }
+  @media (width >= 64rem) { .c-pd-glance { display: none; } }
+
   /* ===== Licensing: price labels that are not numbers, compact tiers, the comparison on phones ===== */
   .c-pd-tiers { padding-top: clamp(32px, 4vw, 56px); }
   .c-pd-price-tbc { font-size: var(--fs-5); letter-spacing: -0.015em; }
-  .c-pd-tier--compact { gap: 10px; padding: 20px 18px 18px;
-    & .c-pd-price-tbc { font-size: var(--fs-2); font-weight: 650; font-stretch: var(--wd-ui); letter-spacing: 0; color: var(--text-2); } }
+  .c-pd-tier--compact { gap: 10px; padding: 20px 18px 18px; }
+  .c-pd-tier-soon { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; & .c-price-unit { flex-basis: auto; } }
   .c-pd-tier-ask { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line);
     & h4 { font-size: var(--fs-1); } }
   .c-pd-tiers-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; margin-top: var(--gap); padding: 18px 20px; border: 1px dashed var(--field); border-radius: var(--r-3); background: var(--s1);
@@ -214,8 +242,8 @@
     .c-pd-compare .c-compare-table .c-price-amount { font-size: 1.375rem; }
     .c-pd-compare .c-compare-table .c-btn { padding-inline: 6px; }
     .c-pd-compare .c-tier-head { grid-template-rows: 34px auto auto; }
-    .c-pd-compare .c-tier-head .c-flag { font-size: 11px; line-height: 1.15; padding: 2px 5px; }
-    .c-pd-compare-remind { display: block; font: 600 11px/1.2 var(--font-sans); font-stretch: var(--wd-ui); color: var(--text-3); }
+    .c-pd-compare .c-tier-head .c-flag { font-size: 12px; line-height: 1.15; padding: 2px 5px; }
+    .c-pd-compare-remind { display: block; font: 600 12px/1.2 var(--font-sans); font-stretch: var(--wd-ui); color: var(--text-2); }
   }
 
   /* ===== How to buy: steps as a static cue ladder, the step text is the line ===== */

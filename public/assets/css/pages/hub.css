@@ -13,10 +13,24 @@
     .hub-ladder-untimed.c-ladder--static :is(.c-ladder-head, .c-cue) { grid-template-columns: 84px minmax(0, 1fr) 160px; }
   }
 
-  /* Links that continue a section: descriptive anchors in one row. */
-  .hub-more { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: var(--sp-5); font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui);
-    & a { text-decoration-color: var(--line-2); text-decoration-thickness: 2px; text-underline-offset: 0.3em; }
+  /* Links that continue a section: descriptive anchors in one row, each at least 24px tall (WCAG 2.5.8). */
+  .hub-more { display: flex; flex-wrap: wrap; gap: 4px 28px; margin-top: var(--sp-5); font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui);
+    & a { padding-block: 3px; text-decoration-color: var(--line-2); text-decoration-thickness: 2px; text-underline-offset: 0.3em; }
     & a:hover { text-decoration-color: currentColor; } }
+
+  /* The multiview: the four tiles share their rows (screen, UMD, line, facts, links), so the facts and links line
+     up across the wall like a real multiviewer's cells. */
+  .hub-multiview .c-product-card { display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 0; }
+  .hub-multiview .c-product-card-body { grid-row: span 3; grid-template-rows: subgrid; }
+
+  /* A launcher for the assistant is a real button; it needs the script, so it steps aside without one. */
+  @media (scripting: none) { .hub-js-only { display: none; } }
+
+  /* At the narrowest phones a long action label wraps instead of pushing the page sideways (WCAG 1.4.10). */
+  @media (width < 22.5rem) { main .c-btn { white-space: normal; text-align: center; padding-block: 8px; } }
+
+  /* A card whose status or role tag reads after its title but shows above it. */
+  .hub-tag-first { order: -1; }
 
   /* A status tag on a multiview tile's UMD strip (early access), between the name and the role. */
   .hub-umd-tag { padding-block: 1px; font-size: 12px; }
@@ -27,9 +41,12 @@
   .hub-rates dt { display: flex; flex-wrap: wrap; align-items: center; align-content: start; gap: 8px; }
   .hub-rates dd { display: grid; gap: 6px; align-content: start; font-weight: 400; font-stretch: 100%; color: var(--text-2);
     & a { font-weight: 620; font-stretch: var(--wd-ui); color: var(--text); text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 0.25em; } }
-  .hub-rate-prices { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; color: var(--text); font-weight: 560; font-stretch: var(--wd-ui);
-    & b { margin-left: 4px; font: 720 1.375rem/1.1 var(--font-display); font-stretch: 112%; letter-spacing: -0.02em; font-variant-numeric: lining-nums tabular-nums; }
-    & s { color: var(--text-3); font-variant-numeric: tabular-nums; } }
+  /* StageWatch's three prices: the tier's name over its price, side by side, wrapping only on the narrowest phones. */
+  .hub-rate-prices { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px clamp(20px, 3vw, 36px); margin-bottom: 4px;
+    & li { display: grid; gap: 2px; align-content: start; }
+    & span { font-size: var(--fs-0); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); }
+    & b { font: 720 1.5rem/1.1 var(--font-display); font-stretch: 112%; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: lining-nums tabular-nums; }
+    & s { margin-left: 6px; font: 500 var(--fs-1)/1 var(--font-sans); color: var(--text-3); font-variant-numeric: tabular-nums; } }
 
   /* The closing call to action: the four app bars, a heading, a line and the actions. */
   .hub-cta-bars { width: 112px; height: 6px; margin-bottom: var(--sp-6); }
@@ -37,8 +54,18 @@
     & h2 { max-width: 18ch; } & .c-hero-actions { margin-top: var(--sp-5); } }
   @media (width >= 64rem) { .hub-cta-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: end; } }
 
-  /* Ecosystem: the tagline over the pillars, each full stop in its app's bar. */
-  .hub-stops { margin-bottom: clamp(28px, 4vw, 48px); font: 680 var(--fs-6)/1.05 var(--font-display); font-stretch: 116%; letter-spacing: -0.022em; text-wrap: balance; }
+  /* Ecosystem hero: the words on the left, the tagline on the right as four labelled lines, like the label strip on
+     a rack, each full stop in its app's bar. One column below 64rem. */
+  .c-hero--page .c-hero-grid.hub-hero-split { display: grid; gap: var(--sp-6) var(--gap); }
+  @media (width >= 64rem) { .c-hero--page .c-hero-grid.hub-hero-split { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: end; } }
+  .hub-stops { display: grid; margin: 0; font: 680 var(--fs-5)/1.1 var(--font-display); font-stretch: 116%; letter-spacing: -0.022em;
+    & > .hub-stop { padding-block: 10px; border-top: 1px solid var(--line); color: var(--text); white-space: nowrap; }
+    & > .hub-stop:last-child { border-bottom: 1px solid var(--line); }
+    /* The full stop is drawn as a square of the app's bar (a fill, so yellow holds on the light page); the "." stays
+       in the text for reading and copying. */
+    & .hub-stop > [data-product] { display: inline-block; width: 0.19em; height: 0.19em; margin-left: 0.06em; overflow: hidden; vertical-align: baseline;
+      color: transparent; background: var(--accent); box-shadow: inset 0 0 0 1px var(--swatch-edge); } }
+  @media (width >= 64rem) { .hub-stops { font-size: var(--fs-6); & > .hub-stop { padding-block: 14px; } } }
 
   /* Connections grouped by the apps they join: a group title with the apps' bars, then the cards. */
   .hub-pair + .hub-pair { margin-top: clamp(40px, 5vw, 64px); }
@@ -98,7 +125,8 @@
   /* "What it sends" under each app's AI. */
   .hub-sends { flex-wrap: nowrap; align-items: flex-start; gap: 10px; font-size: var(--fs-1); color: var(--text-2);
     & .c-icon { margin-top: 2px; color: var(--text-3); } & b { color: var(--text); } }
-  .c-card .c-links { margin-top: 0; padding-top: 4px; }
+  .c-card .c-links { margin-top: 0; padding-top: 4px; & a { padding-block: 2px; } }
+  .hub-ladder-untimed .c-ladder-controls > a { padding-block: 2px; }
 
   /* Licensing: a "from" price on a status card, and the titles over the model's two lists. */
   .hub-from { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--fs-1); color: var(--text-2);

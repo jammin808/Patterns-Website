@@ -76,14 +76,29 @@ const V = {
   licence: () => `<div class="og-sheet"><div class="og-sheet-head">${icon('key')}Your licence</div><dl>
     <dt>Price</dt><dd>One-off</dd><dt>Tied to</dt><dd>Your show PC</dd><dt>Activated</dt><dd>Offline, with a licence file</dd>
     <dt>Also</dt><dd>Trials, nonprofit and rental pricing</dd></dl></div>`,
+  // The tiers as the pricing page shows them: a launch price in the price note is the figure, with the list price
+  // struck through and an outlined "Launch price" flag; the recommended tier carries its badge.
   tiers: () => {
     const t = data.tiers;
-    const tier = (id, unit, rec = false) => `<div class="og-tier${rec ? ' is-rec' : ''}">${rec && t[id].badge ? `<span class="og-flagline">${esc(t[id].badge)}</span>` : ''}
-      <h3>${esc(t[id].name)}</h3><p>${esc(t[id].price)}</p><small>${unit}${t[id].note ? `<br>${esc(t[id].note)}` : ''}</small></div>`;
-    return `<div class="og-tiers">${tier('standard', 'One-off, 1 PC')}${tier('pro', 'One-off, 1 PC', true)}${tier('production', 'One-off, main and backup PC')}</div>`;
+    const tier = (id) => {
+      const x = t[id];
+      const launch = /£\s?(\d+(?:\.\d+)?)/.exec(x.note ?? '');
+      const price = launch ? `£${launch[1]}` : x.price;
+      const flag = x.badge ? `<span class="og-flagline">${esc(x.badge)}</span>` : (launch ? '<span class="og-flagline og-flagline--outline">Launch price</span>' : '');
+      const unit = x.machines === 2 ? 'One-off, main and backup PC' : 'One-off, one PC';
+      return `<div class="og-tier${x.badge ? ' is-rec' : ''}">${flag}<h3>${esc(x.name)}</h3>
+        <p>${esc(price)}${launch ? `<s>${esc(x.price)}</s>` : ''}</p><small>${unit}</small></div>`;
+    };
+    return `<div class="og-tiers">${tier('standard')}${tier('pro')}${tier('production')}</div>`;
   },
+  // Each workflow's apps as swatches, with a legend naming every swatch (a swatch never stands without its name).
   cues: () => `<div class="og-cues">${data.workflows.map((w, i) => `<div class="og-cue"><span>Q${i + 1}</span><b>${esc(w.crumb)}</b>
-    <i>${(data.wfProducts[w.key] ?? []).map((k) => `<b class="c-swatch" data-product="${k}"></b>`).join('')}</i></div>`).join('')}</div>`,
+    <i>${(data.wfProducts[w.key] ?? []).map((k) => `<b class="c-swatch" data-product="${k}"></b>`).join('')}</i></div>`).join('')}</div>
+    <p class="og-legend">${order.map((k) => `<span data-product="${k}"><i class="c-swatch"></i>${esc(P[k].name)}</span>`).join('')}</p>`,
+  // About: the four habits the apps share (the about page's principles), rather than repeating the headline.
+  habits: () => `<div class="og-sheet"><div class="og-sheet-head">What the four apps share</div><ul class="og-list">${[
+    ['bus', 'Offline on the venue network'], ['reset', 'Built to keep running'], ['approve', 'A person decides'], ['check', 'Confirmed, not hopeful'],
+  ].map(([i, t]) => `<li>${icon(i)}${t}</li>`).join('')}</ul></div>`,
   downloads: () => `<div class="og-rows">${[
     ['download', 'The latest Windows builds'], ['deck', 'Bitfocus Companion modules'], ['doc', 'Release notes'],
     ['clock', 'StageWatch’s 14-day trial'], ['user', 'Every build for signed-in clients'],
@@ -93,9 +108,6 @@ const V = {
     <div class="og-chat-chips"><span>Which licence do I need?</span><span>Which app is for an AGM?</span><span>How do I report a bug?</span></div></div>`,
   topics: () => `<div class="og-radios">${['Buying a licence or pricing', 'Help with the software', 'A licence I already have', 'Rental, reseller or partnership']
     .map((t, i) => `<div class="og-radio${i === 0 ? ' is-on' : ''}">${t}</div>`).join('')}</div>`,
-  about: () => `<div class="og-sheet"><div class="og-sheet-head">${icon('user')}Patterns Show Control</div><dl>
-    <dt>Made in</dt><dd>The UK</dd><dt>By</dt><dd>Ben Rohleder</dd><dt>Built for</dt><dd>Conferences, AGMs and live events</dd>
-    <dt>Apps</dt><dd>Patterns, StageWatch, AGMessage and PlayMap</dd></dl></div>`,
 };
 
 // ---------------------------------------------------------------------------------------------- the cards
@@ -114,9 +126,9 @@ const cards = {
   playmap: { product: 'playmap', title: 'Play it, map it, run the show', sub: 'Media playback and 3D projection mapping in one Windows app.', visual: V.monitor('playmap') },
   workflows: { eyebrow: 'From load-in to curtain', title: 'Show workflows', sub: 'Step-by-step guides for LED walls, blends, conferences, AGMs, mapping and Stream Deck control.', visual: V.cues(), size: 80 },
   downloads: { title: 'Downloads', sub: 'Windows builds, Bitfocus Companion modules and release notes.', visual: V.downloads(), size: 80 },
-  support: { eyebrow: 'Guides, FAQ and the assistant', title: 'Support for Patterns, StageWatch, AGMessage and PlayMap', sub: '', visual: V.assistant() },
+  support: { title: 'Support', sub: 'Getting-started guides, troubleshooting, licence help and the support assistant.', visual: V.assistant(), size: 80 },
   contact: { eyebrow: 'Contact', title: 'Get in touch', sub: 'Licences, an AGM, rental packs or a show next week. Based in the UK.', visual: V.topics(), size: 80 },
-  about: { eyebrow: 'About', title: 'Made in the UK by Ben Rohleder', sub: 'Built at real show desks for the crews who run conferences, AGMs and live events.', visual: V.about() },
+  about: { eyebrow: 'About', title: 'Made in the UK by Ben Rohleder', sub: 'Built at real show desks for the crews who run conferences, AGMs and live events.', visual: V.habits() },
 };
 
 const missing = Object.keys(data.og).filter((k) => !cards[k]);
@@ -172,17 +184,18 @@ for (const key of todo) {
   }, { c, p: P });
   await page.evaluate(() => document.fonts.ready);
   // The headline steps down (to 50 px at the least) until it fits beside the visual in three lines.
-  await page.evaluate((start) => {
+  const fits = await page.evaluate((start) => {
     const title = document.querySelector('.og-title');
     const text = document.querySelector('.og-text');
-    const sub = document.querySelector('.og-sub');
     const maxLines = 3;
     for (let size = start; size >= 50; size -= 2) {
       title.style.fontSize = `${size}px`;
       const lines = Math.round(title.getBoundingClientRect().height / (size * 1.02));
-      if (lines <= maxLines && text.getBoundingClientRect().height <= 430) break;
+      if (lines <= maxLines && text.getBoundingClientRect().height <= 430) return true;
     }
+    return false;
   }, c.size ?? 66);
+  if (!fits) console.warn(`${key}: the headline needs more than three lines at 50 px; shorten it or its line.`);
   await page.waitForLoadState('networkidle');
   const file = path.join(outDir, `${key}.png`);
   await page.locator('[data-og]').screenshot({ path: file });
