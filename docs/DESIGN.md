@@ -1096,6 +1096,31 @@ with the page's description as the line, rather than its 55-character title). Te
 `content/pages.php` names an `og` image with no card. Cards are palette PNGs when that is visually identical, and stay
 under 150 KB (25–90 KB today).
 
+### 8.35 Cookie choice (`templates/partials/consent.php`, `site.js` initConsent)
+
+```html
+<section class="c-consent" data-consent data-ga="G-…" aria-labelledby="consent-title" hidden>   <!-- after the skip link -->
+  <div class="c-consent-card">
+    <div class="c-consent-text"><h2 class="c-consent-title" id="consent-title">Can we count your visit?</h2><p>… <a href="/legal/cookies/">Read the cookie notice</a>.</p></div>
+    <div class="c-consent-actions">
+      <button type="button" class="c-btn c-btn--secondary" data-consent-choice="granted">Accept statistics cookies</button>
+      <button type="button" class="c-btn c-btn--secondary" data-consent-choice="denied">Reject statistics cookies</button></div>
+  </div>
+</section>
+<button type="button" class="c-footer-consent" data-consent-open hidden>Cookie settings</button>   <!-- footer; also on the cookie notice -->
+```
+- **Shown only on pages that carry the Google tag**, and only while the visitor has given no answer in the last
+  year (`psc-consent` in localStorage, `granted:<ms>` or `denied:<ms>`). It sits first in the DOM after the skip link,
+  so the keyboard reaches it early, but it is fixed over the foot of the page, never a wall. It is not modal and
+  takes no focus on load.
+- **Accept and reject are equals:** the same style, size, weight and wording pattern. Saying no changes nothing
+  else on the site.
+- **Basic Consent Mode:** the tag's inline part denies every consent type and fetches gtag.js only after
+  acceptance, so nothing reaches Google and no `_ga` cookie exists before then. Rejecting after accepting withdraws
+  consent and deletes the `_ga` cookies.
+- **Reopening:** any `[data-consent-open]` reopens the card with focus on the current answer, and Escape closes a
+  reopened card. The openers stay hidden without scripting, because the choice needs scripting, and so does the tag.
+
 ## 9. Imagery: real screenshots
 
 - Capture each app in its dark theme at 100% scale, cropped to the window content with no OS chrome. Blur or
