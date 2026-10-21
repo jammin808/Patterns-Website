@@ -1,0 +1,1200 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design system kitchen sink · Patterns Show Control</title>
+<meta name="description" content="Every component of the Patterns Show Control design system, in both themes.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#090C10">
+<meta name="robots" content="noindex">
+<!-- Production pages preload the two Latin files the first screen needs. -->
+<link rel="preload" href="../public/assets/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../public/assets/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../public/assets/css/site.css">
+<script type="module" src="../public/assets/js/site.js"></script>
+<script type="module" src="../public/assets/js/hero.js"></script>
+<script type="module" src="../public/assets/js/countdown.js"></script>
+<style>
+  /* Kitchen-sink scaffolding only: not part of the design system. */
+  .ks-intro { padding-block: 28px; border-bottom: 1px solid var(--line); background: var(--s1); }
+  .ks-intro p { max-width: 80ch; color: var(--text-2); font-size: var(--fs-1); }
+  .ks-toc { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: var(--fs-1); }
+  .ks-classes { margin-top: 10px; font: 500 12px/1.5 var(--font-mono); color: var(--text-3); }
+  .ks-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .ks-sub { margin: 32px 0 14px; font-size: var(--fs-2); font-stretch: var(--wd-ui); color: var(--text-2); }
+  .ks-sub:first-child { margin-top: 0; }
+  .ks-swatches { display: grid; gap: 2px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+  .ks-swatch { display: grid; gap: 2px; padding: 10px 12px 12px; border: 1px solid var(--line); background: var(--s1); font-size: var(--fs-0); }
+  .ks-swatch::before { content: ""; height: 44px; margin: -10px -12px 8px; background: var(--sw); border-bottom: 1px solid var(--line); }
+  .ks-swatch code { color: var(--text-2); font-size: 11px; }
+  .ks-type > * + * { margin-top: 14px; }
+  .ks-type small { display: block; font: 500 11px/1.4 var(--font-mono); color: var(--text-3); margin-bottom: 2px; }
+  .ks-icons { display: grid; gap: 2px; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); }
+  .ks-icons div { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border: 1px solid var(--line); background: var(--s1); font: 500 11px/1 var(--font-mono); color: var(--text-2); }
+  .ks-boxes { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); }
+  .ks-box { padding: 18px; border: 1px solid var(--line); background: var(--s1); font-size: var(--fs-0); color: var(--text-2); }
+  .ks-float { position: relative; height: 600px; overflow: hidden; border: 1px dashed var(--line-2); border-radius: var(--r-3); background: var(--bg); }
+  .ks-float .c-chat-panel { position: absolute; bottom: 84px; right: 16px; }
+  .ks-float .c-chat-fab { position: absolute; right: 16px; bottom: 16px; }
+  .ks-float-note { position: absolute; left: 16px; top: 14px; max-width: 34ch; font-size: var(--fs-0); color: var(--text-3); }
+  .ks-themes { display: grid; gap: 2px; grid-template-columns: minmax(0, 1fr); background: var(--line); border: 1px solid var(--line); }
+  @media (width >= 64rem) { .ks-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .ks-themes > div { display: grid; gap: 16px; align-content: start; padding: 24px; }
+  .ks-themes > div > p:first-child { font: 600 12px/1 var(--font-mono); color: var(--text-3); }
+  @media (width < 40rem) { .ks-float { height: 640px; } .ks-float .c-chat-panel { left: 8px; right: 8px; width: auto; bottom: 76px; } .ks-float-note { display: none; } }
+</style>
+</head>
+<body class="l-page">
+<!-- The icon sprite (the same symbols as /assets/img/icons.svg), inlined once per page. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" class="u-visually-hidden" aria-hidden="true" focusable="false">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M7 12h10"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3.5 7h17M3.5 12h17M3.5 17h17"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
+  <symbol id="i-system" viewBox="0 0 24 24"><path d="M3.5 5h17v11h-17zM8.5 20h7M12 16v4"/><path d="M12 5v11"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H10l-4 3.5V16H4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12h14M12.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.5v1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 16.8v1"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8 5.4-5.6"/></symbol>
+  <symbol id="i-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+  <symbol id="i-bus" viewBox="0 0 24 24"><path d="M2.5 12h19"/><path d="M6 12V6.5M12 12V4.5M18 12V6.5M8 12v6M16 12v6"/><path d="M4.5 4.5h3v2h-3zM10.5 2.5h3v2h-3zM16.5 4.5h3v2h-3zM6.5 18h3v2h-3zM14.5 18h3v2h-3z"/></symbol>
+  <symbol id="i-deck" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M6 9h3v2.5H6zM10.5 9h3v2.5h-3zM15 9h3v2.5h-3zM6 13h3v2.5H6zM10.5 13h3v2.5h-3zM15 13h3v2.5h-3z"/></symbol>
+  <symbol id="i-approve" viewBox="0 0 24 24"><circle cx="9" cy="7.5" r="3.5"/><path d="M2.5 20c0-4 3-6.5 6.5-6.5 1.6 0 3 .5 4.1 1.3"/><path d="M14 18l2.5 2.5 5-5.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5M9 12h7M9 15.5h7"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M4.5 19.5h15"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M8.5 8.5h11v11h-11z"/><path d="M15.5 8.5v-4h-11v11h4"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3.5 7h17v3.2a1.8 1.8 0 0 0 0 3.6V17h-17v-3.2a1.8 1.8 0 0 0 0-3.6z"/><path d="M14.5 7.5v1.5M14.5 11.2v1.6M14.5 15v1.5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4"/><path d="M11 12.5L19.5 4M15.5 8l3 3M17.5 6l2 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6.5h16M7 12h10M10 17.5h4"/></symbol>
+  <symbol id="i-attach" viewBox="0 0 24 24"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.4-7.4a4 4 0 0 0-5.7-5.7l-7.4 7.4a6 6 0 0 0 8.5 8.5l4.7-4.7"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8.5 5.5v13M15.5 5.5v13"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M5.5 12a6.5 6.5 0 1 0 2-4.7"/><path d="M5.5 4v4h4"/></symbol>
+  <symbol id="i-pattern" viewBox="0 0 24 24"><path d="M3.5 5.5h17v13h-17z"/><path d="M3.5 12h17M9 5.5v13M15 5.5v13"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="8.5" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.5"/><path d="M2.5 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M15 13.6c3.3-.3 6.5 1.6 6.5 4.9"/></symbol>
+  <symbol id="i-projector" viewBox="0 0 24 24"><path d="M2.5 8.5h7v7h-7z"/><path d="M9.5 10l11-5.5v15l-11-5.5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M3.5 6h17v12h-17z"/><path d="M4 6.5l8 6 8-6"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 24 24"><path d="M9 7.5a3 3 0 0 1 6 0"/><path d="M7.5 9h9v6a4.5 4.5 0 0 1-9 0z"/><path d="M12 9v10.5M3.5 13h4M16.5 13h4M4.5 19l3-1.5M19.5 19l-3-1.5M4.5 7l3 2M19.5 7l-3 2"/></symbol>
+  <symbol id="i-idea" viewBox="0 0 24 24"><path d="M9 17.5h6M10 20.5h4"/><path d="M12 3.5a6 6 0 0 0-3.5 10.9V16h7v-1.6A6 6 0 0 0 12 3.5z"/></symbol>
+  <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.1 1-1.1 1.8v.5M12 16.5v1"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M5 10.5h14v10H5z"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+</svg>
+<a class="c-skip" href="#main">Skip to content</a>
+
+<!-- ======================================================================== ANNOUNCEMENT -->
+<div class="c-announce" data-dismissible="launch-2026" role="region" aria-label="Announcement">
+  <div class="l-wrap c-announce-bar">
+    <p class="c-announce-text"><i class="c-lamp c-lamp--standby" aria-hidden="true"></i><span>StageWatch Production: <b>£59</b> <s><span class="u-visually-hidden">was </span>£79</s> launch price, one-off.</span> <a href="#pricing">See pricing</a></p>
+    <button class="c-announce-close" type="button" data-dismiss aria-label="Dismiss the announcement"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+</div>
+
+<!-- ======================================================================== HEADER -->
+<header class="c-header" data-header>
+  <div class="l-wrap c-header-bar">
+    <a class="c-brand" href="#main" aria-label="Patterns Show Control, home">
+      <span class="c-brand-mark" aria-hidden="true"></span>
+      <span class="c-brand-name">Patterns <span>Show Control</span></span>
+    </a>
+    <nav class="c-nav" id="site-nav" aria-label="Main">
+      <ul class="c-nav-list" role="list">
+        <li><a class="c-nav-link" href="#flow">Ecosystem</a></li>
+        <li class="c-mega" data-mega>
+          <button class="c-nav-link" type="button" aria-expanded="false" aria-controls="mega-products">Products <span class="c-mega-mark" aria-hidden="true"></span><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          <div class="c-mega-panel" id="mega-products">
+            <ul class="c-mega-grid" role="list">
+              <li class="c-mega-product" data-product="patterns">
+                <a class="c-mega-title" href="#products"><span class="c-swatch"></span>Patterns <span class="c-role">Picture</span></a>
+                <p class="c-mega-line">Test patterns and the show display desk</p>
+                <ul class="c-mega-links" role="list"><li><a href="#products">Overview</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Licensing</a></li><li><a href="#support">Help</a></li></ul>
+              </li>
+              <li class="c-mega-product" data-product="stagewatch">
+                <a class="c-mega-title" href="#stagewatch"><span class="c-swatch"></span>StageWatch <span class="c-role">Time</span></a>
+                <p class="c-mega-line">Stage timer and show calling</p>
+                <ul class="c-mega-links" role="list"><li><a href="#stagewatch">Overview</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#support">Help</a></li></ul>
+              </li>
+              <li class="c-mega-product" data-product="agmessage">
+                <a class="c-mega-title" href="#products"><span class="c-swatch"></span>AGMessage <span class="c-role">People</span></a>
+                <p class="c-mega-line">Back-room messaging for AGMs and boards</p>
+                <ul class="c-mega-links" role="list"><li><a href="#products">Overview</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Licensing</a></li><li><a href="#support">Help</a></li></ul>
+              </li>
+              <li class="c-mega-product" data-product="playmap">
+                <a class="c-mega-title" href="#products"><span class="c-swatch"></span>PlayMap <span class="c-role">Mapping</span></a>
+                <p class="c-mega-line">Media playback and projection mapping</p>
+                <ul class="c-mega-links" role="list"><li><a href="#products">Overview</a></li><li><a href="#features">Features</a></li><li><a href="#pricing">Licensing</a></li><li><a href="#support">Help</a></li></ul>
+              </li>
+            </ul>
+            <ul class="c-mega-foot" role="list"><li><a href="#flow">How the apps work together</a></li><li><a href="#chips">Integrations</a></li><li><a href="#tables">Downloads</a></li></ul>
+          </div>
+        </li>
+        <li><a class="c-nav-link" href="#workflow">Workflows</a></li>
+        <li><a class="c-nav-link" href="#pricing" aria-current="page">Licensing</a></li>
+        <li><a class="c-nav-link" href="#support">Support</a></li>
+      </ul>
+      <div class="c-nav-actions">
+        <a class="c-btn c-btn--secondary" href="#tables">Downloads</a>
+        <a class="c-btn c-btn--primary" href="#portal" data-account-link data-account-href="#portal" data-account-label="My account"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-user"/></svg><span data-account-text>Client login</span></a>
+      </div>
+    </nav>
+    <div class="c-header-tools">
+      <div class="c-theme" role="group" aria-label="Colour theme" data-theme-toggle>
+        <button type="button" data-theme-set="system" aria-pressed="true" title="Follow the system"><svg class="c-icon" aria-hidden="true"><use href="#i-system"/></svg><span class="u-visually-hidden">Follow the system</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="Light theme"><svg class="c-icon" aria-hidden="true"><use href="#i-sun"/></svg><span class="u-visually-hidden">Light</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark theme"><svg class="c-icon" aria-hidden="true"><use href="#i-moon"/></svg><span class="u-visually-hidden">Dark</span></button>
+      </div>
+      <button class="c-btn c-btn--secondary c-btn--sm c-menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+        <svg class="c-icon c-icon-open" aria-hidden="true"><use href="#i-menu"/></svg><svg class="c-icon c-icon-close" aria-hidden="true"><use href="#i-close"/></svg><span data-nav-label>Menu</span>
+      </button>
+    </div>
+  </div>
+  <div class="c-scroll-line" aria-hidden="true"></div>
+</header>
+
+<main id="main">
+
+<div class="ks-intro">
+  <div class="l-wrap">
+    <p><b>Design system kitchen sink.</b> Every component of <code>public/assets/css/site.css</code>, rendered with the real class names (docs/DESIGN.md has the markup and the rules). Switch the theme in the header. Open it through a local server (<code>php -S 127.0.0.1:8080</code> from the repository, then <code>/design/kitchen-sink.html</code>) so the fonts and the scripts load; straight from disk the browser blocks both.</p>
+    <nav class="ks-toc" aria-label="Kitchen sink sections">
+      <a href="#hero">Home hero</a><a href="#foundations">Foundations</a><a href="#buttons">Buttons</a><a href="#badges">Badges</a><a href="#heads">Headings</a><a href="#products">Product cards</a><a href="#features">Features</a><a href="#chips">Chips and specs</a><a href="#flow">Signal flow</a><a href="#workflow">Cue ladder</a><a href="#stagewatch">Product hero</a><a href="#page-hero">Page hero</a><a href="#shots">Screenshots</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="#callouts">Callouts</a><a href="#forms">Forms</a><a href="#tables">Tables</a><a href="#portal">Portal</a><a href="#support">Assistant</a><a href="#prose">Prose</a><a href="#error">404</a><a href="#themes">Both themes</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ======================================================================== HOME HERO -->
+<section class="c-hero" id="hero" aria-labelledby="hero-title" data-chat-tuck>
+  <div class="l-wrap c-hero-grid">
+    <div>
+      <h1 class="c-hero-title" id="hero-title">Everything the room sees, on cue.</h1>
+      <p class="c-hero-lede">Four Windows apps for live events: one for the picture, one for the time, one for the people on stage and one for mapping and playback. Run one on its own, or let them find each other on the venue network and share one show.</p>
+      <div class="c-hero-actions">
+        <a class="c-btn c-btn--primary" href="#flow">Explore the ecosystem</a>
+        <a class="c-btn c-btn--secondary" href="#pricing">Start a free trial</a>
+      </div>
+      <p class="c-hero-note">Works with Bitfocus Companion and Stream Deck, OSC, MIDI, NDI, and AI tools over MCP, with a person approving every change.</p>
+    </div>
+    <div class="c-hero-visual">
+      <div class="c-mixer" data-hero role="group" aria-label="Test pattern preview and programme">
+        <div class="c-monitor c-reg c-bars-poster"><canvas data-hero-pgm role="img" aria-label="Programme monitor showing SMPTE colour bars"></canvas></div>
+        <div class="c-umd">
+          <span class="c-tally c-tally--pgm">PGM</span>
+          <span class="c-umd-name" data-hero-pgm-name>SMPTE bars 75%</span>
+          <span class="c-umd-meta">1920×1200 50p</span>
+          <span class="c-umd-tc" data-hero-tc>21:25:22:01</span>
+        </div>
+        <div class="c-takebar">
+          <div class="c-pvw">
+            <canvas data-hero-pvw width="192" height="120" aria-hidden="true"></canvas>
+            <div class="c-pvw-text"><span class="c-tally c-tally--pvw">PVW</span><span class="c-pvw-name" data-hero-pvw-name>Crosshatch 16×10</span></div>
+          </div>
+          <div class="c-take-actions">
+            <fieldset class="c-seg">
+              <legend class="u-visually-hidden">Transition</legend>
+              <label><input type="radio" name="hero-trans" value="mix" data-hero-trans><span>Mix</span></label>
+              <label><input type="radio" name="hero-trans" value="wipe" data-hero-trans><span>Wipe</span></label>
+              <label><input type="radio" name="hero-trans" value="pixels" data-hero-trans checked><span>Pixels</span></label>
+              <label><input type="radio" name="hero-trans" value="iris" data-hero-trans><span>Iris</span></label>
+            </fieldset>
+            <button class="c-btn c-btn--secondary c-btn--sm c-auto" type="button" aria-pressed="true" data-hero-auto><i class="c-lamp" aria-hidden="true"></i>Auto</button>
+            <button class="c-take" type="button" data-hero-take>TAKE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="c-legend" aria-label="How colour is used">
+  <div class="l-wrap c-legend-inner">
+    <p class="c-legend-title">Every colour on this site means one thing. Four bars belong to the apps; green and red keep their broadcast meaning, and amber always means standing by.</p>
+    <ul class="c-legend-list" role="list">
+      <li><b>Reference</b><span>The ecosystem, Show Bus</span></li>
+      <li><b>StageWatch</b><span>The time</span></li>
+      <li><b>Patterns</b><span>The picture</span></li>
+      <li><b>Preview, GO</b><span>Ready, done, safe</span></li>
+      <li><b>AGMessage</b><span>The people</span></li>
+      <li><b>Programme</b><span>Live, over time, errors</span></li>
+      <li><b>PlayMap</b><span>Mapping and playback</span></li>
+      <li><b>Standing by</b><span>STANDBY, approvals, focus</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================================================================== FOUNDATIONS -->
+<section class="l-section" id="foundations" aria-labelledby="foundations-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Foundations</p><h2 id="foundations-title">Colour, type, space, icons</h2></div>
+      <p class="c-lede">Tokens are written once with light-dark(). A bar is a fill; whenever a colour carries text it uses an ink.</p>
+    </div>
+    <h3 class="ks-sub">Bars and lamps (fills, both themes)</h3>
+    <div class="ks-swatches">
+      <div class="ks-swatch" style="--sw: var(--bar-grey)"><b>Ecosystem</b><code>--bar-grey #BFC3C8</code></div>
+      <div class="ks-swatch" style="--sw: var(--c-stagewatch)"><b>StageWatch</b><code>--c-stagewatch #E8DC2C</code></div>
+      <div class="ks-swatch" style="--sw: var(--c-patterns)"><b>Patterns</b><code>--c-patterns #18C8D8</code></div>
+      <div class="ks-swatch" style="--sw: var(--lamp-pvw)"><b>PVW, GO, done</b><code>--lamp-pvw #22D163</code></div>
+      <div class="ks-swatch" style="--sw: var(--c-agmessage)"><b>AGMessage</b><code>--c-agmessage #E052D0</code></div>
+      <div class="ks-swatch" style="--sw: var(--lamp-pgm)"><b>PGM, over, error</b><code>--lamp-pgm #FF4040</code></div>
+      <div class="ks-swatch" style="--sw: var(--c-playmap)"><b>PlayMap</b><code>--c-playmap #5B7BFF</code></div>
+      <div class="ks-swatch" style="--sw: var(--lamp-standby)"><b>Standing by</b><code>--lamp-standby #FFA11A</code></div>
+    </div>
+    <h3 class="ks-sub">Surfaces, lines and text (this theme)</h3>
+    <div class="ks-swatches">
+      <div class="ks-swatch" style="--sw: var(--bg)"><b>Page</b><code>--bg</code></div>
+      <div class="ks-swatch" style="--sw: var(--s1)"><b>Surface 1</b><code>--s1</code></div>
+      <div class="ks-swatch" style="--sw: var(--s2)"><b>Surface 2</b><code>--s2</code></div>
+      <div class="ks-swatch" style="--sw: var(--s3)"><b>Surface 3</b><code>--s3</code></div>
+      <div class="ks-swatch" style="--sw: var(--line)"><b>Hairline</b><code>--line</code></div>
+      <div class="ks-swatch" style="--sw: var(--line-2)"><b>Strong line</b><code>--line-2</code></div>
+      <div class="ks-swatch" style="--sw: var(--field)"><b>Field border (3:1)</b><code>--field</code></div>
+      <div class="ks-swatch" style="--sw: var(--text)"><b>Text</b><code>--text</code></div>
+      <div class="ks-swatch" style="--sw: var(--text-2)"><b>Text 2</b><code>--text-2</code></div>
+      <div class="ks-swatch" style="--sw: var(--text-3)"><b>Text 3</b><code>--text-3</code></div>
+    </div>
+    <h3 class="ks-sub">Inks (text-safe in this theme)</h3>
+    <div class="ks-row" style="font-weight:620">
+      <span style="color: var(--c-patterns-ink)">Patterns ink</span>
+      <span style="color: var(--c-stagewatch-ink)">StageWatch ink</span>
+      <span style="color: var(--c-agmessage-ink)">AGMessage ink</span>
+      <span style="color: var(--c-playmap-ink)">PlayMap ink</span>
+      <span style="color: var(--ink-pvw)">PVW ink</span>
+      <span style="color: var(--ink-pgm)">PGM ink</span>
+      <span style="color: var(--ink-standby)">Standby ink</span>
+    </div>
+    <h3 class="ks-sub">Type: Archivo (wide for headings), JetBrains Mono (numbers that change or line up)</h3>
+    <div class="ks-type">
+      <div><small>--fs-hero · 42–80px · stretch 112%</small><p class="c-hero-title" style="max-width:none">On cue.</p></div>
+      <div><small>h1 · --fs-7 · 40–76px</small><p class="h1" style="font: 680 var(--fs-7)/1 var(--font-display); font-stretch: 116%; letter-spacing: -0.03em">Every pixel. Every second.</p></div>
+      <div><small>h2 · --fs-6 · 30–44px</small><h2 style="font-size:var(--fs-6)">One room, four jobs</h2></div>
+      <div><small>h3 · --fs-4 · 21px</small><h3>Line up the picture</h3></div>
+      <div><small>h4 · --fs-2 · 16px</small><h4>Show Bus</h4></div>
+      <div><small>lede · --fs-lede · 18–21px</small><p class="c-lede">Each app owns one part of the show. Use the one you need tonight.</p></div>
+      <div><small>body · --fs-3 · 17px / 1.55</small><p style="max-width:66ch">The apps find each other on the venue network and run without the internet. A licence is a file you install once; a running show is never interrupted by a licence check.</p></div>
+      <div><small>UI · --fs-1 · 14px · stretch 106%</small><p style="font-size:var(--fs-1); font-stretch:var(--wd-ui)">Running order · Cue lights · Companion</p></div>
+      <div><small>mono · timecode, IDs, values</small><p class="u-mono" style="font-size:1.5rem; font-weight:700">21:25:22:01 · FR-0142 · 08:42</p></div>
+    </div>
+    <div class="c-stops" style="margin-top:28px">
+      <p style="font: 680 var(--fs-6)/1.05 var(--font-display); font-stretch:116%; letter-spacing:-0.022em">Every pixel<span data-product="patterns">.</span> Every second<span data-product="stagewatch">.</span> Every person<span data-product="agmessage">.</span> Every surface<span data-product="playmap">.</span></p>
+    </div>
+    <p class="ks-classes">.c-stops &gt; span[data-product] — the ecosystem tagline, each full stop in its app's bar.</p>
+    <h3 class="ks-sub">Space, radii, elevation</h3>
+    <div class="ks-boxes">
+      <div class="ks-box" style="border-radius:var(--r-1)">--r-1 2px · tallies, chips</div>
+      <div class="ks-box" style="border-radius:var(--r-2)">--r-2 4px · buttons, inputs</div>
+      <div class="ks-box" style="border-radius:var(--r-3)">--r-3 8px · panels, cards</div>
+      <div class="ks-box" style="border-radius:var(--r-3); box-shadow:var(--shadow-1)">--shadow-1 · resting</div>
+      <div class="ks-box" style="border-radius:var(--r-3); box-shadow:var(--shadow-2)">--shadow-2 · menus, launcher</div>
+      <div class="ks-box" style="border-radius:var(--r-3); box-shadow:var(--shadow-3)">--shadow-3 · chat, dialogs</div>
+    </div>
+    <h3 class="ks-sub">Icons (24px grid, 1.5px stroke) · .c-icon, sprite in /assets/img/icons.svg</h3>
+    <div class="ks-icons" id="ks-icons"></div>
+  </div>
+</section>
+
+<!-- ======================================================================== BUTTONS -->
+<section class="l-section" id="buttons" aria-labelledby="buttons-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Components</p><h2 id="buttons-title">Buttons and controls</h2></div>
+      <p class="c-lede">The ecosystem's primary is neutral. Inside <code>data-product</code> the primary takes the app's bar.</p>
+    </div>
+    <h3 class="ks-sub">Variants and sizes · .c-btn (.pt-btn in the portal)</h3>
+    <div class="ks-row">
+      <button class="c-btn c-btn--primary" type="button">Primary</button>
+      <button class="c-btn c-btn--secondary" type="button">Secondary</button>
+      <button class="c-btn c-btn--ghost" type="button">Ghost</button>
+      <button class="c-btn c-btn--danger" type="button">Delete account</button>
+      <button class="c-btn c-btn--primary" type="button" disabled>Disabled</button>
+      <a class="c-btn c-btn--secondary" href="#buttons"><svg class="c-icon" aria-hidden="true"><use href="#i-download"/></svg>Download</a>
+    </div>
+    <div class="ks-row u-mt-4">
+      <button class="c-btn c-btn--primary c-btn--lg" type="button">Large</button>
+      <button class="c-btn c-btn--primary" type="button">Default</button>
+      <button class="c-btn c-btn--primary c-btn--sm" type="button">Small</button>
+      <button class="c-btn c-btn--secondary c-btn--icon" type="button" aria-label="Search"><svg class="c-icon" aria-hidden="true"><use href="#i-search"/></svg></button>
+      <button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Close"><svg class="c-icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <h3 class="ks-sub">Primary inside each product</h3>
+    <div class="ks-row">
+      <a class="c-btn c-btn--primary" href="#buttons" data-product="patterns">Get Patterns</a>
+      <a class="c-btn c-btn--primary" href="#buttons" data-product="stagewatch">Start a 14-day trial</a>
+      <a class="c-btn c-btn--primary" href="#buttons" data-product="agmessage">Request AGMessage</a>
+      <a class="c-btn c-btn--primary" href="#buttons" data-product="playmap">Get PlayMap</a>
+    </div>
+    <h3 class="ks-sub">Broadcast keys (only for a real take or GO) · .c-take, .c-go · segmented control · .c-seg</h3>
+    <div class="ks-row">
+      <button class="c-take" type="button">TAKE</button>
+      <button class="c-go" type="button">GO <small>Q3</small></button>
+      <fieldset class="c-seg"><legend class="u-visually-hidden">Status filter</legend>
+        <label><input type="radio" name="ks-seg" checked><span>All</span></label>
+        <label><input type="radio" name="ks-seg"><span>Open</span></label>
+        <label><input type="radio" name="ks-seg"><span>Planned</span></label>
+        <label><input type="radio" name="ks-seg"><span>Done</span></label>
+      </fieldset>
+      <div class="c-seg" role="group" aria-label="View"><button type="button" aria-pressed="true">Cards</button><button type="button" aria-pressed="false">Table</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== BADGES -->
+<section class="l-section" id="badges" aria-labelledby="badges-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Components</p><h2 id="badges-title">Badges, tags, tallies and lamps</h2></div>
+      <p class="c-lede">Status uses no product colour: neutral shapes, then green, amber and red. The word is always there.</p>
+    </div>
+    <h3 class="ks-sub">Status · .c-badge--open / triaged / planned / progress / done / declined</h3>
+    <div class="ks-row">
+      <span class="c-badge c-badge--open">Open</span>
+      <span class="c-badge c-badge--triaged">Triaged</span>
+      <span class="c-badge c-badge--planned">Planned</span>
+      <span class="c-badge c-badge--progress">In progress</span>
+      <span class="c-badge c-badge--done">Done</span>
+      <span class="c-badge c-badge--declined">Declined</span>
+      <span class="c-badge c-badge--muted">Closed</span>
+    </div>
+    <h3 class="ks-sub">Portal contract · .pt-badge--{status}</h3>
+    <div class="ks-row">
+      <span class="pt-badge pt-badge--requested">Requested</span><span class="pt-badge pt-badge--awaiting_payment">Awaiting payment</span><span class="pt-badge pt-badge--issued">Issued</span><span class="pt-badge pt-badge--revoked">Revoked</span>
+      <span class="pt-badge pt-badge--approval">Needs approval</span><span class="pt-badge pt-badge--active">Active</span><span class="pt-badge pt-badge--disabled">Disabled</span><span class="pt-badge pt-badge--new">New</span><span class="pt-badge pt-badge--read">Read</span>
+      <span class="pt-badge pt-badge--bug">Bug</span><span class="pt-badge pt-badge--feature">Feature</span><span class="pt-badge pt-badge--question">Question</span><span class="pt-badge pt-badge--stable">Stable</span><span class="pt-badge pt-badge--beta">Beta</span><span class="pt-badge pt-badge--admin">Admin</span><span class="pt-badge pt-badge--private">Private</span>
+    </div>
+    <h3 class="ks-sub">Tiers, roles, app chips · .c-badge--tier, .c-role, .c-app, .c-tag</h3>
+    <div class="ks-row">
+      <span class="c-badge c-badge--tier" data-product="stagewatch">Pro</span>
+      <span class="c-badge c-badge--tier" data-product="stagewatch">Production</span>
+      <span data-product="patterns"><span class="c-role">Picture</span></span>
+      <span data-product="stagewatch"><span class="c-role">Time</span></span>
+      <span data-product="agmessage"><span class="c-role">People</span></span>
+      <span data-product="playmap"><span class="c-role">Mapping</span></span>
+      <span class="c-app" data-product="patterns"><i class="c-swatch"></i>Patterns</span>
+      <span class="c-app" data-product="stagewatch"><i class="c-swatch"></i>StageWatch</span>
+      <span class="c-app" data-product="agmessage"><i class="c-swatch"></i>AGMessage</span>
+      <span class="c-app" data-product="playmap"><i class="c-swatch"></i>PlayMap</span>
+      <span class="c-app" data-product="companion"><i class="c-swatch"></i>Companion</span>
+      <span class="c-tag">Windows 11</span>
+    </div>
+    <h3 class="ks-sub">Tallies and cue lamps · .c-tally--pgm/pvw/standby, .c-lamp--pgm/go/standby/off</h3>
+    <div class="ks-row">
+      <span class="c-tally c-tally--pgm">PGM</span><span class="c-tally c-tally--pvw">PVW</span><span class="c-tally c-tally--standby">STBY</span>
+      <span class="l-cluster" style="--cluster:8px"><i class="c-lamp c-lamp--go"></i>Go</span>
+      <span class="l-cluster" style="--cluster:8px"><i class="c-lamp c-lamp--standby"></i>Standby</span>
+      <span class="l-cluster" style="--cluster:8px"><i class="c-lamp c-lamp--pgm"></i>On air</span>
+      <span class="l-cluster" style="--cluster:8px"><i class="c-lamp c-lamp--off"></i>Clear</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== SECTION HEADINGS -->
+<section class="l-section l-section--tint" id="heads" aria-labelledby="heads-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Ecosystem</p><h2 id="heads-title">Section heading with an eyebrow</h2></div>
+      <p class="c-lede">Title left, lede right on wide screens. The eyebrow carries the four app bars on ecosystem pages.</p>
+    </div>
+    <div class="c-section-head c-section-head--stack" data-product="playmap">
+      <div><p class="c-eyebrow">PlayMap · Mapping</p><h2>Stacked variant inside a product</h2></div>
+      <p class="c-lede">Inside data-product the eyebrow takes the app's bar. Sentence case everywhere; no all-caps labels.</p>
+    </div>
+    <p class="ks-classes">.l-section (--tint, --tight, --flush) &gt; .l-wrap &gt; .c-section-head (--stack) &gt; .c-eyebrow + h2 + .c-lede</p>
+  </div>
+</section>
+
+<!-- ======================================================================== PRODUCT CARDS -->
+<section class="l-section" id="products" aria-labelledby="products-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Products</p><h2 id="products-title">One room, four jobs</h2></div>
+      <p class="c-lede">Each app owns one part of the show. Use the one you need tonight; add the others when the show grows.</p>
+    </div>
+    <div class="c-multiview">
+      <ul class="c-multiview-grid" role="list">
+        <li class="c-product-card" data-product="patterns">
+          <div class="c-product-card-screen c-screen" aria-hidden="true">
+            <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+              <defs><pattern id="ks-hatch" width="15" height="15" patternUnits="userSpaceOnUse" x="40" y="35"><path d="M15 0V15M0 15H15" stroke="#E8ECF1" stroke-opacity=".55" stroke-width=".8" fill="none"/></pattern></defs>
+              <rect width="320" height="200" fill="#05070A"/>
+              <g transform="translate(40 35)"><rect width="240" height="120" fill="#0A0D12"/><rect width="240" height="120" fill="url(#ks-hatch)"/><path d="M0 0H240V120H0Z M80 0V120 M160 0V120 M0 60H240" stroke="#05070A" stroke-width="2.5" fill="none"/><path d="M120 0V120M0 60H240" stroke="#FFF" stroke-width="1.2"/><circle cx="120" cy="60" r="54" stroke="#FFF" stroke-width="1.1" fill="none"/><circle cx="30" cy="30" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="210" cy="30" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="30" cy="90" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="210" cy="90" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/></g>
+              <rect x="38" y="33" width="244" height="124" fill="none" stroke="#18C8D8" stroke-width="1.2" stroke-dasharray="4 3"/>
+              <g fill="#18C8D8"><rect x="35" y="30" width="6" height="6"/><rect x="279" y="30" width="6" height="6"/><rect x="35" y="154" width="6" height="6"/><rect x="279" y="154" width="6" height="6"/></g>
+              <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#A7B0BC"><text x="40" y="172">CANVAS 5760×2400</text><text x="280" y="172" text-anchor="end">6 OUTPUTS</text></g>
+              <rect x="40" y="16" width="26" height="11" rx="1" fill="#FF4040"/><text x="53" y="24.5" font-family="JetBrains Mono, monospace" font-size="7.5" font-weight="700" text-anchor="middle" fill="#090C10">PGM</text>
+            </svg>
+          </div>
+          <div class="c-umd"><span class="c-umd-bar"></span><h3>Patterns</h3><span class="c-umd-role">Picture</span></div>
+          <div class="c-product-card-body">
+            <p>Pixel-exact test patterns and show content on every LED wall, projector, monitor and NDI receiver, run from one desk with preview and programme.</p>
+            <ul class="c-facts" role="list"><li>Portable app, runs from a USB stick</li><li>Multi-screen canvases and blends</li><li>The Eye: every output at a glance</li></ul>
+            <p class="c-links"><a href="#products">Patterns overview</a><a href="#features">Features</a></p>
+          </div>
+        </li>
+        <li class="c-product-card" data-product="stagewatch">
+          <div class="c-product-card-screen c-screen" aria-hidden="true">
+            <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+              <rect width="320" height="200" fill="#05070A"/>
+              <g font-family="Archivo, sans-serif" font-size="10" fill="#A7B0BC"><text x="22" y="28" fill="#E8ECF1" font-weight="600">Main stage</text><text x="298" y="28" text-anchor="end" font-family="JetBrains Mono, monospace">14:32:07</text><text x="160" y="62" text-anchor="middle" fill="#E8ECF1" font-size="11">Keynote</text></g>
+              <text x="160" y="124" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="800" font-size="62" letter-spacing="-2" fill="#22D163">08:42</text>
+              <rect x="50" y="140" width="220" height="5" fill="#1C222B"/><rect x="50" y="140" width="132" height="5" fill="#22D163"/><rect x="235" y="140" width="35" height="5" fill="#FFA11A" fill-opacity=".35"/>
+              <line x1="22" y1="162" x2="298" y2="162" stroke="#262D37"/>
+              <g font-family="Archivo, sans-serif" font-size="9.5" fill="#A7B0BC"><text x="22" y="180">Next <tspan fill="#E8ECF1" font-weight="600">Awards</tspan></text><text x="298" y="180" text-anchor="end" font-family="JetBrains Mono, monospace" fill="#E8ECF1">14:45</text></g>
+            </svg>
+          </div>
+          <div class="c-umd"><span class="c-umd-bar"></span><h3>StageWatch</h3><span class="c-umd-role">Time</span></div>
+          <div class="c-product-card-body">
+            <p>Stage countdowns, confidence monitors and show calling: a running order, cue ladders and STANDBY and GO for every department.</p>
+            <ul class="c-facts" role="list"><li>Follows PowerPoint as it advances</li><li>Cue lights over Art-Net, sACN and Hue</li><li>LTC and multi-room shows</li></ul>
+            <p class="c-links"><a href="#stagewatch">StageWatch overview</a><a href="#pricing">Pricing</a></p>
+          </div>
+        </li>
+        <li class="c-product-card" data-product="agmessage">
+          <div class="c-product-card-screen c-screen" aria-hidden="true">
+            <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+              <rect width="320" height="200" fill="#05070A"/>
+              <rect x="18" y="18" width="170" height="164" rx="4" fill="#0F1318" stroke="#262D37"/>
+              <g font-family="Archivo, sans-serif" font-size="9"><text x="30" y="36" fill="#A7B0BC">Chair to Research</text><rect x="30" y="44" width="132" height="34" rx="6" fill="#1C222B"/><text x="40" y="58" fill="#E8ECF1">Who takes the pension</text><text x="40" y="70" fill="#E8ECF1">question?</text><rect x="46" y="88" width="132" height="46" rx="6" fill="#E052D0" fill-opacity=".16" stroke="#E052D0" stroke-opacity=".7"/><text x="56" y="102" fill="#F2C9EC">The finance director.</text><text x="56" y="114" fill="#F2C9EC">Figures are on your</text><text x="56" y="126" fill="#F2C9EC">On stage panel.</text><rect x="30" y="148" width="88" height="20" rx="3" fill="none" stroke="#FFA11A" stroke-opacity=".8" stroke-dasharray="3 2"/><circle cx="40" cy="158" r="3" fill="#FFA11A"/><text x="48" y="161" fill="#FFC266" font-size="8">AI draft waiting</text></g>
+              <rect x="200" y="18" width="102" height="164" rx="4" fill="#0F1318" stroke="#262D37"/>
+              <g font-family="Archivo, sans-serif" font-size="9"><text x="212" y="36" fill="#E8ECF1" font-weight="600">On stage</text><rect x="212" y="46" width="78" height="100" fill="#E8ECF1" fill-opacity=".92"/><g fill="#0F1318" fill-opacity=".55"><rect x="220" y="56" width="50" height="4"/><rect x="220" y="66" width="62" height="2.5"/><rect x="220" y="72" width="58" height="2.5"/><rect x="220" y="78" width="62" height="2.5"/><rect x="220" y="92" width="62" height="24" fill-opacity=".18"/><rect x="220" y="124" width="40" height="2.5"/><rect x="220" y="130" width="54" height="2.5"/></g><text x="212" y="166" fill="#A7B0BC" font-size="8">Pushed 14:31</text></g>
+            </svg>
+          </div>
+          <div class="c-umd"><span class="c-umd-bar"></span><h3>AGMessage</h3><span class="c-umd-role">People</span></div>
+          <div class="c-product-card-body">
+            <p>Private messages between the directors on stage and the research team backstage, on any phone or tablet on the venue network.</p>
+            <ul class="c-facts" role="list"><li>Documents pushed to the On stage panel</li><li>AI drafts answers; a person approves</li><li>Built for AGMs and board meetings</li></ul>
+            <p class="c-links"><a href="#products">AGMessage overview</a><a href="#features">Features</a></p>
+          </div>
+        </li>
+        <li class="c-product-card" data-product="playmap">
+          <div class="c-product-card-screen c-screen" aria-hidden="true">
+            <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+              <rect width="320" height="200" fill="#05070A"/>
+              <polygon points="64,46 272,50 280,156 168,166" fill="#5B7BFF" fill-opacity=".1"/>
+              <g stroke="#5B7BFF" stroke-opacity=".35" stroke-width=".8"><line x1="64" y1="46" x2="176" y2="62"/><line x1="64" y1="46" x2="272" y2="50"/><line x1="64" y1="46" x2="280" y2="156"/><line x1="64" y1="46" x2="168" y2="166"/></g>
+              <polygon points="272,50 300,66 306,164 280,156" fill="#11172A" stroke="#7F98FF" stroke-opacity=".7" stroke-width=".8"/>
+              <polygon points="176,62 272,50 280,156 168,166" fill="#141B33" stroke="#7F98FF" stroke-width="1"/>
+              <path d="M192 60L186.7 164.3M174.7 79.3L273.3 67.7M208 58L205.3 162.7M173.3 96.7L274.7 85.3M224 56L224 161M172 114L276 103M240 54L242.7 159.3M170.7 131.3L277.3 120.7M256 52L261.3 157.7M169.3 148.7L278.7 138.3" stroke="#7F98FF" stroke-opacity=".75" stroke-width=".7" fill="none"/>
+              <path d="M281.3 55.3L288.7 158.7M290.7 60.7L297.3 161.3M273.3 67.7L301 82.3M274.7 85.3L302 98.7M276 103L303 115M277.3 120.7L304 131.3M278.7 138.3L305 147.7" stroke="#7F98FF" stroke-opacity=".4" stroke-width=".6" fill="none"/>
+              <g fill="#05070A" stroke="#E8ECF1" stroke-width="1.2"><rect x="172" y="58" width="8" height="8"/><rect x="268" y="46" width="8" height="8"/><rect x="276" y="152" width="8" height="8"/><rect x="164" y="162" width="8" height="8"/></g>
+              <g transform="translate(24 32)"><rect width="34" height="22" rx="2" fill="#1C222B" stroke="#3A4450"/><circle cx="34" cy="12" r="6" fill="#0F1318" stroke="#7F98FF"/><circle cx="34" cy="12" r="2.5" fill="#B9C6FF"/></g>
+              <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#A7B0BC"><text x="24" y="72">PJ-1</text><text x="24" y="182">Mesh 6×6  corner pin</text></g>
+            </svg>
+          </div>
+          <div class="c-umd"><span class="c-umd-bar"></span><h3>PlayMap</h3><span class="c-umd-role">Mapping</span></div>
+          <div class="c-product-card-body">
+            <p>A media playback node and 3D projection-mapping suite: corner-pin in four clicks, scan with a camera or phone, blend automatically.</p>
+            <ul class="c-facts" role="list"><li>HAP decoded on the GPU</li><li>Sync groups across machines</li><li>LED fixtures and pixel maps</li></ul>
+            <p class="c-links"><a href="#products">PlayMap overview</a><a href="#features">Features</a></p>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <p class="ks-classes">.c-multiview &gt; .c-multiview-grid &gt; .c-product-card[data-product] &gt; .c-product-card-screen.c-screen + .c-umd (.c-umd-bar, h3, .c-umd-role) + .c-product-card-body (.c-facts, .c-links)</p>
+    <h3 class="ks-sub">Generic cards · .c-card (.pt-card), .c-card--link, .c-card[data-product]</h3>
+    <div class="l-grid l-grid--3">
+      <article class="c-card"><span class="c-card-meta">Release notes</span><h3 class="c-card-title">StageWatch 2.16</h3><p class="c-card-body">Department cues can now be acknowledged from a phone.</p><div class="c-card-footer"><a class="c-btn c-btn--secondary c-btn--sm" href="#tables">Download</a></div></article>
+      <a class="c-card c-card--link" href="#forms"><span class="c-card-title">Report a bug</span><span class="c-card-body">Something not working as it should? Tell us what happened.</span></a>
+      <article class="c-card" data-product="agmessage"><span class="c-card-meta">AGMessage</span><h3 class="c-card-title">Seat the board</h3><p class="c-card-body">Directors open AGMessage on their tablets over the venue Wi-Fi.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== FEATURES / BENTO -->
+<section class="l-section" id="features" aria-labelledby="features-title" data-product="patterns">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Patterns · Features</p><h2 id="features-title">Feature grid and bento</h2></div>
+      <p class="c-lede">Features read as a quiet grid with hairline tops; a bento mixes media tiles for overview pages.</p>
+    </div>
+    <div class="c-features">
+      <article class="c-feature" data-reveal><svg class="c-icon" aria-hidden="true"><use href="#i-pattern"/></svg><h3>Pixel-exact patterns</h3><p>Grids, crosshatch, ramps and zone plates drawn at the output's own resolution.</p></article>
+      <article class="c-feature" data-reveal><svg class="c-icon" aria-hidden="true"><use href="#i-projector"/></svg><h3>Blends and canvases</h3><p>One canvas across many outputs, with edge blends you can see from the back row.</p></article>
+      <article class="c-feature" data-reveal><svg class="c-icon" aria-hidden="true"><use href="#i-deck"/></svg><h3>Stream Deck ready</h3><p>A Companion module whose keys show what is on air.</p><ul class="c-facts" role="list"><li>Take, cut and blackout</li><li>Live tally on every key</li></ul></article>
+      <article class="c-feature" data-reveal><svg class="c-icon" aria-hidden="true"><use href="#i-approve"/></svg><h3>AI, with approval</h3><p>An assistant can propose a cue. Nothing reaches a screen until a person approves it.</p></article>
+    </div>
+    <h3 class="ks-sub">.c-bento &gt; .c-bento-item (--wide, --tall) &gt; .c-bento-media</h3>
+    <div class="c-bento">
+      <article class="c-bento-item c-bento-item--wide">
+        <div class="c-bento-media c-screen c-bars-poster" aria-hidden="true"></div>
+        <h3>Colour bars on every output</h3><p>SMPTE 75% with PLUGE, at native resolution, in one take.</p>
+      </article>
+      <article class="c-bento-item c-bento-item--tall">
+        <h3>The Eye</h3><p>Every output, receiver and wall at a glance, with what is live and what is standing by.</p>
+        <ul class="c-facts" role="list"><li>Programme and preview per wall</li><li>NDI receivers listed by name</li><li>Faults in red, with the reason</li></ul>
+      </article>
+      <article class="c-bento-item"><h3>Portable</h3><p>Runs from a USB stick on the show laptop. No installer.</p></article>
+      <article class="c-bento-item"><h3>Show Bus</h3><p>Finds StageWatch and PlayMap on the venue network.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== CHIPS AND SPECS -->
+<section class="l-section" id="chips" aria-labelledby="chips-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Integrations</p><h2 id="chips-title">Integration chips and spec lists</h2></div>
+      <p class="c-lede">No logos: a mono abbreviation and the name. Specs are a hairline grid of label and value.</p>
+    </div>
+    <ul class="c-chips" role="list">
+      <li class="c-chip"><span class="c-chip-mark">BFC</span><span>Bitfocus Companion<small>Module for every app</small></span></li>
+      <li class="c-chip"><span class="c-chip-mark">SD</span>Stream Deck</li>
+      <li class="c-chip"><span class="c-chip-mark">OSC</span>OSC</li>
+      <li class="c-chip"><span class="c-chip-mark">MIDI</span>MIDI</li>
+      <li class="c-chip"><span class="c-chip-mark">NDI</span>NDI®</li>
+      <li class="c-chip"><span class="c-chip-mark">MCP</span>AI tools over MCP</li>
+      <li class="c-chip"><span class="c-chip-mark">DMX</span>Art-Net and sACN</li>
+      <li class="c-chip"><span class="c-chip-mark">LTC</span>Timecode</li>
+      <li class="c-chip"><span class="c-chip-mark">PPT</span>PowerPoint</li>
+    </ul>
+    <h3 class="ks-sub">.c-specs (dl) · .c-specs--rows for requirements</h3>
+    <div class="l-grid l-grid--2">
+      <dl class="c-specs">
+        <div><dt>Presenter</dt><dd>Confidence monitor, PowerPoint aware</dd></div>
+        <div><dt>Cue lights</dt><dd>Art-Net, sACN, Philips Hue</dd></div>
+        <div><dt>Timecode</dt><dd>LTC in, drift check</dd></div>
+        <div><dt>Rooms</dt><dd>Multi-room dashboard</dd></div>
+      </dl>
+      <dl class="c-specs c-specs--rows">
+        <div><dt>Windows</dt><dd>Windows 10 and 11, 64-bit</dd></div>
+        <div><dt>Distribution</dt><dd>Installer</dd></div>
+        <div><dt>Network</dt><dd>Works offline on the venue LAN</dd></div>
+      </dl>
+    </div>
+    <h3 class="ks-sub">.c-kv (.pt-kv) and .c-codeline with copy</h3>
+    <div class="l-grid l-grid--2">
+      <dl class="c-kv"><dt>Licence</dt><dd>StageWatch Pro</dd><dt>Machine</dt><dd class="u-mono">SW-7F3A-91C2-44DE</dd><dt>Issued</dt><dd><time datetime="2026-10-12">12 Oct 2026</time></dd></dl>
+      <div class="c-codeline"><code id="ks-sha">sha256 9f2c1e7a4b3d8e60c5a1f7d2e9b4c6a8d3f1e0b7c2a9d5e4f6b8a1c3d7e9f0a2</code><button class="c-btn c-btn--ghost c-btn--sm c-copy" type="button" data-copy-target="#ks-sha"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-copy"/></svg><span data-copy-label>Copy</span></button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== SIGNAL FLOW -->
+<section class="l-section l-section--tint" id="flow" aria-labelledby="flow-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Ecosystem</p><h2 id="flow-title">How they connect</h2></div>
+      <p class="c-lede">Operators' controllers reach Show Bus directly. Anything an AI proposes stops at a gate until a person approves it.</p>
+    </div>
+    <figure class="c-flow-wrap">
+      <div class="c-flow">
+        <p class="c-flow-h c-flow-h--in">Inputs</p>
+        <p class="c-flow-h c-flow-h--bus" aria-hidden="true">Bus</p>
+        <p class="c-flow-h c-flow-h--apps">Apps</p>
+        <p class="c-flow-h c-flow-h--room">To the room</p>
+        <ul class="c-flow-inputs" role="list">
+          <li class="c-flow-node c-flow-node--ctl"><h3><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-deck"/></svg>Companion and Stream Deck</h3><p>Keys that show live state</p></li>
+          <li class="c-flow-node c-flow-node--ctl"><h3>OSC and MIDI</h3><p>Consoles, playback and lighting desks</p></li>
+          <li class="c-flow-proposal">
+            <div class="c-flow-node c-flow-node--ai"><h3>AI tools over MCP</h3><p>Read the show, propose a change</p></div>
+            <span class="c-flow-wire c-flow-wire--proposal">Proposal</span>
+            <div class="c-flow-gate"><h3><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-approve"/></svg>A person approves</h3><p>Approve, edit or decline</p><span class="c-flow-gate-state"><i class="c-lamp c-lamp--standby"></i>Standing by for you</span></div>
+          </li>
+        </ul>
+        <div class="c-flow-bus"><b>Show Bus</b><span>Discovery, shared state and approvals on the venue network. No internet needed.</span></div>
+        <ul class="c-flow-apps" role="list">
+          <li class="c-flow-app" data-product="patterns"><div class="c-flow-node c-flow-node--app"><h3><span class="c-swatch"></span>Patterns</h3><p>Outputs, takes and the Eye</p></div><p class="c-flow-out">LED walls, projectors, NDI receivers</p></li>
+          <li class="c-flow-app" data-product="stagewatch"><div class="c-flow-node c-flow-node--app"><h3><span class="c-swatch"></span>StageWatch</h3><p>Running order and the clock</p></div><p class="c-flow-out">Confidence monitors, cue lights, LTC</p></li>
+          <li class="c-flow-app" data-product="agmessage"><div class="c-flow-node c-flow-node--app"><h3><span class="c-swatch"></span>AGMessage</h3><p>Messages and the On stage panel</p></div><p class="c-flow-out">Directors' phones and tablets</p></li>
+          <li class="c-flow-app" data-product="playmap"><div class="c-flow-node c-flow-node--app"><h3><span class="c-swatch"></span>PlayMap</h3><p>Surfaces, media and sync</p></div><p class="c-flow-out">Mapped surfaces, LED fixtures</p></li>
+        </ul>
+      </div>
+      <figcaption class="c-flow-note u-mt-4">Companion, Stream Deck, OSC and MIDI are an operator's hands and join Show Bus directly. AI tools over MCP connect only to the approval gate, never to the bus.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================================================================== WORKFLOW CUE LADDER -->
+<section class="l-section" id="workflow" aria-labelledby="workflow-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Workflows</p><h2 id="workflow-title">An AGM on a blended screen</h2></div>
+      <p class="c-lede">Workflow steps are a cue ladder: a cue number, the time before doors, the app that does it, how long it takes. GO steps through.</p>
+    </div>
+    <div class="c-ladder" data-ladder>
+      <div class="c-ladder-head" aria-hidden="true"><span>Cue</span><span>Step</span><span>App</span><span>Takes</span><span>State</span></div>
+      <ol class="c-ladder-list" role="list">
+        <li class="c-cue" data-cue="Q1" data-state="done" data-product="playmap">
+          <span class="c-cue-q">Q1<small>T−04:00</small></span>
+          <div class="c-cue-body"><h3>Scan and blend the screen</h3><p>Point a phone camera at the screen. PlayMap scans it with structured light and solves the blend for both projectors.</p></div>
+          <div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>PlayMap</span><span class="c-cue-time">15 min</span><span class="c-cue-state"><i class="c-lamp"></i><span data-cue-label>Done</span></span></div>
+        </li>
+        <li class="c-cue" data-cue="Q2" data-state="done" data-product="patterns">
+          <span class="c-cue-q">Q2<small>T−03:30</small></span>
+          <div class="c-cue-body"><h3>Line up the picture</h3><p>Send a crosshatch and 50% grey to both projectors and the confidence monitors. Check the blend from the back row.</p></div>
+          <div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>Patterns</span><span class="c-cue-time">10 min</span><span class="c-cue-state"><i class="c-lamp"></i><span data-cue-label>Done</span></span></div>
+        </li>
+        <li class="c-cue" data-cue="Q3" data-state="standby" data-product="stagewatch">
+          <span class="c-cue-q">Q3<small>T−02:00</small></span>
+          <div class="c-cue-body"><h3>Build the running order</h3><p>Paste the agenda. Each speaker gets a countdown, a wrap-up warning, and STANDBY and GO for lighting, sound and video.</p></div>
+          <div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>StageWatch</span><span class="c-cue-time">10 min</span><span class="c-cue-state"><i class="c-lamp"></i><span data-cue-label>Standby</span></span></div>
+        </li>
+        <li class="c-cue" data-cue="Q4" data-state="waiting" data-product="agmessage">
+          <span class="c-cue-q">Q4<small>T−01:00</small></span>
+          <div class="c-cue-body"><h3>Seat the board</h3><p>Directors open AGMessage on their tablets; the research team works from one desk backstage.</p></div>
+          <div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>AGMessage</span><span class="c-cue-time">5 min</span><span class="c-cue-state"><i class="c-lamp"></i><span data-cue-label>Waiting</span></span></div>
+        </li>
+        <li class="c-cue" data-cue="Q5" data-state="waiting" data-product="companion">
+          <span class="c-cue-q">Q5<small>T 00:00</small></span>
+          <div class="c-cue-body"><h3>Run it from the deck</h3><p>One Stream Deck page: take the next pattern, start the timer, call the next cue. The assistant drafts notes; you approve them.</p></div>
+          <div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>Companion</span><span class="c-cue-time">Show</span><span class="c-cue-state"><i class="c-lamp"></i><span data-cue-label>Waiting</span></span></div>
+        </li>
+      </ol>
+      <div class="c-ladder-controls">
+        <button class="c-go" type="button" data-ladder-go>GO <small data-ladder-go-q>Q3</small></button>
+        <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-ladder-back>Back</button>
+        <p class="c-ladder-status" data-ladder-status aria-live="polite">Standing by: Q3, build the running order.</p>
+        <a href="#workflow">See all six workflows</a>
+      </div>
+    </div>
+    <h3 class="ks-sub">Static steps (getting started, how to buy) · .c-ladder.c-ladder--static</h3>
+    <div class="c-ladder c-ladder--static" data-product="stagewatch">
+      <div class="c-ladder-head" aria-hidden="true"><span>Step</span><span>What to do</span><span>Where</span><span>Takes</span></div>
+      <ol class="c-ladder-list" role="list">
+        <li class="c-cue"><span class="c-cue-q">1</span><div class="c-cue-body"><h3>Install and use the trial</h3><p>Every feature for 14 days from first launch.</p></div><div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>StageWatch</span><span class="c-cue-time">5 min</span></div></li>
+        <li class="c-cue"><span class="c-cue-q">2</span><div class="c-cue-body"><h3>Copy your hardware ID</h3><p>Help → License → Plans, then Copy.</p></div><div class="c-cue-meta"><span class="c-app"><i class="c-swatch"></i>StageWatch</span><span class="c-cue-time">1 min</span></div></li>
+        <li class="c-cue"><span class="c-cue-q">3</span><div class="c-cue-body"><h3>Request the licence</h3><p>In the client portal, with the hardware ID.</p></div><div class="c-cue-meta"><span class="c-app" data-product="ecosystem"><i class="c-swatch"></i>Portal</span><span class="c-cue-time">2 min</span></div></li>
+      </ol>
+    </div>
+    <p class="ks-classes">.c-ladder[data-ladder] (--static without the State column) &gt; .c-cue[data-cue][data-state=done|standby|waiting][data-product]</p>
+  </div>
+</section>
+
+<!-- ======================================================================== PRODUCT HERO -->
+<section class="c-hero c-hero--product" id="stagewatch" data-product="stagewatch" aria-labelledby="sw-title">
+  <div class="l-wrap">
+    <nav class="c-crumbs" aria-label="Breadcrumb"><ol><li><a href="#main">Home</a></li><li><a href="#products">Products</a></li><li><a href="#stagewatch" aria-current="page">StageWatch</a></li></ol></nav>
+    <div class="c-hero-grid">
+      <div>
+        <p class="c-product-tag"><span class="c-swatch"></span>StageWatch <span class="c-role">Time</span></p>
+        <h2 class="c-hero-title" id="sw-title">The clock the whole stage trusts.</h2>
+        <p class="c-hero-lede">A stage countdown timer and show-calling tool. Confidence monitors for presenters, a running order for the producer, and cue ladders with STANDBY and GO for every department.</p>
+        <div class="c-hero-actions">
+          <a class="c-btn c-btn--primary" href="#pricing">Start a 14-day trial</a>
+          <a class="c-btn c-btn--secondary" href="#pricing">Compare licences</a>
+        </div>
+        <dl class="c-specs u-mt-6">
+          <div><dt>Presenter</dt><dd>Confidence monitor</dd></div>
+          <div><dt>Cue lights</dt><dd>Art-Net, sACN, Hue</dd></div>
+          <div><dt>Timecode</dt><dd>LTC in</dd></div>
+          <div><dt>Rooms</dt><dd>Multi-room</dd></div>
+        </dl>
+      </div>
+      <div class="c-hero-visual" data-countdown-scope>
+        <div class="c-cm" data-countdown="75" data-warn="60" data-overrun="12" data-state="go" role="img" aria-label="StageWatch confidence monitor: a keynote countdown">
+          <div class="c-cm-top"><span class="c-cm-room">Main stage</span><span class="c-cm-onair">ON AIR</span><span class="c-cm-clock" data-countdown-clock>14:32:07</span></div>
+          <div class="c-cm-main">
+            <p class="c-cm-seg">Keynote <span>Opening address</span></p>
+            <p class="c-cm-time" data-countdown-time>01:15</p>
+            <p class="c-cm-msg" data-countdown-msg></p>
+            <div class="c-cm-bar"><span class="c-cm-fill" data-countdown-fill></span></div>
+          </div>
+          <div class="c-cm-foot"><span>Next</span><b>Panel: the hybrid AGM</b><span class="c-cm-clock">14:45</span></div>
+        </div>
+        <div class="c-depts">
+          <div class="c-dept" data-dept data-standby-at="15" data-go-at="0"><b>LX</b><span><i class="c-lamp"></i><span data-dept-state>Clear</span></span></div>
+          <div class="c-dept" data-dept data-standby-at="45" data-go-at="0"><b>SND</b><span><i class="c-lamp"></i><span data-dept-state>Clear</span></span></div>
+          <div class="c-dept" data-dept data-standby-at="30" data-go-at="0"><b>VT</b><span><i class="c-lamp"></i><span data-dept-state>Clear</span></span></div>
+          <div class="c-dept" data-dept data-go-at="9999" data-cue="go"><b>CAM</b><span><i class="c-lamp"></i><span data-dept-state>Go</span></span></div>
+        </div>
+        <div class="c-cm-controls">
+          <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-countdown-action="pause" aria-pressed="false"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-pause"/></svg><span data-label>Pause</span></button>
+          <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-countdown-action="minus" aria-label="Take a minute off">−1:00</button>
+          <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-countdown-action="plus" aria-label="Add a minute">+1:00</button>
+          <button class="c-btn c-btn--ghost c-btn--sm" type="button" data-countdown-action="reset"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-reset"/></svg>Reset</button>
+          <ul class="c-cm-legend" role="list"><li><i class="c-lamp c-lamp--go"></i>On time</li><li><i class="c-lamp c-lamp--standby"></i>Wrap up at 1:00</li><li><i class="c-lamp c-lamp--pgm"></i>Over time</li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="c-shots" id="shots" data-scroll-region="StageWatch screenshots">
+      <figure class="c-shot"><div class="c-shot-frame"><img src="../public/assets/img/products/patterns/run-mode-800.webp" width="800" height="507" alt="Patterns in Run mode: the cue stack with the five-minute call standing by" loading="lazy" decoding="async"></div><figcaption class="c-shot-caption">A real capture in the frame: cover-fitted to 16:10.</figcaption></figure>
+      <figure class="c-shot"><div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>StageWatch — cue ladder</b>1920 × 1200 · 16:10</span></div></div><figcaption class="c-shot-caption">The cue ladder: STANDBY and GO for lighting, sound, video and camera.</figcaption></figure>
+      <figure class="c-shot"><div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>StageWatch — outputs</b>1920 × 1200 · 16:10</span></div></div><figcaption class="c-shot-caption">Outputs: what each confidence monitor shows, and when it turns amber.</figcaption></figure>
+    </div>
+    <nav class="c-subnav u-mt-6" aria-label="StageWatch pages"><a href="#stagewatch" aria-current="page">Overview</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#support">Help</a><a href="#tables">Downloads</a></nav>
+  </div>
+</section>
+
+<!-- ======================================================================== PAGE HERO -->
+<section class="c-hero c-hero--page" id="page-hero" aria-labelledby="page-hero-title">
+  <div class="l-wrap">
+    <nav class="c-crumbs" aria-label="Breadcrumb"><ol><li><a href="#main">Home</a></li><li><a href="#support">Support</a></li><li><a href="#page-hero" aria-current="page">Frequently asked questions</a></li></ol></nav>
+    <div class="c-hero-grid">
+      <p class="c-eyebrow">Support</p>
+      <h2 class="c-hero-title" id="page-hero-title">Questions before the show</h2>
+      <p class="c-hero-lede">The compact page hero: breadcrumbs, a title and one line. Used by support, legal, workflow and portal-adjacent pages.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== PRICING -->
+<section class="l-section" id="pricing" data-product="stagewatch" aria-labelledby="pricing-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">StageWatch · Pricing</p><h2 id="pricing-title">StageWatch licences</h2></div>
+      <p class="c-lede">One-off licences in GBP, activated offline with a licence file. Every licence starts with 14 days of everything.</p>
+    </div>
+    <div class="c-tiers">
+      <article class="c-tier"><h3 class="c-tier-name">Trial</h3><p class="c-price"><span class="c-price-amount">£0</span><span class="c-price-unit">Free for 14 days</span></p><p class="c-tier-sub">Every feature, no watermark, for 14 days from first launch.</p><ul class="c-tier-list" role="list"><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Every Production feature</li><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Starts on first launch</li></ul><div class="c-tier-cta"><a class="c-btn c-btn--secondary" href="#tables">Download the trial</a></div></article>
+      <article class="c-tier"><h3 class="c-tier-name">Standard</h3><p class="c-price"><span class="c-price-amount">£9</span><span class="c-price-unit">One-off · one PC</span></p><p class="c-tier-sub">The core timer: presets, end-at timing, alerts, NDI and keyed outputs.</p><ul class="c-tier-list" role="list"><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>12 presets and end-at timing</li><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>NDI and chroma-key outputs</li></ul><div class="c-tier-cta"><a class="c-btn c-btn--secondary" href="#forms">Request Standard</a></div></article>
+      <article class="c-tier is-rec"><span class="c-flag">Best for one room</span><h3 class="c-tier-name">Pro</h3><p class="c-price"><span class="c-price-amount">£29</span><span class="c-price-unit">One-off · one PC</span></p><p class="c-tier-sub">The running order, browser remotes, Companion, PowerPoint and triggers.</p><ul class="c-tier-list" role="list"><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Everything in Standard</li><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Bitfocus Companion, HTTP and OSC</li><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>PowerPoint slide awareness</li></ul><div class="c-tier-cta"><a class="c-btn c-btn--primary" href="#forms">Request Pro</a></div></article>
+      <article class="c-tier"><span class="c-flag c-flag--outline">Launch price</span><h3 class="c-tier-name">Production</h3><p class="c-price"><span class="c-price-amount">£59</span><s class="c-price-was"><span class="u-visually-hidden">was </span>£79</s><span class="c-price-unit">One-off · main and backup PC</span></p><p class="c-tier-sub">The crew loop and multi-room kit.</p><ul class="c-tier-list" role="list"><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged department cues</li><li><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg>Cue lights, LTC, multi-room</li></ul><div class="c-tier-cta"><a class="c-btn c-btn--secondary" href="#forms">Request Production</a></div></article>
+    </div>
+
+    <h3 class="ks-sub">Full comparison · .c-compare[data-compare] &gt; .c-compare-scroll &gt; table.c-compare-table</h3>
+    <div class="c-compare" data-compare>
+      <p class="c-compare-hint"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-arrow"/></svg>Scroll sideways to compare all five licences</p>
+      <div class="c-compare-scroll" data-compare-scroll tabindex="0" role="region" aria-label="StageWatch licence comparison">
+        <table class="c-compare-table">
+          <caption class="u-visually-hidden">What each StageWatch licence includes</caption>
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <th scope="col"><span class="c-tier-head"><span class="c-tier-name">Trial</span><span class="c-price"><span class="c-price-amount">£0</span></span></span></th>
+              <th scope="col"><span class="c-tier-head"><span class="c-tier-name">Free</span><span class="c-price"><span class="c-price-amount">£0</span></span></span></th>
+              <th scope="col"><span class="c-tier-head"><span class="c-tier-name">Standard</span><span class="c-price"><span class="c-price-amount">£9</span></span></span></th>
+              <th scope="col" class="is-rec"><span class="c-tier-head"><span class="c-flag">Best for one room</span><span class="c-tier-name">Pro</span><span class="c-price"><span class="c-price-amount">£29</span></span></span></th>
+              <th scope="col"><span class="c-tier-head"><span class="c-flag c-flag--outline">Launch</span><span class="c-tier-name">Production</span><span class="c-price"><span class="c-price-amount">£59</span><s class="c-price-was"><span class="u-visually-hidden">was </span>£79</s></span></span></th>
+            </tr>
+            <tr>
+              <td></td>
+              <td><span class="c-tier-head-sub">14 days of everything</span><a class="c-btn c-btn--secondary c-btn--sm" href="#tables">Download</a></td>
+              <td><span class="c-tier-head-sub">A basic timer, watermarked</span><a class="c-btn c-btn--secondary c-btn--sm" href="#tables">Download</a></td>
+              <td><span class="c-tier-head-sub">One-off, one PC</span><a class="c-btn c-btn--secondary c-btn--sm" href="#forms">Request</a></td>
+              <td class="is-rec"><span class="c-tier-head-sub">One-off, one PC</span><a class="c-btn c-btn--primary c-btn--sm" href="#forms">Request Pro</a></td>
+              <td><span class="c-tier-head-sub">One-off, main and backup PC</span><a class="c-btn c-btn--secondary c-btn--sm" href="#forms">Request</a></td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="c-compare-group"><th scope="rowgroup" colspan="6">The timer</th></tr>
+            <tr><th scope="row">Countdown, count-up, time of day</th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td class="is-rec"><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr><th scope="row">Full-screen output window</th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td>Watermarked</td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td class="is-rec"><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr><th scope="row">Presets</th><td><span class="c-val">12</span></td><td><span class="c-val">2</span></td><td><span class="c-val">12</span></td><td class="is-rec"><span class="c-val">12</span></td><td><span class="c-val">12</span></td></tr>
+            <tr class="c-compare-group"><th scope="rowgroup" colspan="6">Running the show</th></tr>
+            <tr><th scope="row">Running order<small>Next, auto-advance, ahead/behind, CSV import</small></th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td class="is-rec"><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr><th scope="row">PowerPoint slides and rehearsal ghost</th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td class="is-rec"><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr class="c-compare-group"><th scope="rowgroup" colspan="6">The crew loop and multi-room</th></tr>
+            <tr><th scope="row">Acknowledged cues, departments STANDBY/GO</th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td class="is-rec"><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr><th scope="row">Cue lights over Art-Net, sACN or Hue</th><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td class="is-rec"><span class="c-no"><svg class="c-icon" aria-hidden="true"><use href="#i-dash"/></svg><span class="u-visually-hidden">Not included</span></span></td><td><span class="c-yes"><svg class="c-icon" aria-hidden="true"><use href="#i-check"/></svg><span class="u-visually-hidden">Included</span></span></td></tr>
+            <tr class="c-compare-group"><th scope="rowgroup" colspan="6">Licence</th></tr>
+            <tr><th scope="row">Machines per licence</th><td><span class="c-val">This PC</span></td><td><span class="c-val">Any</span></td><td><span class="c-val">1</span></td><td class="is-rec"><span class="c-val">1</span></td><td><span class="c-val">2</span><small class="u-small u-muted"> main + backup</small></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="c-fineprint">Prices in pounds sterling, one-off. Licences are files tied to a PC's hardware ID and work offline.</p>
+    </div>
+    <div class="c-pass u-mt-6">
+      <svg class="c-icon" aria-hidden="true"><use href="#i-ticket"/></svg>
+      <b>Production event pass <span class="c-price-amount">£15</span></b>
+      <p>Everything in Production for one event on one PC, for 30 days. The £15 counts towards a full Production licence.</p>
+      <a class="c-btn c-btn--secondary c-btn--sm" href="#forms">Request an event pass</a>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== FAQ -->
+<section class="l-section" id="faq" aria-labelledby="faq-title">
+  <div class="l-wrap l-split l-split--aside">
+    <div>
+      <p class="c-eyebrow">Support</p>
+      <h2 id="faq-title">Questions before the show</h2>
+      <p class="c-lede u-mt-4">The answers people need at the get-in. More in the <a href="#support">support pages</a>.</p>
+    </div>
+    <div class="c-faq">
+      <details class="c-faq-item" name="ks-faq" open>
+        <summary class="c-faq-q">Do the apps need the internet during a show?<span class="c-xhair" aria-hidden="true"></span></summary>
+        <div class="c-faq-a"><p>No. The apps find each other on the venue network and run without the internet. A licence is a file you install once.</p></div>
+      </details>
+      <details class="c-faq-item" name="ks-faq">
+        <summary class="c-faq-q">Can the AI change my show on its own?<span class="c-xhair" aria-hidden="true"></span></summary>
+        <div class="c-faq-a"><p>No. An AI tool can read the show and propose a change. The proposal waits until a person approves, edits or declines it.</p></div>
+      </details>
+      <details class="c-faq-item" name="ks-faq">
+        <summary class="c-faq-q">Does Patterns need installing on the show laptop?<span class="c-xhair" aria-hidden="true"></span></summary>
+        <div class="c-faq-a"><p>No. Patterns is a portable app: it runs from a folder or a USB stick.</p></div>
+      </details>
+      <details class="c-faq-item" name="ks-faq">
+        <summary class="c-faq-q">What do I need for Stream Deck control?<span class="c-xhair" aria-hidden="true"></span></summary>
+        <div class="c-faq-a"><p>Bitfocus Companion and the module for the app you want to control.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== CALLOUTS AND TOASTS -->
+<section class="l-section" id="callouts" aria-labelledby="callouts-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Components</p><h2 id="callouts-title">Callouts, flashes and toasts</h2></div>
+      <p class="c-lede">Info is the ecosystem's grey: no app owns it. Success is green, warning amber, danger red, each with an icon and a sentence.</p>
+    </div>
+    <div class="l-grid l-grid--2">
+      <div class="c-callout c-callout--info" role="note"><svg class="c-icon" aria-hidden="true"><use href="#i-info"/></svg><strong class="c-callout-title">Show in the next 48 hours?</strong><p>Pick Support as the topic and say so; those messages are answered first.</p></div>
+      <div class="c-callout c-callout--success" role="status"><svg class="c-icon" aria-hidden="true"><use href="#i-ok"/></svg><strong class="c-callout-title">Two of your reports are fixed</strong><p>Both are in StageWatch 2.16. <a href="#tables">Download it</a>.</p></div>
+      <div class="c-callout c-callout--warning" role="note"><svg class="c-icon" aria-hidden="true"><use href="#i-alert"/></svg><strong class="c-callout-title">Licence questions</strong><p>Include the hardware ID from Help → License, so the licence can be found.</p></div>
+      <div class="c-callout c-callout--danger" role="alert"><svg class="c-icon" aria-hidden="true"><use href="#i-error"/></svg><strong class="c-callout-title">The download link has expired</strong><p>Links last 24 hours. Open Downloads again for a fresh one.</p></div>
+    </div>
+    <h3 class="ks-sub">Portal flashes · .pt-alert--{info,success,warning,danger}</h3>
+    <div class="pt-alert pt-alert--success" role="status">Your licence request was sent. You will get the payment details by email.</div>
+    <div class="pt-alert pt-alert--danger" role="alert">That email address and password do not match an account.</div>
+    <h3 class="ks-sub">Toasts · .c-toasts (fixed, top right) &gt; .c-toast--{success,warning,danger}</h3>
+    <div class="l-grid l-grid--3" style="pointer-events:none">
+      <div class="c-toast c-toast--success" style="animation:none"><svg class="c-icon" aria-hidden="true"><use href="#i-ok"/></svg><div><strong>Vote added</strong><p>48 people want this.</p></div><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Dismiss"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+      <div class="c-toast c-toast--warning" style="animation:none"><svg class="c-icon" aria-hidden="true"><use href="#i-alert"/></svg><div><strong>Saved as a draft</strong><p>Send it when you are ready.</p></div><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Dismiss"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+      <div class="c-toast c-toast--danger" style="animation:none"><svg class="c-icon" aria-hidden="true"><use href="#i-error"/></svg><div><strong>Upload failed</strong><p>Files can be up to 20 MB.</p></div><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Dismiss"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== FORMS -->
+<section class="l-section" id="forms" aria-labelledby="forms-title">
+  <div class="l-wrap l-split">
+    <div>
+      <p class="c-eyebrow">Contact</p>
+      <h2 id="forms-title">Forms</h2>
+      <p class="c-lede u-mt-4">Labels above fields, hints above the control, errors with an icon and a sentence that says how to fix it, and a summary that links to each field.</p>
+      <dl class="c-kv u-mt-6"><dt>Replies</dt><dd>Within two working days</dd><dt>Show-day problems</dt><dd>Ask the assistant first; it can open a ticket for you</dd></dl>
+    </div>
+    <form class="c-form c-form--panel" action="#forms" novalidate>
+      <div class="c-callout c-callout--danger c-error-summary" data-error-summary tabindex="-1" role="alert" aria-labelledby="ks-err-title">
+        <svg class="c-icon" aria-hidden="true"><use href="#i-alert"/></svg>
+        <strong class="c-callout-title" id="ks-err-title">Check one field before sending</strong>
+        <ul><li><a href="#ks-email">Enter an email address in the format name@example.co.uk</a></li></ul>
+      </div>
+      <div class="c-form-row">
+        <div class="c-field"><label for="ks-name">Name</label><input id="ks-name" name="name" autocomplete="name" value="Priya Natarajan"></div>
+        <div class="c-field is-invalid"><label for="ks-email">Email</label><input id="ks-email" name="email" type="email" autocomplete="email" value="priya@northfield" aria-invalid="true" aria-describedby="ks-email-err"><p class="c-error-msg" id="ks-email-err">Enter an email address in the format name@example.co.uk</p></div>
+      </div>
+      <div class="c-form-row">
+        <div class="c-field"><label for="ks-org">Organisation <span class="c-label-opt">Optional</span></label><input id="ks-org" name="org" autocomplete="organization" placeholder="Production company or venue"></div>
+        <div class="c-field"><label for="ks-product">Product</label><select id="ks-product" name="product"><option>Patterns</option><option selected>StageWatch</option><option>AGMessage</option><option>PlayMap</option></select></div>
+      </div>
+      <fieldset class="c-fieldset">
+        <legend>What is it about?</legend>
+        <div class="c-radio-cards">
+          <label class="c-radio-card"><input type="radio" name="topic" value="sales"><span>Buying a licence</span></label>
+          <label class="c-radio-card"><input type="radio" name="topic" value="support" checked><span>Technical support</span></label>
+          <label class="c-radio-card"><input type="radio" name="topic" value="show"><span>Planning a show</span></label>
+        </div>
+      </fieldset>
+      <div class="c-form-row">
+        <div class="c-field"><label for="ks-date">Show date <span class="c-label-opt">Optional</span></label><p class="c-help" id="ks-date-help">So a show-day problem is answered first.</p><input id="ks-date" name="show_date" type="date" aria-describedby="ks-date-help"></div>
+        <div class="c-field"><label for="ks-machines">Machines at the show <span class="c-label-opt">Optional</span></label><p class="c-help" id="ks-machines-help">How many PCs run the apps.</p><input id="ks-machines" name="machines" inputmode="numeric" value="2" aria-describedby="ks-machines-help"></div>
+      </div>
+      <div class="c-field"><label for="ks-msg">Message</label><p class="c-help" id="ks-msg-help">What you are running, on which machines, and what you expected to happen.</p><textarea id="ks-msg" name="message" maxlength="2000" aria-describedby="ks-msg-help ks-msg-count" data-count="#ks-msg-count">Running StageWatch Pro on two laptops. The cue lights stop after the Hue bridge sleeps.</textarea><p class="c-count" id="ks-msg-count" aria-live="polite">87 / 2000</p></div>
+      <div class="c-field"><label for="ks-file">Attach the show's log <span class="c-label-opt">Optional</span></label><input id="ks-file" name="file" type="file"></div>
+      <div class="c-checks">
+        <label class="c-check"><input type="checkbox" name="copy" checked>Send me a copy of this message</label>
+        <label class="c-check"><input type="radio" name="reply" checked>Reply by email</label>
+        <label class="c-check"><input type="radio" name="reply">Phone me (UK numbers)</label>
+      </div>
+      <div class="c-form-foot"><button class="c-btn c-btn--primary" type="submit">Send message</button><p>We use your details only to reply. See the privacy notice.</p></div>
+    </form>
+  </div>
+  <div class="l-wrap u-mt-8">
+    <h3 class="ks-sub">Portal contract · form.pt-form &gt; .pt-field &gt; label + control + .pt-help + .pt-error</h3>
+    <form class="pt-form" action="#forms" style="max-width:36rem">
+      <div class="pt-field"><label for="ks-pt-title">Title</label><input id="ks-pt-title" name="title" aria-invalid="true" aria-describedby="ks-pt-title-err"><p class="pt-help">One line that says what went wrong.</p><p class="pt-error" id="ks-pt-title-err">Enter a title.</p></div>
+      <div class="pt-field pt-field--inline"><input id="ks-pt-terms" type="checkbox" name="terms"><label for="ks-pt-terms">I agree to the website terms</label></div>
+      <div class="pt-actions"><button class="pt-btn pt-btn--primary" type="submit">Send report</button><a class="pt-btn pt-btn--ghost" href="#forms">Cancel</a></div>
+    </form>
+  </div>
+</section>
+
+<!-- ======================================================================== TABLES -->
+<section class="l-section" id="tables" aria-labelledby="tables-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Components</p><h2 id="tables-title">Data tables, tabs, filters, pagination</h2></div>
+      <p class="c-lede">For the portal and admin. Mono IDs and values, a dot-and-word status, absolute dates. Below 40rem a stacked table becomes cards.</p>
+    </div>
+    <div class="c-stats">
+      <div class="c-stat"><span class="c-stat-value">12</span><span class="c-stat-label">Open tickets</span><span class="c-stat-meta"><i class="c-lamp c-lamp--standby"></i>3 waiting on you</span></div>
+      <div class="c-stat"><span class="c-stat-value">4</span><span class="c-stat-label">Licences</span></div>
+      <div class="c-stat"><span class="c-stat-value">31</span><span class="c-stat-label">Fixed this year</span><span class="c-stat-meta"><i class="c-lamp c-lamp--go"></i>2 in the latest build</span></div>
+      <a class="c-stat" href="#tables"><span class="c-stat-value">7</span><span class="c-stat-label">Your votes</span></a>
+    </div>
+    <nav class="c-tabs" aria-label="Ticket types"><a href="#tables" aria-current="page">All <span class="c-tabs-count">12</span></a><a href="#tables">Bug reports <span class="c-tabs-count">5</span></a><a href="#tables">Feature requests <span class="c-tabs-count">7</span></a><a href="#tables">Closed <span class="c-tabs-count">31</span></a></nav>
+    <form class="c-search" action="#tables" role="search" aria-label="Filter requests">
+      <div class="c-search-field"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-search"/></svg><label class="u-visually-hidden" for="ks-q">Search requests</label><input id="ks-q" type="search" placeholder="Search requests"></div>
+      <label for="ks-status">Status</label><select id="ks-status"><option>Any status</option><option>Open</option><option>Planned</option></select>
+      <button class="c-btn c-btn--secondary c-btn--sm" type="submit">Filter</button>
+    </form>
+    <div class="c-table-wrap">
+      <table class="c-table c-table--stack">
+        <caption class="u-visually-hidden">Feature requests and bug reports, most votes first</caption>
+        <thead><tr><th scope="col">ID</th><th scope="col">Type</th><th scope="col" aria-sort="descending"><button class="c-sort" type="button">Request</button></th><th scope="col">Product</th><th scope="col">Status</th><th scope="col"><button class="c-sort" type="button">Updated</button></th><th scope="col" class="c-num">Votes</th></tr></thead>
+        <tbody>
+          <tr><td data-label="ID"><span class="c-id">FR-0142</span></td><td data-label="Type"><span class="pt-badge pt-badge--feature">Feature</span></td><td data-label="Request"><a href="#tables">Presenter view on a second machine</a><small>PowerPoint on the lectern laptop, timer on the desk</small></td><td data-label="Product"><span class="c-app" data-product="stagewatch"><i class="c-swatch"></i>StageWatch</span></td><td data-label="Status"><span class="c-badge c-badge--planned">Planned</span></td><td data-label="Updated"><time class="c-id" datetime="2026-10-12">12 Oct 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="true" aria-label="Remove your vote, 48 votes">48</button></td></tr>
+          <tr class="is-unread"><td data-label="ID"><span class="c-id">FR-0137</span></td><td data-label="Type"><span class="pt-badge pt-badge--feature">Feature</span></td><td data-label="Request"><a href="#tables">NDI output with alpha for lower thirds</a><small>Key over camera in the vision mixer</small></td><td data-label="Product"><span class="c-app" data-product="patterns"><i class="c-swatch"></i>Patterns</span></td><td data-label="Status"><span class="c-badge c-badge--progress">In progress</span></td><td data-label="Updated"><time class="c-id" datetime="2026-10-09">09 Oct 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="false" aria-label="Vote, 35 votes">35</button></td></tr>
+          <tr><td data-label="ID"><span class="c-id">BR-0322</span></td><td data-label="Type"><span class="pt-badge pt-badge--bug">Bug</span></td><td data-label="Request"><a href="#tables">Blend gamma resets after reopening the project</a><small>Two machines affected</small></td><td data-label="Product"><span class="c-app" data-product="playmap"><i class="c-swatch"></i>PlayMap</span></td><td data-label="Status"><span class="c-badge c-badge--triaged">Triaged</span></td><td data-label="Updated"><time class="c-id" datetime="2026-10-18">18 Oct 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="false" aria-label="Vote, 7 votes">7</button></td></tr>
+          <tr><td data-label="ID"><span class="c-id">FR-0129</span></td><td data-label="Type"><span class="pt-badge pt-badge--feature">Feature</span></td><td data-label="Request"><a href="#tables">Scan with two phones at once</a><small>Faster scans of wide surfaces</small></td><td data-label="Product"><span class="c-app" data-product="playmap"><i class="c-swatch"></i>PlayMap</span></td><td data-label="Status"><span class="c-badge c-badge--open">Open</span></td><td data-label="Updated"><time class="c-id" datetime="2026-10-02">02 Oct 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="false" aria-label="Vote, 29 votes">29</button></td></tr>
+          <tr><td data-label="ID"><span class="c-id">FR-0121</span></td><td data-label="Type"><span class="pt-badge pt-badge--feature">Feature</span></td><td data-label="Request"><a href="#tables">Export the message log as a PDF after the AGM</a><small>For the company secretary's minutes</small></td><td data-label="Product"><span class="c-app" data-product="agmessage"><i class="c-swatch"></i>AGMessage</span></td><td data-label="Status"><span class="c-badge c-badge--done">Done in 2.1</span></td><td data-label="Updated"><time class="c-id" datetime="2026-09-20">20 Sep 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="false" aria-label="Vote, 12 votes">12</button></td></tr>
+          <tr><td data-label="ID"><span class="c-id">FR-0101</span></td><td data-label="Type"><span class="pt-badge pt-badge--feature">Feature</span></td><td data-label="Request"><a href="#tables">Cloud sync of show files</a><small>The apps run offline by design</small></td><td data-label="Product"><span class="c-app" data-product="patterns"><i class="c-swatch"></i>Patterns</span></td><td data-label="Status"><span class="c-badge c-badge--declined">Declined</span></td><td data-label="Updated"><time class="c-id" datetime="2026-08-14">14 Aug 2026</time></td><td data-label="Votes" class="c-num"><button class="c-vote" type="button" aria-pressed="false" aria-label="Vote, 3 votes">3</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav class="c-pager" aria-label="Pages"><a rel="prev" href="#tables">Previous</a><ol role="list"><li><a href="#tables">1</a></li><li><a href="#tables" aria-current="page">2</a></li><li><a href="#tables">3</a></li><li><span>…</span></li><li><a href="#tables">8</a></li></ol><span class="c-pager-info">7–12 of 38</span><a rel="next" href="#tables">Next</a></nav>
+
+    <h3 class="ks-sub">Zebra and compact · .c-table--zebra .c-table--compact · admin</h3>
+    <div class="c-table-wrap">
+      <table class="c-table c-table--zebra c-table--compact">
+        <caption>Releases</caption>
+        <thead><tr><th scope="col">Product</th><th scope="col">Version</th><th scope="col">Channel</th><th scope="col">Published</th><th scope="col" class="c-num">Size</th><th scope="col" class="c-num">Downloads</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">StageWatch</th><td class="u-mono">2.16.0</td><td><span class="pt-badge pt-badge--stable">Stable</span></td><td><time class="c-id" datetime="2026-10-14">14 Oct 2026</time></td><td class="c-num">84.2 MB</td><td class="c-num">1,204</td></tr>
+          <tr><th scope="row">Patterns</th><td class="u-mono">5.3.1</td><td><span class="pt-badge pt-badge--stable">Stable</span></td><td><time class="c-id" datetime="2026-10-02">02 Oct 2026</time></td><td class="c-num">61.9 MB</td><td class="c-num">980</td></tr>
+          <tr><th scope="row">PlayMap</th><td class="u-mono">0.9.0</td><td><span class="pt-badge pt-badge--beta">Beta</span></td><td><time class="c-id" datetime="2026-09-28">28 Sep 2026</time></td><td class="c-num">212.5 MB</td><td class="c-num">143</td></tr>
+          <tr><th scope="row">AGMessage</th><td class="u-mono">2.1.0</td><td><span class="pt-badge pt-badge--stable">Stable</span></td><td><time class="c-id" datetime="2026-09-20">20 Sep 2026</time></td><td class="c-num">38.0 MB</td><td class="c-num">77</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 class="ks-sub">Empty state · .c-empty (.pt-empty)</h3>
+    <div class="c-empty"><span class="c-empty-mark" aria-hidden="true"></span><p>You have not opened any tickets yet. When something is not working, or you have an idea or a question, start here.</p><a class="c-btn c-btn--primary" href="#forms">Open a ticket</a></div>
+    <h3 class="ks-sub">Tabs as buttons · [data-tabs] [role=tab] (site.js)</h3>
+    <div class="c-tabs" role="tablist" aria-label="Downloads" data-tabs>
+      <button role="tab" type="button" id="ks-tab-1" aria-controls="ks-panel-1" aria-selected="true">Latest</button>
+      <button role="tab" type="button" id="ks-tab-2" aria-controls="ks-panel-2" aria-selected="false">Earlier versions</button>
+      <button role="tab" type="button" id="ks-tab-3" aria-controls="ks-panel-3" aria-selected="false">Checksums</button>
+    </div>
+    <div class="c-tabpanel" role="tabpanel" id="ks-panel-1" aria-labelledby="ks-tab-1" tabindex="0"><p class="u-muted">StageWatch 2.16.0 for Windows 10 and 11, 64-bit.</p></div>
+    <div class="c-tabpanel" role="tabpanel" id="ks-panel-2" aria-labelledby="ks-tab-2" tabindex="0" hidden><p class="u-muted">2.15.2 and 2.14.0 stay available for a year.</p></div>
+    <div class="c-tabpanel" role="tabpanel" id="ks-panel-3" aria-labelledby="ks-tab-3" tabindex="0" hidden><p class="u-muted">SHA-256 sums for every file.</p></div>
+  </div>
+</section>
+
+<!-- ======================================================================== PORTAL -->
+<section class="l-section l-section--tint" id="portal" aria-labelledby="portal-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Client portal</p><h2 id="portal-title">The portal contract (pt-*)</h2></div>
+      <p class="c-lede">templates/layouts/portal.php and docs/PORTAL-UI.md: the shell, header, stats, table, thread, files and votes.</p>
+    </div>
+  </div>
+  <div class="pt-shell">
+    <nav class="pt-nav" aria-label="Client portal (sample)">
+      <ul><li><a href="#portal">Dashboard</a></li><li><a href="#portal">Downloads</a></li><li><a href="#portal">Licences</a></li><li><a href="#portal" aria-current="page">Tickets</a></li><li><a href="#portal">Feature requests</a></li><li><a href="#portal">Account</a></li></ul>
+      <p class="pt-nav-heading">Administration</p>
+      <ul><li><a href="#portal">Admin overview</a></li><li><a href="#portal">All tickets</a></li><li><a href="#portal">Licence requests</a></li><li><a href="#portal">Users</a></li></ul>
+      <form class="pt-nav-signout" action="#portal"><p class="pt-small pt-muted">Signed in as Priya Natarajan</p><button type="button" class="pt-btn pt-btn--ghost pt-btn--small">Sign out</button></form>
+    </nav>
+    <div class="pt-main">
+      <header class="pt-header">
+        <p class="pt-eyebrow">Client portal</p>
+        <h3 class="pt-title">Countdown freezes after resume</h3>
+        <p class="pt-lede">Bug report BR-0331 for StageWatch, opened 18 Oct 2026.</p>
+        <div class="pt-header-actions"><a class="pt-btn pt-btn--primary" href="#portal">Reply</a><a class="pt-btn pt-btn--secondary" href="#portal">Close the ticket</a></div>
+      </header>
+      <nav class="pt-tabs" aria-label="Ticket types (sample)"><a href="#portal" aria-current="page">All <span class="pt-muted">(12)</span></a><a href="#portal">Bug reports <span class="pt-muted">(5)</span></a><a href="#portal">Feature requests <span class="pt-muted">(7)</span></a><a href="#portal">Questions <span class="pt-muted">(0)</span></a></nav>
+      <form class="pt-search" action="#portal" aria-label="Filter your tickets by status"><label for="ks-pt-status">Status</label><select id="ks-pt-status"><option>Any status</option><option>Open</option></select><button type="button" class="pt-btn pt-btn--secondary pt-btn--small">Filter</button></form>
+      <div class="pt-grid pt-grid--3 u-mt-4">
+        <a class="pt-card pt-card--link" href="#portal"><span class="pt-card-title">Report a bug</span><span class="pt-card-body">Something not working as it should? Tell us what happened.</span></a>
+        <a class="pt-card pt-card--link" href="#portal"><span class="pt-card-title">Request a feature</span><span class="pt-card-body">An idea that would help your shows? Suggest it.</span></a>
+        <div class="pt-card"><span class="pt-card-meta">Latest release</span><span class="pt-card-title">StageWatch 2.16.0</span><span class="pt-card-body">Windows 10 and 11, 64-bit.</span><div class="pt-card-footer"><a class="pt-btn pt-btn--secondary pt-btn--small" href="#portal">Download</a><button class="pt-btn pt-btn--danger pt-btn--small" type="button">Revoke</button></div></div>
+      </div>
+      <div class="pt-alert pt-alert--warning u-mt-4" role="status">Your licence for StageWatch Pro is waiting for payment.</div>
+      <div class="pt-stats"><div class="pt-stat"><span class="pt-stat-value">3</span><span class="pt-stat-label">Replies</span></div><div class="pt-stat"><span class="pt-stat-value">2</span><span class="pt-stat-label">Attachments</span></div><div class="pt-stat"><span class="pt-stat-value">12</span><span class="pt-stat-label">Votes</span></div></div>
+      <div class="pt-grid pt-grid--2">
+        <section class="pt-section"><h4 class="pt-h2">Details</h4><dl class="pt-kv"><dt>Status</dt><dd><span class="pt-badge pt-badge--in_progress">In progress</span></dd><dt>Type</dt><dd><span class="pt-badge pt-badge--bug">Bug</span></dd><dt>Version</dt><dd class="pt-mono">2.16.0</dd></dl></section>
+        <section class="pt-section"><h4 class="pt-h2">Files</h4><ul class="pt-files"><li><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-doc"/></svg><a href="#portal">stagewatch-log-2026-10-18.txt</a><span class="pt-small pt-muted pt-mono">48 KB</span></li><li><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-doc"/></svg><a href="#portal">screen.png</a><span class="pt-small pt-muted pt-mono">1.2 MB</span></li></ul></section>
+      </div>
+      <section class="pt-section"><h4 class="pt-h2">Conversation</h4>
+        <div class="pt-thread">
+          <article class="pt-comment"><p class="pt-comment-meta"><strong>Priya Natarajan</strong><time datetime="2026-10-18T09:12">18 Oct 2026, 09:12</time></p><div class="pt-comment-body pt-prose"><p>After pausing for the interval and resuming, the countdown stays on 04:12 until I press GO again.</p></div></article>
+          <article class="pt-comment pt-comment--staff"><p class="pt-comment-meta"><strong>Ben Rohleder</strong><span class="pt-badge pt-badge--admin">Staff</span><time datetime="2026-10-18T11:40">18 Oct 2026, 11:40</time></p><div class="pt-comment-body pt-prose"><p>Thanks, I can reproduce it with a running order of more than 40 items. A fix is in progress.</p></div></article>
+          <article class="pt-comment pt-comment--internal"><p class="pt-comment-meta"><strong>Internal note</strong><time datetime="2026-10-18T11:42">18 Oct 2026, 11:42</time></p><div class="pt-comment-body pt-prose"><p>Only visible to administrators.</p></div></article>
+        </div>
+      </section>
+      <section class="pt-section"><h4 class="pt-h2">Feature board row</h4>
+        <div class="pt-table-wrap"><table class="pt-table"><caption class="u-visually-hidden">Feature requests</caption><thead><tr><th scope="col">Request</th><th scope="col">Status</th><th scope="col" class="pt-num">Votes</th></tr></thead><tbody><tr><td><a href="#portal">Presenter view on a second machine</a></td><td><span class="pt-badge pt-badge--planned">Planned</span></td><td class="pt-num"><form action="#portal"><button type="button" class="pt-vote" aria-pressed="true"><span class="pt-vote-count">48</span> <span class="pt-small">votes</span><span class="u-visually-hidden"> — vote for “Presenter view on a second machine”</span></button></form></td></tr><tr><td><a href="#portal">Hue cue lights wake the bridge</a></td><td><span class="pt-badge pt-badge--open">Open</span></td><td class="pt-num"><form action="#portal"><button type="button" class="pt-vote" aria-pressed="false"><span class="pt-vote-count">9</span> <span class="pt-small">votes</span></button></form></td></tr></tbody></table></div>
+        <nav class="pt-pager" aria-label="Pages"><a rel="prev" href="#portal">Previous</a><span class="pt-pager-info">Page 2 of 4</span><a rel="next" href="#portal">Next</a></nav>
+      </section>
+    </div>
+  </div>
+  <div class="l-wrap">
+    <div class="pt-auth">
+      <header class="pt-header"><p class="pt-eyebrow">Client portal</p><h3 class="pt-title">Sign in</h3><p class="pt-lede">Downloads, licence files and your tickets.</p></header>
+      <form class="pt-form" action="#portal">
+        <div class="pt-field"><label for="ks-li-email">Email</label><input id="ks-li-email" type="email" autocomplete="email"></div>
+        <div class="pt-field"><label for="ks-li-pass">Password</label><input id="ks-li-pass" type="password" autocomplete="current-password"></div>
+        <fieldset class="pt-fieldset"><legend>Remember me</legend><div class="pt-field pt-field--inline"><input id="ks-li-rem" type="checkbox"><label for="ks-li-rem">Keep me signed in on this computer</label></div></fieldset>
+        <div class="pt-actions"><button class="pt-btn pt-btn--primary" type="submit">Sign in</button><a class="pt-btn pt-btn--ghost" href="#portal">Forgot your password?</a></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== SUPPORT + CHAT -->
+<section class="l-section" id="support" aria-labelledby="support-title">
+  <div class="l-wrap l-split l-split--main">
+    <div>
+      <p class="c-eyebrow">Support</p>
+      <h2 id="support-title">Help, before the doors open</h2>
+      <p class="c-lede u-mt-4">The assistant answers from the support pages for all four apps, and hands you to a person when it can't.</p>
+      <button class="c-launcher u-mt-6" type="button" aria-controls="chat-panel" aria-expanded="false"><span class="c-launcher-icon"><svg class="c-icon" aria-hidden="true"><use href="#i-chat"/></svg></span><span><b>Ask the assistant</b><small>Setup, line-up, licences and show-day fixes</small></span></button>
+      <ul class="c-support-links u-mt-6" role="list">
+        <li data-product="patterns"><a href="#support"><span class="c-swatch"></span><span>Patterns help<small>Outputs, NDI, blends</small></span></a></li>
+        <li data-product="stagewatch"><a href="#support"><span class="c-swatch"></span><span>StageWatch help<small>Timers, cue lights, LTC</small></span></a></li>
+        <li data-product="agmessage"><a href="#support"><span class="c-swatch"></span><span>AGMessage help<small>Devices, rooms, approvals</small></span></a></li>
+        <li data-product="playmap"><a href="#support"><span class="c-swatch"></span><span>PlayMap help<small>Scanning, mapping, sync</small></span></a></li>
+      </ul>
+    </div>
+    <div class="c-chat c-chat--inline" data-chat data-chat-inline>
+      <section class="c-chat-panel" id="chat-panel" data-chat-panel aria-labelledby="ks-chat-title">
+        <header class="c-chat-head"><h2 id="ks-chat-title">Show assistant</h2><span class="c-chat-status"><i class="c-lamp c-lamp--go"></i>Online</span><span class="c-chat-tools"><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" data-chat-reset aria-label="Start a new conversation"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-reset"/></svg></button></span></header>
+        <p class="c-chat-scope"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-info"/></svg><span><b>I can help with Patterns, StageWatch, AGMessage and PlayMap.</b> I answer from the support pages; nothing is sent for you without your approval.</span></p>
+        <div class="c-chat-log" data-chat-log role="log" aria-live="polite" aria-label="Conversation">
+          <div class="c-chat-msg c-chat-msg--user"><span class="u-visually-hidden">You said: </span><div class="c-chat-msg-body">The overlap on my two projectors is brighter than the rest of the screen. What should I check first?</div></div>
+          <div class="c-chat-msg c-chat-msg--assistant"><span class="u-visually-hidden">Assistant: </span><div class="c-chat-msg-body"><p>Check it on flat grey before touching the blend.</p><ol><li>In Patterns, send <b>Flat 50%</b> to both outputs.</li><li>In PlayMap, open the blend for that pair and lower the gamma a step at a time.</li><li>Stop when the band disappears from the back row.</li></ol></div>
+            <p class="c-chat-src"><a href="#support"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-doc"/></svg>PlayMap: blending two projectors</a><a href="#support"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-doc"/></svg>Patterns: flat fields</a></p>
+            <div class="c-chat-feedback"><span>Was this helpful?</span><button class="c-btn c-btn--secondary c-btn--sm" type="button">Yes</button><button class="c-btn c-btn--secondary c-btn--sm" type="button">No</button></div>
+          </div>
+          <div class="c-chat-msg c-chat-msg--assistant c-chat-msg--error"><span class="u-visually-hidden">Assistant: </span><div class="c-chat-msg-body">That is outside what I can answer. A person can help.</div><div class="c-chat-handoff"><a class="c-btn c-btn--secondary c-btn--sm" href="#forms">Contact us</a><a class="c-btn c-btn--secondary c-btn--sm" href="#forms">Open a support ticket</a></div></div>
+          <div class="c-chat-typing" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="c-chat-suggest"><button class="c-chat-chip" type="button" data-chat-suggest>That fixed it</button><button class="c-chat-chip" type="button" data-chat-suggest>Draft a bug report</button><button class="c-chat-chip" type="button" data-chat-suggest>Talk to a person</button></div>
+        <form class="c-chat-form" data-chat-form action="#support">
+          <label class="u-visually-hidden" for="ks-chat-input">Ask about your show</label>
+          <textarea class="c-chat-input" id="ks-chat-input" data-chat-input rows="1" maxlength="1200" placeholder="Ask about your show"></textarea>
+          <button class="c-chat-send" type="submit" aria-label="Send"><svg class="c-icon" aria-hidden="true"><use href="#i-send"/></svg></button>
+          <p class="c-chat-count" data-chat-count></p>
+        </form>
+        <p class="c-chat-foot">Answers can be wrong; check them before doors. Don't paste licence keys or passwords.</p>
+        <p class="u-visually-hidden" data-chat-status role="status"></p>
+      </section>
+    </div>
+  </div>
+  <div class="l-wrap u-mt-8">
+    <h3 class="ks-sub">Floating launcher and panel (bottom sheet below 40rem) · [data-chat] .c-chat &gt; .c-chat-fab[data-chat-open][data-chat-fab] + .c-chat-panel[data-chat-panel]</h3>
+    <div class="ks-float">
+      <p class="ks-float-note">On a page the launcher is fixed bottom right, tucked away while the hero or an inline chat is on screen; here it is pinned inside this frame.</p>
+      <div class="c-chat is-open">
+        <button class="c-chat-fab" type="button" aria-expanded="true" aria-controls="ks-float-panel"><i class="c-lamp" aria-hidden="true"></i><span>Ask<span class="c-chat-fab-long"> the assistant</span></span></button>
+        <section class="c-chat-panel" id="ks-float-panel" aria-labelledby="ks-float-title">
+          <header class="c-chat-head"><h2 id="ks-float-title">Show assistant</h2><span class="c-chat-status"><i class="c-lamp c-lamp--go"></i>Online</span><span class="c-chat-tools"><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Start a new conversation"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-reset"/></svg></button><button class="c-btn c-btn--ghost c-btn--icon c-btn--sm" type="button" aria-label="Close the assistant"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-close"/></svg></button></span></header>
+          <p class="c-chat-scope"><svg class="c-icon c-icon--sm" aria-hidden="true"><use href="#i-info"/></svg><span><b>I can help with Patterns, StageWatch, AGMessage and PlayMap.</b> Licence and billing changes go to a person.</span></p>
+          <div class="c-chat-log" role="log" aria-label="Conversation">
+            <div class="c-chat-msg c-chat-msg--assistant"><span class="u-visually-hidden">Assistant: </span><div class="c-chat-msg-body">Hello. Ask me about setting up, lining up or licensing any of the four apps.</div></div>
+            <div class="c-chat-msg c-chat-msg--user"><span class="u-visually-hidden">You said: </span><div class="c-chat-msg-body">Where is my hardware ID?</div></div>
+            <div class="c-chat-typing" aria-hidden="true"><span></span><span></span><span></span></div>
+          </div>
+          <div class="c-chat-suggest"><button class="c-chat-chip" type="button">Which licence do I need?</button><button class="c-chat-chip" type="button">Line up an LED wall</button></div>
+          <form class="c-chat-form" action="#support"><label class="u-visually-hidden" for="ks-float-input">Ask about your show</label><textarea class="c-chat-input" id="ks-float-input" rows="1" placeholder="Ask about your show"></textarea><button class="c-chat-send" type="button" aria-label="Send"><svg class="c-icon" aria-hidden="true"><use href="#i-send"/></svg></button></form>
+          <p class="c-chat-foot">Don't paste licence keys or passwords.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== PROSE -->
+<section class="l-section" id="prose" aria-labelledby="prose-title">
+  <div class="l-wrap l-wrap--prose">
+    <p class="c-eyebrow">Legal · Support</p>
+    <h2 id="prose-title">Long-form text</h2>
+    <div class="c-prose u-mt-6">
+      <p>.c-prose sets the rhythm for legal pages, support articles and release notes rendered from Markdown. Lines stay under 70 characters; headings get room above them.</p>
+      <h3>Moving a licence to a new PC</h3>
+      <p>A licence follows the PC's hardware ID. After a Windows reinstall or a new motherboard, send the new hardware ID and a fresh licence file is issued. Open <b>Help → License</b> and press <kbd>Copy</kbd>.</p>
+      <ul><li>Standard and Pro cover one PC.</li><li>Production covers a main and a backup PC.</li></ul>
+      <blockquote><p>A running show is never interrupted by a licence check.</p></blockquote>
+      <h4>Checksums</h4>
+      <p>Every download lists its SHA-256 sum, for example <code>9f2c…f0a2</code>.</p>
+      <table><thead><tr><th>Data</th><th>Kept for</th></tr></thead><tbody><tr><td>Support tickets</td><td>Two years after closing</td></tr><tr><td>Assistant conversations</td><td>30 days</td></tr></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================== 404 -->
+<section class="l-section" id="error" aria-labelledby="error-title">
+  <div class="c-error">
+    <p class="c-error-code" aria-hidden="true">404</p>
+    <h2 id="error-title">This page is off air</h2>
+    <p>This page does not exist, or it has moved. Try the links below, or ask the support assistant.</p>
+    <p class="c-error-links"><a href="#main">Home</a> · <a href="#support">Support</a> · <a href="#forms">Contact</a></p>
+  </div>
+</section>
+
+<!-- ======================================================================== BOTH THEMES -->
+<section class="l-section" id="themes" aria-labelledby="themes-title">
+  <div class="l-wrap">
+    <div class="c-section-head">
+      <div><p class="c-eyebrow">Theming</p><h2 id="themes-title">Both themes, side by side</h2></div>
+      <p class="c-lede">.u-theme-light and .u-theme-dark set color-scheme on a container; every token inside follows. Monitors stay dark in both.</p>
+    </div>
+    <div class="ks-themes">
+      <div class="u-theme-light">
+        <p>Light</p>
+        <div class="ks-row"><button class="c-btn c-btn--primary c-btn--sm" type="button">Primary</button><button class="c-btn c-btn--secondary c-btn--sm" type="button">Secondary</button><span data-product="stagewatch"><button class="c-btn c-btn--primary c-btn--sm" type="button">StageWatch</button></span></div>
+        <div class="ks-row"><span class="c-badge c-badge--open">Open</span><span class="c-badge c-badge--planned">Planned</span><span class="c-badge c-badge--progress">In progress</span><span class="c-badge c-badge--done">Done</span><span class="c-badge c-badge--declined">Declined</span></div>
+        <div class="ks-row"><span class="c-app" data-product="patterns"><i class="c-swatch"></i>Patterns</span><span class="c-app" data-product="stagewatch"><i class="c-swatch"></i>StageWatch</span><span data-product="stagewatch"><span class="c-role">Time</span></span><span class="c-app" data-product="agmessage"><i class="c-swatch"></i>AGMessage</span><span class="c-app" data-product="playmap"><i class="c-swatch"></i>PlayMap</span></div>
+        <div class="c-callout c-callout--warning"><svg class="c-icon" aria-hidden="true"><use href="#i-alert"/></svg><strong class="c-callout-title">Standing by</strong><p>Amber means standing by, in both themes.</p></div>
+        <div class="c-field"><label for="ks-l-in">Field</label><input class="c-input" id="ks-l-in" value="3:1 border"></div>
+        <div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>A monitor stays dark</b>16:10</span></div></div>
+      </div>
+      <div class="u-theme-dark">
+        <p>Dark</p>
+        <div class="ks-row"><button class="c-btn c-btn--primary c-btn--sm" type="button">Primary</button><button class="c-btn c-btn--secondary c-btn--sm" type="button">Secondary</button><span data-product="stagewatch"><button class="c-btn c-btn--primary c-btn--sm" type="button">StageWatch</button></span></div>
+        <div class="ks-row"><span class="c-badge c-badge--open">Open</span><span class="c-badge c-badge--planned">Planned</span><span class="c-badge c-badge--progress">In progress</span><span class="c-badge c-badge--done">Done</span><span class="c-badge c-badge--declined">Declined</span></div>
+        <div class="ks-row"><span class="c-app" data-product="patterns"><i class="c-swatch"></i>Patterns</span><span class="c-app" data-product="stagewatch"><i class="c-swatch"></i>StageWatch</span><span data-product="stagewatch"><span class="c-role">Time</span></span><span class="c-app" data-product="agmessage"><i class="c-swatch"></i>AGMessage</span><span class="c-app" data-product="playmap"><i class="c-swatch"></i>PlayMap</span></div>
+        <div class="c-callout c-callout--warning"><svg class="c-icon" aria-hidden="true"><use href="#i-alert"/></svg><strong class="c-callout-title">Standing by</strong><p>Amber means standing by, in both themes.</p></div>
+        <div class="c-field"><label for="ks-d-in">Field</label><input class="c-input" id="ks-d-in" value="3:1 border"></div>
+        <div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>A monitor stays dark</b>16:10</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ======================================================================== FOOTER -->
+<footer class="c-footer">
+  <span class="c-bars" aria-hidden="true"></span>
+  <div class="l-wrap">
+    <div class="c-footer-grid">
+      <div class="c-footer-brand">
+        <a class="c-brand" href="#main"><span class="c-brand-mark" aria-hidden="true"></span><span class="c-brand-name">Patterns <span>Show Control</span></span></a>
+        <p>Made in the UK by Ben Rohleder, for the crews who run conferences, AGMs and live events.</p>
+      </div>
+      <nav aria-labelledby="ft-products"><h2 class="c-footer-title" id="ft-products">Products</h2><ul class="c-footer-links" role="list"><li data-product="patterns"><a href="#products"><i class="c-swatch"></i>Patterns</a></li><li data-product="stagewatch"><a href="#stagewatch"><i class="c-swatch"></i>StageWatch</a></li><li data-product="agmessage"><a href="#products"><i class="c-swatch"></i>AGMessage</a></li><li data-product="playmap"><a href="#products"><i class="c-swatch"></i>PlayMap</a></li><li><a href="#tables">Downloads</a></li></ul></nav>
+      <nav aria-labelledby="ft-eco"><h2 class="c-footer-title" id="ft-eco">Ecosystem</h2><ul class="c-footer-links" role="list"><li><a href="#flow">How the apps work together</a></li><li><a href="#chips">Integrations</a></li><li><a href="#flow">AI with approval</a></li><li><a href="#workflow">All workflows</a></li></ul></nav>
+      <nav aria-labelledby="ft-support"><h2 class="c-footer-title" id="ft-support">Support</h2><ul class="c-footer-links" role="list"><li><a href="#support">Support home</a></li><li><a href="#faq">Frequently asked questions</a></li><li><a href="#portal">Client portal sign-in</a></li><li><a href="#portal">Create a free account</a></li></ul></nav>
+      <nav aria-labelledby="ft-company"><h2 class="c-footer-title" id="ft-company">Company</h2><ul class="c-footer-links" role="list"><li><a href="#main">About</a></li><li><a href="#forms">Contact</a></li><li><a href="#pricing">How licensing works</a></li><li><a href="#prose">Software licence terms</a></li></ul></nav>
+    </div>
+    <div class="c-footer-legal">
+      <p>© 2026 Ben Rohleder. patternsshowcontrol.co.uk</p>
+      <ul role="list"><li><a href="#prose">Privacy</a></li><li><a href="#prose">Cookies</a></li><li><a href="#prose">Website terms</a></li><li><a href="#prose">Licence terms</a></li></ul>
+      <p class="c-footer-tm">NDI® is a registered trademark of Vizrt NDI AB. Bitfocus Companion, Stream Deck, PowerPoint, vMix, Philips Hue and other names belong to their owners.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- The site-wide floating launcher: a link to the contact page that chat.js turns into the panel's button. -->
+<a class="c-chat-fab is-tucked" href="/contact/" data-chat-fab><i class="c-lamp" aria-hidden="true"></i><span>Ask<span class="c-chat-fab-long"> the assistant</span></span></a>
+
+<script type="module">
+  // Kitchen sink only: list the sprite's icons with their names.
+  const grid = document.getElementById('ks-icons');
+  if (grid) for (const s of document.querySelectorAll('svg symbol[id^="i-"]')) {
+    const d = document.createElement('div');
+    d.innerHTML = `<svg class="c-icon c-icon--lg" aria-hidden="true"><use href="#${s.id}"/></svg>${s.id.slice(2)}`;
+    grid.append(d);
+  }
+  // Kitchen sink only: the vote toggles (on real pages these are forms that post to the portal).
+  for (const b of document.querySelectorAll('.c-vote')) b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') !== 'true', n = parseInt(b.textContent, 10) + (on ? 1 : -1);
+    b.textContent = String(n); b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', `${on ? 'Remove your vote' : 'Vote'}, ${n} votes`);
+  });
+</script>
+</body>
+</html>

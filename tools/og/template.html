@@ -1,0 +1,234 @@
+<!doctype html>
+<!--
+  The Open Graph card template (1200 x 630). tools/og/build.mjs serves public/ and this folder from a local server,
+  fills the slots for one card at a time and screenshots .og. It uses the site's own tokens and fonts (site.css); the
+  og- rules below are for these cards only. Text sizes are chosen to stay legible at a 400 px thumbnail.
+-->
+<html lang="en-GB" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Open Graph card</title>
+<link rel="stylesheet" href="/assets/css/site.css">
+<style>
+  html, body { margin: 0; background: #090C10; }
+  body { width: 1200px; height: 630px; overflow: hidden; }
+  .og {
+    --pad: 64px;
+    position: relative; isolation: isolate; width: 1200px; height: 630px; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+    color-scheme: dark; background: var(--bg); color: var(--text); font-family: var(--font-sans);
+  }
+  .og::before {
+    content: ""; position: absolute; inset: 0; z-index: -2;
+    background-image: linear-gradient(rgb(232 236 241 / 0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(232 236 241 / 0.05) 1px, transparent 1px);
+    background-size: 48px 48px; background-position: -1px -1px; mask-image: linear-gradient(to bottom, #000 20%, transparent 92%);
+  }
+  .og[data-product]::after {
+    content: ""; position: absolute; z-index: -1; right: -12%; top: -18%; width: 78%; height: 150%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 18%, transparent), transparent 74%);
+  }
+  .og-topbar { position: absolute; inset: 0 0 auto; height: 8px; background: var(--accent); }
+  .og:not([data-product]) .og-topbar { display: none; }
+
+  .og-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 46px var(--pad) 0; }
+  .og-brand { display: flex; align-items: center; gap: 18px; font: 720 31px/1 var(--font-display); font-stretch: 118%; letter-spacing: -0.02em; white-space: nowrap; }
+  .og-brand span { font-weight: 420; color: var(--text-2); }
+  .og-mark { width: 56px; height: 44px; flex: none;
+    background: linear-gradient(90deg, var(--text) 0 18px, transparent 0) 0 100% / 100% 10px no-repeat,
+      linear-gradient(var(--bg), var(--bg)) 0 100% / 100% 12px no-repeat, var(--bars); }
+  .og-url { font: 560 22px/1 var(--font-sans); font-stretch: 106%; color: var(--text-2); letter-spacing: 0.005em; }
+
+  .og-body { display: grid; grid-template-columns: minmax(0, 1fr) 452px; gap: 60px; align-items: center; padding: 0 var(--pad); min-height: 0; }
+  .og--wide .og-body { grid-template-columns: minmax(0, 1fr) 500px; gap: 48px; }
+  .og-nb { white-space: nowrap; }
+  .og-text { min-width: 0; }
+  .og-tag { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; font: 700 34px/1 var(--font-display); font-stretch: 116%; letter-spacing: -0.015em; }
+  .og-tag .c-swatch { width: 22px; height: 22px; border-radius: 2px; }
+  .og-role { display: inline-flex; align-items: center; height: 34px; padding: 0 11px; border-radius: 3px; background: var(--accent); color: var(--on-lamp); font: 700 19px/1 var(--font-mono); letter-spacing: 0.02em; }
+  .og-flag { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--accent-line); font: 650 19px/1 var(--font-sans); font-stretch: 106%; letter-spacing: 0; color: var(--text); }
+  .og-eyebrow { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; font: 620 25px/1.1 var(--font-sans); font-stretch: 106%; color: var(--text-2); }
+  .og-eyebrow::before { content: ""; width: 30px; height: 15px; flex: none; background: var(--apps); }
+  .og-title { font: 700 66px/1.02 var(--font-display); font-stretch: 112%; letter-spacing: -0.032em; text-wrap: balance; }
+  .og-sub { margin-top: 24px; max-width: 30ch; font-size: 27px; line-height: 1.32; color: var(--text-2); text-wrap: pretty; }
+  .og-sub:empty { display: none; }
+  .og-bars { height: 14px; background: var(--bars); }
+  .og-visual { min-width: 0; }
+
+  /* A monitor with its under-monitor display (the drawn screens are the kitchen sink's). */
+  .og-monitor { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border: 1px solid #262D37; border-bottom: 0; background: #05070A; }
+  .og-monitor > svg { width: 100%; height: 100%; }
+  .og-umd { display: flex; align-items: center; gap: 14px; height: 50px; padding: 0 16px 0 0; background: #000; border: 1px solid #262D37; border-top-color: #1C222B; color: #E8ECF1; }
+  .og-umd b { font: 650 23px/1 var(--font-display); font-stretch: 112%; }
+  .og-umd i { width: 6px; align-self: stretch; background: var(--accent); }
+  .og-umd em { margin-left: auto; font: 650 18px/1 var(--font-mono); font-style: normal; letter-spacing: 0.04em; color: var(--accent); }
+  .og-umd .c-tally { height: 26px; min-width: 52px; font-size: 13px; margin-left: 12px; }
+
+  /* Home: the multiview. */
+  .og-mv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; padding: 3px; background: #262D37; }
+  .og-mv-tile { background: #000; }
+  .og-mv-tile svg { display: block; width: 100%; aspect-ratio: 16 / 10; }
+  .og-mv-umd { display: flex; align-items: center; gap: 10px; height: 36px; padding-right: 12px; border-top: 1px solid #1C222B; }
+  .og-mv-umd i { width: 5px; align-self: stretch; background: var(--accent); }
+  .og-mv-umd b { font: 650 18px/1 var(--font-display); font-stretch: 112%; color: #E8ECF1; }
+  .og-mv-umd em { margin-left: auto; font: 650 14px/1 var(--font-mono); font-style: normal; color: var(--accent); }
+
+  /* Rows: a router panel of the four apps, a download list, an integration list. */
+  .og-rows { display: grid; gap: 2px; padding: 2px; border-radius: 8px; background: var(--line); }
+  .og-row { display: flex; align-items: center; gap: 16px; min-height: 76px; padding: 0 22px 0 0; background: var(--s1); }
+  .og-row:first-child { border-radius: 6px 6px 0 0; } .og-row:last-child { border-radius: 0 0 6px 6px; }
+  .og-row > i { width: 6px; align-self: stretch; background: var(--accent); }
+  .og-row b { font: 680 25px/1.1 var(--font-display); font-stretch: 112%; }
+  .og-row--app { padding: 14px 20px 14px 0; }
+  .og-row-main { display: grid; gap: 6px; flex: 1; min-width: 0; }
+  .og-row-top { display: flex; align-items: center; gap: 12px; }
+  .og-row--app small { margin-top: 0; font-size: 18px; }
+  .og-row small { display: block; margin-top: 5px; font-size: 17px; color: var(--text-2); font-stretch: 100%; font-weight: 400; font-family: var(--font-sans); }
+  .og-row .og-role { margin-left: auto; height: 30px; font-size: 16px; }
+  .og-row--icon { padding-left: 22px; min-height: 68px; }
+  .og-row--icon .c-icon { width: 30px; height: 30px; color: var(--text-2); stroke-width: 1.5; }
+  .og-row--icon b { font: 600 23px/1.15 var(--font-sans); font-stretch: 106%; }
+
+  .og-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .og-chip { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 8px 14px 8px 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--s1); font: 600 20px/1.15 var(--font-sans); font-stretch: 106%; }
+  .og-chip span { display: grid; place-items: center; min-width: 54px; height: 46px; padding: 0 6px; border-radius: 3px; background: var(--s3); font: 700 16px/1 var(--font-mono); letter-spacing: 0.03em; }
+
+  /* AI: the proposal reaches only the amber gate. */
+  .og-flow { display: grid; gap: 0; justify-items: stretch; }
+  .og-node { display: grid; gap: 6px; padding: 18px 22px; border: 1.5px solid var(--line-2); border-radius: 6px; background: var(--s1); }
+  .og-node b { display: flex; align-items: center; gap: 12px; font: 680 26px/1.1 var(--font-display); font-stretch: 110%; }
+  .og-node small { font-size: 19px; color: var(--text-2); }
+  .og-node--ai { border-style: dashed; }
+  .og-node--gate { border: 2px dashed var(--ink-standby); background: color-mix(in srgb, var(--lamp-standby) 10%, var(--s1)); }
+  .og-node--gate .c-icon { width: 30px; height: 30px; }
+  .og-node--gate em { display: flex; align-items: center; gap: 10px; margin-top: 4px; font: 650 18px/1 var(--font-sans); font-style: normal; color: var(--ink-standby); }
+  .og-node--gate .c-lamp { width: 11px; height: 11px; }
+  .og-wire { display: flex; align-items: center; gap: 14px; height: 54px; padding-left: 40px; font: 650 15px/1 var(--font-mono); letter-spacing: 0.06em; color: var(--ink-standby); }
+  .og-wire::before { content: ""; align-self: stretch; border-left: 3px dashed currentColor; }
+  .og-wire--plain { color: var(--text-3); }
+  .og-wire--plain { height: 40px; }
+  .og-wire--plain::before { border-left-style: solid; border-left-width: 2px; border-left-color: var(--text-3); }
+
+  /* Ecosystem: four apps on one bus. */
+  .og-bus { display: grid; grid-template-columns: minmax(0, 1fr) 54px; column-gap: 34px; align-items: stretch; }
+  .og-bus-apps { display: grid; gap: 12px; }
+  .og-bus-app { position: relative; display: flex; align-items: center; gap: 14px; height: 70px; padding: 0 18px; border: 1px solid var(--line-2); border-left: 5px solid var(--accent); border-radius: 6px; background: var(--s1); }
+  .og-bus-app b { font: 680 25px/1 var(--font-display); font-stretch: 112%; }
+  .og-bus-app em { margin-left: auto; font: 650 16px/1 var(--font-mono); font-style: normal; color: var(--accent-ink); }
+  .og-bus-app::after { content: ""; position: absolute; left: 100%; top: 50%; width: 35px; height: 3px; background: var(--accent); }
+  .og-bus-line { position: relative; display: grid; place-items: center; border: 1.5px solid var(--text-2); border-radius: 6px; background: var(--s2); overflow: hidden; }
+  .og-bus-line::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: linear-gradient(var(--c-patterns) 0 25%, var(--c-stagewatch) 0 50%, var(--c-agmessage) 0 75%, var(--c-playmap) 0); }
+  .og-bus-line b { writing-mode: vertical-rl; rotate: 180deg; font: 700 22px/1 var(--font-display); font-stretch: 116%; }
+  .og-note { margin-top: 18px; font-size: 19px; color: var(--text-2); }
+
+  /* Cue list (workflows). */
+  .og-cues { border: 1px solid var(--line); border-radius: 8px; background: var(--s1); overflow: hidden; }
+  .og-cue { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 14px; height: 60px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+  .og-cue:last-child { border-bottom: 0; }
+  .og-cue span { font: 700 21px/1 var(--font-mono); color: var(--text-2); }
+  .og-cue b { font: 600 21px/1.1 var(--font-sans); font-stretch: 106%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .og-cue i { display: flex; gap: 5px; }
+  .og-cue i .c-swatch { width: 13px; height: 13px; }
+
+  /* Pricing (StageWatch licences): three tiers. */
+  .og-tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+  .og-tier { position: relative; display: grid; align-content: start; gap: 10px; padding: 26px 16px 18px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--s1); }
+  .og-tier.is-rec { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--s1)); box-shadow: inset 0 5px 0 var(--accent); }
+  .og-tier h3 { font: 680 22px/1.1 var(--font-display); font-stretch: 110%; }
+  .og-tier p { font: 720 48px/1 var(--font-display); font-stretch: 112%; letter-spacing: -0.03em; font-variant-numeric: lining-nums tabular-nums; }
+  .og-tier small { font-size: 16px; line-height: 1.3; color: var(--text-2); }
+  .og-tier .og-flagline { position: absolute; top: -15px; left: 12px; padding: 5px 9px; border-radius: 3px; background: var(--accent); color: var(--on-lamp); font: 700 15px/1 var(--font-sans); font-stretch: 106%; white-space: nowrap; }
+  .og-tier .og-flagline--outline { background: var(--bg); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+  .og-tier p s { margin-left: 10px; font: 560 22px/1 var(--font-sans); letter-spacing: 0; color: var(--text-3); text-decoration-thickness: 2px; }
+
+  /* The workflows' legend: every swatch on the card is named here. */
+  .og-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 16px; padding-inline: 4px; font: 560 17px/1.2 var(--font-sans); font-stretch: 100%; color: var(--text-2); }
+  .og-legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .og-legend .c-swatch { width: 13px; height: 13px; }
+
+  /* A licence file, a fact sheet. */
+  .og-sheet { border: 1px solid var(--line-2); border-radius: 8px; background: var(--s1); overflow: hidden; }
+  .og-sheet-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--line-2); background: var(--s2); font: 680 25px/1 var(--font-display); font-stretch: 112%; }
+  .og-sheet-head .c-icon { width: 30px; height: 30px; }
+  .og-sheet dl { display: grid; grid-template-columns: auto minmax(0, 1fr); margin: 0; }
+  .og-sheet dt, .og-sheet dd { margin: 0; padding: 15px 22px; border-bottom: 1px solid var(--line); font-size: 20px; line-height: 1.25; }
+  .og-sheet dt { color: var(--text-3); font-weight: 560; padding-right: 8px; }
+  .og-sheet dd { font-weight: 600; font-stretch: 106%; }
+  .og-sheet dl > :nth-last-child(-n+2) { border-bottom: 0; }
+  .og-list { list-style: none; margin: 0; padding: 0; }
+  .og-list li { display: flex; align-items: center; gap: 16px; min-height: 66px; padding: 0 22px; border-bottom: 1px solid var(--line); font: 600 23px/1.15 var(--font-sans); font-stretch: 106%; }
+  .og-list li:last-child { border-bottom: 0; }
+  .og-list .c-icon { width: 30px; height: 30px; color: var(--text-2); }
+
+  /* The assistant, the contact form. */
+  .og-chat { border: 1px solid var(--line-2); border-radius: 8px; background: var(--s1); overflow: hidden; }
+  .og-chat-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--s2); font: 680 24px/1 var(--font-display); font-stretch: 110%; }
+  .og-chat-head em { display: inline-flex; align-items: center; gap: 9px; margin-left: auto; font: 500 17px/1 var(--font-sans); font-style: normal; color: var(--text-2); }
+  .og-chat-scope { display: flex; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 18px; line-height: 1.35; color: var(--text-2); }
+  .og-chat-scope b { color: var(--text); font-weight: 620; }
+  .og-chat-scope .c-icon { width: 22px; height: 22px; margin-top: 1px; }
+  .og-chat-chips { display: flex; flex-wrap: wrap; gap: 10px; padding: 18px 20px 22px; }
+  .og-chat-chips span { padding: 9px 16px; border: 1.5px solid var(--field); border-radius: 999px; font: 600 18px/1 var(--font-sans); }
+  .og-radios { display: grid; gap: 10px; }
+  .og-radio { display: flex; align-items: center; gap: 16px; min-height: 62px; padding: 0 20px; border: 1.5px solid var(--field); border-radius: 6px; background: var(--s1); font: 580 21px/1.15 var(--font-sans); font-stretch: 104%; }
+  .og-radio::before { content: ""; width: 20px; height: 20px; flex: none; border: 2px solid var(--text-3); border-radius: 50%; }
+  .og-radio.is-on { border-color: var(--text); background: var(--s2); box-shadow: inset 0 0 0 1px var(--text); }
+  .og-radio.is-on::before { border: 6px solid var(--text); }
+</style>
+</head>
+<body>
+<div class="og" data-og>
+  <span class="og-topbar"></span>
+  <header class="og-head">
+    <span class="og-brand"><span class="og-mark"></span>Patterns <span>Show Control</span></span>
+    <span class="og-url">patternsshowcontrol.co.uk</span>
+  </header>
+  <main class="og-body">
+    <div class="og-text">
+      <p class="og-tag" data-slot="tag" hidden><i class="c-swatch"></i><span data-slot="name"></span><span class="og-role" data-slot="role"></span><span class="og-flag" data-slot="flag" hidden></span></p>
+      <p class="og-eyebrow" data-slot="eyebrow" hidden></p>
+      <h1 class="og-title" data-slot="title"></h1>
+      <p class="og-sub" data-slot="sub"></p>
+    </div>
+    <div class="og-visual" data-slot="visual"></div>
+  </main>
+  <span class="og-bars"></span>
+</div>
+
+<!-- Drawn product screens (from design/kitchen-sink.html). -->
+<template id="s-patterns"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+  <defs><pattern id="og-hatch" width="15" height="15" patternUnits="userSpaceOnUse" x="40" y="35"><path d="M15 0V15M0 15H15" stroke="#E8ECF1" stroke-opacity=".55" stroke-width=".8" fill="none"/></pattern></defs>
+  <rect width="320" height="200" fill="#05070A"/>
+  <g transform="translate(40 35)"><rect width="240" height="120" fill="#0A0D12"/><rect width="240" height="120" fill="url(#og-hatch)"/><path d="M0 0H240V120H0Z M80 0V120 M160 0V120 M0 60H240" stroke="#05070A" stroke-width="2.5" fill="none"/><path d="M120 0V120M0 60H240" stroke="#FFF" stroke-width="1.2"/><circle cx="120" cy="60" r="54" stroke="#FFF" stroke-width="1.1" fill="none"/><circle cx="30" cy="30" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="210" cy="30" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="30" cy="90" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/><circle cx="210" cy="90" r="15" stroke="#FFF" stroke-opacity=".8" fill="none"/></g>
+  <rect x="38" y="33" width="244" height="124" fill="none" stroke="#18C8D8" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g fill="#18C8D8"><rect x="35" y="30" width="6" height="6"/><rect x="279" y="30" width="6" height="6"/><rect x="35" y="154" width="6" height="6"/><rect x="279" y="154" width="6" height="6"/></g>
+  <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#A7B0BC"><text x="40" y="172">CANVAS 5760×2400</text><text x="280" y="172" text-anchor="end">6 OUTPUTS</text></g>
+  <rect x="40" y="16" width="26" height="11" rx="1" fill="#FF4040"/><text x="53" y="24.5" font-family="JetBrains Mono, monospace" font-size="7.5" font-weight="700" text-anchor="middle" fill="#090C10">PGM</text>
+</svg></template>
+<template id="s-stagewatch"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+  <rect width="320" height="200" fill="#05070A"/>
+  <g font-family="Archivo, sans-serif" font-size="10" fill="#A7B0BC"><text x="22" y="28" fill="#E8ECF1" font-weight="600">Main stage</text><text x="298" y="28" text-anchor="end" font-family="JetBrains Mono, monospace">14:32:07</text><text x="160" y="62" text-anchor="middle" fill="#E8ECF1" font-size="11">Keynote</text></g>
+  <text x="160" y="124" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="800" font-size="62" letter-spacing="-2" fill="#22D163">08:42</text>
+  <rect x="50" y="140" width="220" height="5" fill="#1C222B"/><rect x="50" y="140" width="132" height="5" fill="#22D163"/><rect x="235" y="140" width="35" height="5" fill="#FFA11A" fill-opacity=".35"/>
+  <line x1="22" y1="162" x2="298" y2="162" stroke="#262D37"/>
+  <g font-family="Archivo, sans-serif" font-size="9.5" fill="#A7B0BC"><text x="22" y="180">Next <tspan fill="#E8ECF1" font-weight="600">Awards</tspan></text><text x="298" y="180" text-anchor="end" font-family="JetBrains Mono, monospace" fill="#E8ECF1">14:45</text></g>
+</svg></template>
+<template id="s-agmessage"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+  <rect width="320" height="200" fill="#05070A"/>
+  <rect x="18" y="18" width="170" height="164" rx="4" fill="#0F1318" stroke="#262D37"/>
+  <g font-family="Archivo, sans-serif" font-size="9"><text x="30" y="36" fill="#A7B0BC">Chair to Research</text><rect x="30" y="44" width="132" height="34" rx="6" fill="#1C222B"/><text x="40" y="58" fill="#E8ECF1">Who takes the pension</text><text x="40" y="70" fill="#E8ECF1">question?</text><rect x="46" y="88" width="132" height="46" rx="6" fill="#E052D0" fill-opacity=".16" stroke="#E052D0" stroke-opacity=".7"/><text x="56" y="102" fill="#F2C9EC">The finance director.</text><text x="56" y="114" fill="#F2C9EC">Figures are on your</text><text x="56" y="126" fill="#F2C9EC">On stage panel.</text><rect x="30" y="148" width="88" height="20" rx="3" fill="none" stroke="#FFA11A" stroke-opacity=".8" stroke-dasharray="3 2"/><circle cx="40" cy="158" r="3" fill="#FFA11A"/><text x="48" y="161" fill="#FFC266" font-size="8">AI draft waiting</text></g>
+  <rect x="200" y="18" width="102" height="164" rx="4" fill="#0F1318" stroke="#262D37"/>
+  <g font-family="Archivo, sans-serif" font-size="9"><text x="212" y="36" fill="#E8ECF1" font-weight="600">On stage</text><rect x="212" y="46" width="78" height="100" fill="#E8ECF1" fill-opacity=".92"/><g fill="#0F1318" fill-opacity=".55"><rect x="220" y="56" width="50" height="4"/><rect x="220" y="66" width="62" height="2.5"/><rect x="220" y="72" width="58" height="2.5"/><rect x="220" y="78" width="62" height="2.5"/><rect x="220" y="92" width="62" height="24" fill-opacity=".18"/><rect x="220" y="124" width="40" height="2.5"/><rect x="220" y="130" width="54" height="2.5"/></g><text x="212" y="166" fill="#A7B0BC" font-size="8">Pushed 14:31</text></g>
+</svg></template>
+<template id="s-playmap"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice">
+  <rect width="320" height="200" fill="#05070A"/>
+  <polygon points="64,46 272,50 280,156 168,166" fill="#5B7BFF" fill-opacity=".1"/>
+  <g stroke="#5B7BFF" stroke-opacity=".35" stroke-width=".8"><line x1="64" y1="46" x2="176" y2="62"/><line x1="64" y1="46" x2="272" y2="50"/><line x1="64" y1="46" x2="280" y2="156"/><line x1="64" y1="46" x2="168" y2="166"/></g>
+  <polygon points="272,50 300,66 306,164 280,156" fill="#11172A" stroke="#7F98FF" stroke-opacity=".7" stroke-width=".8"/>
+  <polygon points="176,62 272,50 280,156 168,166" fill="#141B33" stroke="#7F98FF" stroke-width="1"/>
+  <path d="M192 60L186.7 164.3M174.7 79.3L273.3 67.7M208 58L205.3 162.7M173.3 96.7L274.7 85.3M224 56L224 161M172 114L276 103M240 54L242.7 159.3M170.7 131.3L277.3 120.7M256 52L261.3 157.7M169.3 148.7L278.7 138.3" stroke="#7F98FF" stroke-opacity=".75" stroke-width=".7" fill="none"/>
+  <path d="M281.3 55.3L288.7 158.7M290.7 60.7L297.3 161.3M273.3 67.7L301 82.3M274.7 85.3L302 98.7M276 103L303 115M277.3 120.7L304 131.3M278.7 138.3L305 147.7" stroke="#7F98FF" stroke-opacity=".4" stroke-width=".6" fill="none"/>
+  <g fill="#05070A" stroke="#E8ECF1" stroke-width="1.2"><rect x="172" y="58" width="8" height="8"/><rect x="268" y="46" width="8" height="8"/><rect x="276" y="152" width="8" height="8"/><rect x="164" y="162" width="8" height="8"/></g>
+  <g transform="translate(24 32)"><rect width="34" height="22" rx="2" fill="#1C222B" stroke="#3A4450"/><circle cx="34" cy="12" r="6" fill="#0F1318" stroke="#7F98FF"/><circle cx="34" cy="12" r="2.5" fill="#B9C6FF"/></g>
+  <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#A7B0BC"><text x="24" y="72">PJ-1</text><text x="24" y="182">Mesh 6×6  corner pin</text></g>
+</svg></template>
+</body>
+</html>

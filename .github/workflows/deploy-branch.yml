@@ -1,0 +1,82 @@
+name: Deploy branch
+
+# On every push to main that passes CI's checks, the built site (production dependencies, no development files)
+# is committed to the "deploy" branch. Hostinger's Git deployment pulls that branch into public_html.
+#
+# Only a CI run for a push to this repository's own main deploys: a pull request's run (a fork's branch may also be
+# called "main") never does. Deploys run one at a time, and a run deploys only while its commit is still the tip of
+# main, so a slower run for an older commit can never put older code over newer.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-branch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Still the tip of main?
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          tip="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if [ "$tip" = "$SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main has moved on to ${tip}; that commit's own run deploys it."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.tip.outputs.deploy == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        if: steps.tip.outputs.deploy == 'true'
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Build
+        if: steps.tip.outputs.deploy == 'true'
+        run: tools/build-release.sh
+      - name: Commit to the deploy branch
+        if: steps.tip.outputs.deploy == 'true'
+        # The deploy branch only ever moves forward (no force-push), so the server's "git pull" always fast-forwards.
+        # The token reaches this step only, after the build has run.
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          remote="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$remote" deploy > /dev/null; then
+            git clone -q --branch deploy --single-branch "$remote" ../deploy
+          else
+            mkdir ../deploy && git -C ../deploy init -q && git -C ../deploy checkout -q -b deploy
+          fi
+          rsync -a --delete --exclude '.git/' dist/site/ ../deploy/
+          cd ../deploy
+          git add -A
+          git add -f vendor
+          # The site cannot answer without these: never push a deploy that lacks them.
+          git ls-files --error-unmatch vendor/autoload.php vendor/anthropic-ai/sdk/src/Client.php storage/.htaccess > /dev/null
+          if git diff --cached --quiet; then echo "Nothing to deploy"; exit 0; fi
+          git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -q -m "Deploy ${SHA}"
+          git push -q "$remote" deploy

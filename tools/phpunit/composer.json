@@ -1,0 +1,11 @@
+{
+    "name": "patterns-show-control/website-dev-tools",
+    "description": "Test tooling only; installed in tools/phpunit, never deployed.",
+    "type": "project",
+    "require": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

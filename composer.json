@@ -1,0 +1,27 @@
+{
+    "name": "patterns-show-control/website",
+    "description": "Marketing, support and client portal website for the Patterns Show Control ecosystem.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-mbstring": "*",
+        "ext-json": "*",
+        "anthropic-ai/sdk": "^0.60.0",
+        "guzzlehttp/guzzle": "^7.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "Psc\\": "app/src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform-check": false,
+        "allow-plugins": {
+            "php-http/discovery": false
+        }
+    }
+}
