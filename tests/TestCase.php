@@ -13,6 +13,7 @@ use Psc\Db\Migrator;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Mail\Mailer;
+use Psc\Support\FormGuard;
 
 /**
  * Boots a fresh application per test: an in-memory SQLite database with every migration applied, a temporary
@@ -47,6 +48,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'mail' => ['driver' => 'log', 'admin_to' => 'owner@example.test'],
             'db' => ['auto_migrate' => false],
             'chat' => ['api_key' => ''],
+            // The Google tag is off in tests (no page reaches Google); tests that need it switch it on.
+            'analytics' => ['ga_id' => ''],
         ];
         $merged = array_replace_recursive($base, $config);
         $this->app = App::boot($this->shadowRoot !== null ? $this->shadowedConfig($merged) : Config::fromArray(PSC_ROOT, $merged));
@@ -257,6 +260,30 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             $_SESSION['_created'] ??= time();
         }
         return $token;
+    }
+
+    /**
+     * What a person's browser sends with one of the FormGuard forms besides the fields: the empty honeypot and the
+     * time the form was shown, $seconds ago, signed for this session as the form would have signed it.
+     *
+     * @return array{_started: string, website: string}
+     */
+    protected function filledIn(string $form, int $seconds = 30): array
+    {
+        $at = time() - $seconds;
+        return [
+            FormGuard::STARTED => $at . '.' . FormGuard::signature($this->app->secret(), $form, $at, $this->csrf()),
+            FormGuard::HONEYPOT => '',
+        ];
+    }
+
+    /**
+     * A page with each form's signed showing time blanked: the time a page was drawn is all that changes between
+     * two views of it, so pages that must read the same for every address are compared without it.
+     */
+    protected static function withoutFormTimes(string $html): string
+    {
+        return (string) preg_replace('/name="' . FormGuard::STARTED . '" value="[^"]*"/', 'name="' . FormGuard::STARTED . '" value=""', $html);
     }
 
     /** @return list<array{to: string, subject: string, template: string, data: array<string, mixed>, html: string}> */

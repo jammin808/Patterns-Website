@@ -14,9 +14,17 @@
  * @var int $packQuantity
  * @var array<string, string> $errors
  * @var array<string, string> $old
+ * @var list<array{type: string, message: string}> $flashes
  */
 $field = fn (array $p): string => $this->render('portal/licences/_field', $p);
 $machines = (int) $option['machines'];
+// The summary's links, in the order the fields appear (ids as portal/licences/_field makes them from the names).
+$fieldId = static fn (string $name): string => 'f-' . trim((string) preg_replace('/[^a-z0-9]+/i', '-', $name), '-');
+$summaryFields = [];
+foreach (array_keys($hardwareFields) as $name) {
+    $summaryFields[$name] = $fieldId($name);
+}
+$summaryFields += ['nonprofit' => 'f-nonprofit', 'organisation' => 'f-organisation', 'pack' => 'f-pack', 'note' => 'f-note'];
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow">Licences</p>
@@ -40,10 +48,17 @@ $machines = (int) $option['machines'];
     <p class="pt-small"><a href="/portal/licences/request/?product=<?= e(rawurlencode($product)) ?>">Choose a different licence</a></p>
 </section>
 
-<form class="pt-form" method="post" action="/portal/licences/request/" id="form">
+<form class="pt-form" method="post" action="/portal/licences/request/" id="form" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="product" value="<?= e($product) ?>">
     <input type="hidden" name="tier" value="<?= e($tier) ?>">
+    <?= $this->partial('error-summary', [
+        'errors' => $errors,
+        'fields' => $summaryFields,
+        'flashes' => $flashes ?? [],
+        'action' => 'before sending',
+        'failed' => 'Your request was not sent',
+    ]) ?>
 
     <fieldset class="pt-fieldset">
         <legend><?= $machines > 1 ? 'Hardware IDs' : 'Hardware ID' ?></legend>
@@ -106,7 +121,7 @@ $machines = (int) $option['machines'];
     ]) ?>
 
     <div class="pt-actions">
-        <button type="submit" class="pt-btn pt-btn--primary">Send request</button>
+        <button type="submit" class="pt-btn pt-btn--primary" data-busy="Sending…">Send request</button>
         <a class="pt-btn pt-btn--ghost" href="/portal/licences/">Cancel</a>
     </div>
 </form>

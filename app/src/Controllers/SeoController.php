@@ -137,14 +137,15 @@ final class SeoController extends Controller
     public const SECURITY_TXT_DAYS = 180;
 
     /**
-     * security.txt (RFC 9116). It names no Policy: that field is for a vulnerability disclosure policy, which the
-     * site does not publish, and a privacy notice is not one.
+     * security.txt (RFC 9116). Its Contact is the contact page's https URI, which RFC 9116 allows, so the file
+     * publishes no email address for crawlers to collect. It names no Policy: that field is for a vulnerability
+     * disclosure policy, which the site does not publish, and a privacy notice is not one.
      */
     public function security(Request $request): Response
     {
         $base = $this->app->baseUrl();
         $lines = [
-            'Contact: mailto:' . $this->app->config->string('app.support_email'),
+            'Contact: ' . $base . '/contact/',
             'Expires: ' . gmdate('Y-m-d\T00:00:00\Z', time() + self::SECURITY_TXT_DAYS * 86400),
             'Preferred-Languages: en',
             'Canonical: ' . $base . '/.well-known/security.txt',

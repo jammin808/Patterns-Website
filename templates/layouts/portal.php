@@ -63,7 +63,7 @@ ob_start();
             <form method="post" action="/portal/logout/" class="pt-nav-signout">
                 <?= csrf_field() ?>
                 <p class="pt-small pt-muted">Signed in as <?= e($user['name']) ?></p>
-                <button type="submit" class="pt-btn pt-btn--ghost pt-btn--small">Sign out</button>
+                <button type="submit" class="pt-btn pt-btn--ghost pt-btn--small" data-busy="Signing out…">Sign out</button>
             </form>
         <?php endif; ?>
     </nav>

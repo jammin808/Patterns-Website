@@ -34,7 +34,7 @@ CSS. Every class here has a style; a template needs no other.
 | `pt-badge` + `pt-badge--{open,triaged,planned,in_progress,done,declined,closed,requested,awaiting_payment,issued,revoked,active,pending,approval,disabled,new,read,archived,admin,client,bug,feature,question,stable,beta,private,public}` | status and type pills (text is always present; colour is never the only cue) |
 | `pt-btn` + `pt-btn--primary` / `--secondary` / `--ghost` / `--danger` / `--small` | buttons and link-buttons |
 | `pt-actions` | a row of buttons |
-| `form.pt-form` | a form; fields are `div.pt-field` > `label` + control + `p.pt-help` + `p.pt-error` (only when invalid, with the control `aria-invalid="true"` and `aria-describedby`) |
+| `form.pt-form` | a form with `novalidate`; it opens with the shared error summary (`templates/partials/error-summary.php`), and fields are `div.pt-field` > `label` + control + `p.pt-help` + `p.pt-error` (only when invalid, with the control `aria-invalid="true"` and `aria-describedby`) |
 | `pt-field--inline` | checkbox/radio with its label on one line |
 | `pt-fieldset` > `legend` | grouped fields |
 | `pt-alert` + `pt-alert--{info,success,warning,danger}` | flash messages and notices (`role="status"` or `role="alert"` for danger) |

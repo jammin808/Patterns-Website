@@ -15,7 +15,6 @@ return [
         'url' => 'https://patternsshowcontrol.co.uk',
         'secret' => 'REPLACE_WITH_64_HEX_CHARS',      // php -r "echo bin2hex(random_bytes(32));"
         'admin_emails' => ['you@example.com'],
-        'support_email' => 'support@patternsshowcontrol.co.uk',
     ],
     'db' => [
         'dsn' => 'mysql:host=127.0.0.1;port=3306;dbname=u000000000_psc;charset=utf8mb4',

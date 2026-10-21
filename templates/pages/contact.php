@@ -2,13 +2,18 @@
 /**
  * /contact/: the contact form (docs/DESIGN.md 8.24) beside the assistant, the portal's ticket route and what happens
  * next. ContactController::show passes the topics, the old input, the errors, whether a message was just sent and the
- * optional Turnstile site key. The form posts back to /contact/; a hidden "website" field catches bots.
+ * optional Turnstile site key. The form posts back to /contact/ with FormGuard's hidden fields (a honeypot and the
+ * signed time the form was shown). The page names no email address: the form, a support ticket and the assistant are
+ * the ways to reach a person.
  *
  * @var array<string, string> $topics
  * @var array<string, mixed> $old
  * @var array<string, string> $errors
  * @var bool $sent
+ * @var bool $again the message sent was one we already had from this sender, so it was not passed on twice
  * @var bool $quick the last send came faster than a person types: the input is back and nothing was sent
+ * @var int $maxLinks
+ * @var int $maxMessage
  * @var string $turnstileKey
  * @var array<string, mixed> $page
  * @var list<array{type: string, message: string}> $flashes
@@ -17,7 +22,10 @@ $topics ??= [];
 $old ??= [];
 $errors ??= [];
 $sent ??= false;
+$again ??= false;
 $quick ??= false;
+$maxLinks ??= \Psc\Controllers\ContactController::MAX_LINKS;
+$maxMessage ??= \Psc\Controllers\ContactController::MAX_MESSAGE;
 $turnstileKey ??= '';
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/support.css')) . '">');
 if ($turnstileKey !== '' && !$sent) {
@@ -27,19 +35,18 @@ $site = content('site');
 $products = \Psc\Content\Content::products();
 $val = static fn (string $k): string => is_scalar($old[$k] ?? null) ? (string) $old[$k] : '';
 $err = static fn (string $k): ?string => isset($errors[$k]) && is_string($errors[$k]) ? $errors[$k] : null;
-$labels = ['name' => 'Name', 'email' => 'Email address', 'company' => 'Company', 'topic' => 'Topic', 'product' => 'Product', 'message' => 'Message', 'turnstile' => 'Security check'];
-$fieldErrors = array_filter($errors, static fn ($m, $k): bool => is_string($m) && isset($labels[$k]), ARRAY_FILTER_USE_BOTH);
-// A send refused for a reason no field explains (too many messages in an hour, for one) comes back only as a flash at
-// the top of the page, above where the redirect lands. It is shown at the form instead, where the visitor is.
-$formAlert = null;
-if ($fieldErrors === []) {
-    foreach ((array) ($flashes ?? []) as $f) {
-        if (is_array($f) && ($f['type'] ?? '') === 'danger' && is_string($f['message'] ?? null)) {
-            $formAlert = $f['message'];
-        }
-    }
-}
-$email = (string) ($site['email'] ?? '');
+// After a failed POST the redirect lands on #form: the error summary carries that id then, so the fragment focuses it
+// instead of clearing the focus site.js gave it. A send refused for a reason no field explains (too many messages in
+// an hour, for one) is said there too, where the visitor is, with the other ways to reach a person.
+$summary = $this->partial('error-summary', [
+    'errors' => $errors,
+    'fields' => ['name' => 'name', 'email' => 'email', 'company' => 'company', 'topic' => 'topic', 'product' => 'product', 'message' => 'message', 'turnstile' => 'turnstile'],
+    'flashes' => $flashes ?? [],
+    'id' => 'form',
+    'action' => 'before sending',
+    'failed' => $quick ? 'Your message is not sent yet' : 'Your message was not sent',
+    'extra' => $quick ? '' : '<p>You can also <a href="/support/">ask the assistant</a> or, with a client account, <a href="/portal/tickets/new/">open a support ticket</a>.</p>',
+]);
 // aria-describedby for a field: its hint (if any) and its error (if any).
 $describe = static function (string $k, ?string $help = null) use ($err): string {
     $ids = array_filter([$help, $err($k) !== null ? $k . '-err' : null]);
@@ -47,7 +54,6 @@ $describe = static function (string $k, ?string $help = null) use ($err): string
 };
 $invalid = static fn (string $k): string => $err($k) !== null ? ' aria-invalid="true"' : '';
 $errorMsg = static fn (string $k): string => $err($k) !== null ? '<p class="c-error-msg" id="' . e($k) . '-err">' . e($err($k)) . '</p>' : '';
-$maxMessage = 5000;
 ?>
 <section class="c-hero c-hero--page support-contact-hero" aria-labelledby="page-title">
     <div class="l-wrap">
@@ -72,36 +78,22 @@ $maxMessage = 5000;
     <div class="l-wrap l-split l-split--main">
         <section class="support-contact-main" aria-labelledby="form-title">
             <?php if ($sent): ?>
-                <div class="c-callout c-callout--success support-sent" id="sent" role="status" tabindex="-1">
+                <div class="c-callout c-callout--success support-sent" id="sent" role="status" tabindex="-1" data-feedback>
                     <?= icon('ok') ?>
                     <h2 class="c-callout-title" id="form-title">Message sent</h2>
-                    <p>Thank you. Your message is with us and a receipt is on its way to your inbox. The reply will come to the email address you gave.</p>
+                    <?php if ($again): ?>
+                        <p>We already have this message from you, so it was not sent a second time. The reply will come to the email address you gave.</p>
+                    <?php else: ?>
+                        <p>Thank you. Your message is with us and a receipt is on its way to your inbox. The reply will come to the email address you gave.</p>
+                    <?php endif; ?>
                     <p class="support-sent-links"><a href="/support/">Go to support</a><a href="/contact/">Send another message</a></p>
                 </div>
             <?php else: ?>
                 <h2 class="support-contact-title" id="form-title">Send a message</h2>
-                <?php /* After a failed POST the redirect lands on #form: the error summary carries that id then, so the
-                       fragment focuses it instead of clearing the focus site.js gave it. */ ?>
-                <form class="c-form c-form--panel"<?= $fieldErrors === [] && $formAlert === null ? ' id="form"' : '' ?> method="post" action="/contact/#form" novalidate>
+                <form class="c-form c-form--panel"<?= $summary === '' ? ' id="form"' : '' ?> method="post" action="/contact/#form" novalidate>
                     <?= csrf_field() ?>
-                    <?php if ($fieldErrors !== []): $n = count($fieldErrors); ?>
-                        <div class="c-callout c-callout--danger c-error-summary" id="form" data-error-summary tabindex="-1" role="alert" aria-labelledby="error-title">
-                            <?= icon('alert') ?>
-                            <strong class="c-callout-title" id="error-title">Check <?= $n === 1 ? 'one field' : e($n) . ' fields' ?> before sending</strong>
-                            <ul>
-                                <?php foreach ($fieldErrors as $k => $m): ?>
-                                    <li><a href="#<?= e($k === 'turnstile' ? 'turnstile' : $k) ?>"><?= e($m) ?></a></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    <?php elseif ($formAlert !== null): ?>
-                        <div class="c-callout c-callout--danger c-error-summary" id="form" data-error-summary tabindex="-1" role="alert" aria-labelledby="error-title">
-                            <?= icon('alert') ?>
-                            <strong class="c-callout-title" id="error-title"><?= $quick ? 'Your message is not sent yet' : 'Your message was not sent' ?></strong>
-                            <p><?= e($formAlert) ?></p>
-                            <?php if ($email !== '' && !$quick): ?><p>Email <a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></p><?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+                    <?= form_guard('contact', $old) ?>
+                    <?= $summary ?>
 
                     <div class="c-form-row">
                         <div class="c-field<?= $err('name') !== null ? ' is-invalid' : '' ?>">
@@ -147,17 +139,12 @@ $maxMessage = 5000;
 
                     <div class="c-field<?= $err('message') !== null ? ' is-invalid' : '' ?>">
                         <label for="message">Message</label>
-                        <p class="c-help" id="message-help">What you are running, on which machines, and what you need. For a show, include its date.</p>
+                        <p class="c-help" id="message-help">What you are running, on which machines, and what you need. For a show, include its date. Up to <?= e($maxLinks) ?> links.</p>
                         <textarea id="message" name="message" minlength="10" maxlength="<?= e($maxMessage) ?>" required data-count="#message-count"<?= $invalid('message') ?><?= $describe('message', 'message-help message-count') ?>><?= e($val('message')) ?></textarea>
                         <?php /* No live region: a count announced on every keystroke drowns out the typing echo. The
                                field's description carries it, so it is read when the field takes focus. */ ?>
                         <p class="c-count" id="message-count"><?= e(mb_strlen($val('message'))) ?> / <?= e($maxMessage) ?></p>
                         <?= $errorMsg('message') ?>
-                    </div>
-
-                    <div class="u-visually-hidden" aria-hidden="true">
-                        <label for="website">Leave this field empty</label>
-                        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" value="">
                     </div>
 
                     <?php if ($turnstileKey !== ''): ?>
@@ -168,7 +155,7 @@ $maxMessage = 5000;
                     <?php endif; ?>
 
                     <div class="c-form-foot">
-                        <button class="c-btn c-btn--primary" type="submit">Send message</button>
+                        <button class="c-btn c-btn--primary" type="submit" data-busy="Sending…">Send message</button>
                         <p>We use your details only to reply. See the <a href="/legal/privacy/">privacy policy</a>.</p>
                     </div>
                 </form>
@@ -197,7 +184,6 @@ $maxMessage = 5000;
                     <li>The reply comes to the email address you gave.</li>
                 </ol>
                 <dl class="c-kv u-mt-4">
-                    <dt>Email</dt><dd><a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></dd>
                     <dt>Based in</dt><dd><?= e($site['publisher']['country'] ?? 'United Kingdom') ?></dd>
                     <dt>Replies in</dt><dd>English</dd>
                 </dl>

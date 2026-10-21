@@ -60,6 +60,7 @@ return static function (Router $r, App $app): void {
     $r->get('/portal/register/', [AuthController::class, 'registerForm'], $guest);
     $r->post('/portal/register/', [AuthController::class, 'register'], $guestPost);
     $r->get('/portal/verify/', [AuthController::class, 'verify'], ['session', 'nostore']);
+    $r->get('/portal/verify/resend/', [AuthController::class, 'resendForm'], $guest);
     $r->post('/portal/verify/resend/', [AuthController::class, 'resend'], $guestPost);
     $r->get('/portal/forgot/', [AuthController::class, 'forgotForm'], $guest);
     $r->post('/portal/forgot/', [AuthController::class, 'forgot'], $guestPost);

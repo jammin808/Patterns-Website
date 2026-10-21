@@ -39,8 +39,9 @@ final class Schema
     }
 
     /** @return array<string, mixed> */
-    public static function organization(string $base, string $name, string $email): array
+    public static function organization(string $base, string $name): array
     {
+        // Reached through the contact page's form: no email address is published for crawlers to collect.
         return [
             '@type' => 'Organization',
             '@id' => self::organizationId($base),
@@ -56,7 +57,6 @@ final class Schema
             'contactPoint' => [[
                 '@type' => 'ContactPoint',
                 'contactType' => 'customer support',
-                'email' => $email,
                 'url' => $base . '/contact/',
                 'availableLanguage' => ['en-GB'],
             ]],

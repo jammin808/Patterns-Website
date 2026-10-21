@@ -47,11 +47,14 @@ abstract class Controller
         return $this->page($template, $data + ['title' => $title, 'section' => 'portal'], $seo, 'layouts/portal', $status);
     }
 
-    /** The default graph every public page carries: the organisation, its founder and the website. */
+    /**
+     * The default graph every public page carries: the organisation, its founder and the website. The organisation's
+     * contact point is the contact page, never an email address, so crawlers find no address to collect.
+     */
     protected function baseGraph(Seo $seo): Seo
     {
         $base = $this->app->baseUrl();
-        $seo->add(Schema::organization($base, $this->app->name(), $this->app->config->string('app.support_email')));
+        $seo->add(Schema::organization($base, $this->app->name()));
         $seo->add(Schema::person($base, $this->app->config->string('app.publisher')));
         $seo->add(Schema::website($base, $this->app->name(), 'Show control software for live events: Patterns, StageWatch, AGMessage and PlayMap.'));
         return $seo;
@@ -65,14 +68,41 @@ abstract class Controller
         return Response::redirect($to, 303);
     }
 
+    /** An email address field's error when what was typed is not one: it says what the format is. */
+    public const EMAIL_FORMAT = 'Enter an email address in the format name@example.co.uk';
+
+    /** The flash after a refusal whose reasons are all on fields (the form's error summary lists them). */
+    public const CHECK_FIELDS = 'Please check the highlighted fields.';
+
     /** Back to the form after a validation failure, with the input and errors kept for one page view. */
-    protected function backWithErrors(string $to, Request $request, array $errors, string $message = 'Please check the highlighted fields.'): Response
+    protected function backWithErrors(string $to, Request $request, array $errors, string $message = self::CHECK_FIELDS): Response
     {
         $session = $this->app->session();
         $session->keepOld($request->post);
         $session->set('_errors', $errors);
         $session->flash('danger', $message);
         return Response::redirect($to, 303);
+    }
+
+    /**
+     * Back to a form sent sooner than a person fills it in (FormGuard::QUICK): nothing was done, the input and the
+     * form's signed showing time are kept, and $message asks for one more press of the button.
+     */
+    protected function tooQuick(string $to, Request $request, string $form, string $message): Response
+    {
+        $this->app->session()->set('_quick', $form);
+        return $this->backWithErrors($to, $request, [], $message);
+    }
+
+    /** Whether the form is being shown again after tooQuick() (once). */
+    protected function takeQuick(string $form): bool
+    {
+        $session = $this->app->session();
+        $quick = $session->get('_quick') === $form;
+        if ($quick) {
+            $session->forget('_quick');
+        }
+        return $quick;
     }
 
     /** @return array<string, string> errors kept by backWithErrors() */

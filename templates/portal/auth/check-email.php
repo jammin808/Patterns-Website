@@ -10,8 +10,11 @@
     <header class="pt-header">
         <p class="pt-eyebrow">Client portal</p>
         <h1 class="pt-title">Check your email</h1>
-        <p class="pt-lede">We have sent a message to <strong><?= e($email) ?></strong>.</p>
     </header>
+
+    <div class="pt-alert pt-alert--success" role="status" tabindex="-1" data-feedback>
+        <p>We have sent a message to <strong><?= e($email) ?></strong>.</p>
+    </div>
 
     <div class="pt-card">
         <div class="pt-card-body">

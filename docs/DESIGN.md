@@ -264,10 +264,12 @@ Two OFL families, both variable and self-hosted: **Archivo** (wght 400–800, wd
   press), `--d-2` 200ms (toggles, rows), `--d-3` 320ms (panels, timer colour). Easing: `--e-cut`
   `cubic-bezier(.2,0,0,1)` (settles like a fader) and `--e-std`. Every keyframe animation sits behind the same media
   query, so reduced motion stops everything.
-- Progressive enhancements: a left-to-right wipe when the theme changes (a view transition), a cross-fade
-  between pages (`@view-transition`), the SMPTE scroll-progress line under the header (`animation-timeline:
-  scroll()`), the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening with
-  `interpolate-size`, and reveal-on-scroll (`data-reveal`).
+- Progressive enhancements: the SMPTE scroll-progress line under the header (`animation-timeline: scroll()`),
+  the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening with `interpolate-size`, and
+  reveal-on-scroll (`data-reveal`).
+- No view transitions, for a theme change or between pages. A theme change sets `data-theme` at once, and a
+  page restored from the back/forward cache (or open in another tab) re-reads the stored choice. Snapshots could
+  show one theme while the live page painted the other.
 - Anything that updates by itself has a visible pause control (WCAG 2.2.2): the mixer's **Auto** key and the
   countdown's **Pause**. Both stop when off screen or when the tab is hidden. Under reduced motion the mixer never
   auto-takes, TAKE is a cut, and the timecode shows whole seconds. The countdown keeps ticking because the numbers
@@ -792,6 +794,12 @@ The layout renders a page's flash messages in a strip under the header, before t
 `<div class="l-wrap c-flashes">` holding `templates/partials/flashes.php`. The messages carry the strip's space
 (16px above and below each), so a strip whose messages a page hides takes no room.
 
+Every flash message, and every answer to what the visitor just did ("Message sent", "Check your email"), carries
+`data-feedback` and `tabindex="-1"`: `site.js` focuses the first visible one on load, so it is the first thing
+read. When the address's #fragment points elsewhere on the page (a new reply, a vote), the message is announced
+instead and the page stays where the fragment put it. While a form's error summary shows a refusal, `site.css`
+hides the strip's copy of it, so the refusal is said once.
+
 ### 8.24 Forms
 
 ```html
@@ -828,6 +836,20 @@ The layout renders a page's flash messages in a strip under the header, before t
   `.c-input`, `.c-select` and `.c-textarea`. Textareas grow with their content (`field-sizing`).
 - Portal contract: `form.pt-form > div.pt-field > label + control + p.pt-help + p.pt-error`, `pt-field--inline`
   for a checkbox and its label, and `pt-fieldset > legend`.
+- **One error summary partial** (`templates/partials/error-summary.php`), first inside every form that can be
+  refused, public or portal. It lists each field's error as a link to its control (links at least 24px tall), or,
+  when no field explains a refusal (too many sends, a send faster than a person), says why. On a page with several
+  forms only the form that was sent shows it. Forms carry `novalidate`, so the server's summary replaces the
+  browser's bubbles.
+- **Sent once.** `site.js` marks a posting form busy on the first press, until the next page: `aria-busy` on the
+  form and `aria-disabled` on the button (never `disabled`, so the button keeps its focus and its name). A button
+  with `data-busy="Sending…"` shows and announces those words. Any further press does nothing, and a page
+  restored by the browser's Back button can send again. Without JavaScript the form still posts, and the server's
+  defences apply on their own.
+- **Bot defences** (`Psc\Support\FormGuard`, on every public form that sends or stores something): a hidden
+  honeypot and a signed, session-bound time the form was shown. A filled honeypot is answered as if it worked. A
+  send faster than a person fills the form in comes back with the input kept and asks for one more press. It is
+  never a silent loss.
 
 ### 8.25 Data tables (portal and admin), sorting, empty state
 

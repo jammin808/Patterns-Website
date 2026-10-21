@@ -11,7 +11,6 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       before. Choose the daily figure (the default is 1,500,000).
 - [ ] Mailboxes `support@` and `no-reply@` and the SMTP password for `no-reply@`.
 - [ ] Connect GitHub in hPanel → Git (branch `deploy`), or deploy the release zip by hand.
-- [ ] Decide whether `support@patternsshowcontrol.co.uk` is shown publicly (it is in the structured data and on the contact page) or only the contact form.
 
 ## Legal (drafts in `content/legal/`, need your review)
 
@@ -25,6 +24,12 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 - [ ] **Today's free downloads need terms that apply to them.** The licence terms say they will apply "when" each
       app is sold; reword the opening so it also covers the free early-access and evaluation builds of Patterns and
       PlayMap, and link the terms from `/downloads/` and the Patterns and PlayMap licensing pages.
+- [ ] **Google Analytics consent.** The Google tag runs on every page (except one-time link pages) and sets the
+      `_ga` cookies without asking. Under UK PECR, analytics cookies have needed consent; the Data (Use and Access)
+      Act 2025 allows some statistics-only analytics cookies without consent, as long as visitors are told clearly
+      and can object easily. Decide which applies. If consent is needed, add a consent banner with Google Consent Mode,
+      so the tag sets no cookies until a visitor agrees. The cookie notice and privacy policy describe the tag as it
+      runs today.
 - [ ] Privacy policy items: name the payment provider if payment links are switched on; say that a signed-in
       visitor's assistant conversations are linked to their account and may be read to improve answers; confirm the
       Anthropic processing, training and retention wording against the commercial terms in force.
