@@ -1,0 +1,60 @@
+# Patterns Show Control: the repository root is deployed as public_html.
+# Only public/ is web-reachable; every other directory (app, config, storage, templates, vendor, ...) is denied,
+# and every request that is not a real file under public/ goes to public/index.php.
+
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # The canonical host has no www, and http://www and https://www reach it in one hop. HSTS preload is not planned
+    # (the site sends HSTS without preload); preloading would need HTTPS on the same host first, so this rule would
+    # then have to follow the HTTPS rule below.
+    RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+    # Force HTTPS (Hostinger terminates TLS on LiteSpeed; X-Forwarded-Proto covers a proxy in front).
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$ [NC]
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Streaming replies (the support assistant) must not be compressed (gzip or LiteSpeed's Brotli) or buffered,
+    # nor cut off when idle.
+    RewriteRule ^api/chat$ - [E=no-gzip:1,E=no-brotli:1,E=dont-vary:1,E=noabort:1,E=noconntimeout:1]
+
+    # Release files are served only by an internal redirect from the portal (X-LiteSpeed-Location), never by a
+    # direct request: ORG_REQ_URI is the URL the visitor asked for, not the internal one. Other servers deny the
+    # folder outright (the rule below) and the portal streams the file itself. Each file also sits in a random
+    # folder name, so a path cannot be guessed.
+    <IfModule LiteSpeed>
+        RewriteCond %{ORG_REQ_URI} ^/downloads-vault(/|$) [NC]
+        RewriteRule ^ - [F,L]
+        RewriteRule ^downloads-vault/ - [L]
+    </IfModule>
+
+    # Nothing outside public/ is ever served directly.
+    RewriteRule ^(app|config|content|database|design|docs|knowledge|storage|templates|tests|tools|vendor|node_modules|downloads-vault)(/|$) - [F,L,NC]
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|README\.md|\.git.*|.*\.(md|sql|sh|lock|dist|neon|yml|yaml|log|bak|ini|env))$ - [F,L,NC]
+
+    # A real file under public/ is served as is (assets, icons, robots-free statics).
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Everything else is the application.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^ public/index.php [L,QSA]
+</IfModule>
+
+# Dotfiles and backup/config files are never served, even if the rules above are bypassed. /.well-known/ is the one
+# dot-name allowed: it does not exist on disk, so its name is matched here before the rewrite hands
+# /.well-known/security.txt to the application.
+<FilesMatch "^\.(?!well-known$)|\.(php\.dist|sql|md|log|ini|lock|bak|env)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>

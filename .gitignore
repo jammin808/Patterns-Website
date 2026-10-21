@@ -1,0 +1,6 @@
+/config/local.php
+/storage/*
+!/storage/.htaccess
+!/storage/README.md
+/downloads-vault/*
+!/downloads-vault/README.md
