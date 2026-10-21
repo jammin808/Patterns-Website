@@ -1,0 +1,227 @@
+/*
+ * Workflows, support, downloads, contact and legal pages. Everything sits in the components layer and uses the
+ * tokens from site.css; no raw colours. Pushed only by those pages' templates.
+ */
+@layer components {
+  /* ===== Legal: one centred reading column, the breadcrumbs aligned with it ===== */
+  main:has(> .support-legal-hero) > .l-wrap:has(> .c-crumbs) { --max: 760px; }
+  .support-legal-hero .c-hero-grid { padding-bottom: clamp(24px, 3vw, 36px); }
+  .support-legal-hero .c-hero-title { max-width: none; font-size: var(--fs-6); }
+  .support-legal-date { margin-top: var(--sp-4); font-size: var(--fs-1); color: var(--text-3); }
+  .support-legal-nav { border-top: 0; margin-inline: -14px; }
+  .support-legal-body { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+  .support-legal-help { display: grid; gap: var(--sp-5); padding: clamp(20px, 3vw, 28px); border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
+    & h2 { font-size: var(--fs-5); } & p { margin-top: var(--sp-2); max-width: 56ch; font-size: var(--fs-2); color: var(--text-2); } }
+
+  /* ===== Narrow phones: a long button label wraps inside its full-width button rather than overflowing ===== */
+  @media (width < 30rem) { main .c-hero-actions > .c-btn { white-space: normal; text-align: center; padding-block: 10px; } }
+
+  /* ===== Breadcrumbs from the layout: breathing room under the header ===== */
+  main > .l-wrap:has(> .c-crumbs:first-child) { padding-top: 22px; }
+
+  /* ===== The apps a workflow uses, as one bar in their colours (cards, the hero's eyebrow) ===== */
+  .support-runbar { display: flex; height: 4px; gap: 2px;
+    & > i { flex: 1; background: var(--swatch); box-shadow: inset 0 0 0 1px var(--swatch-edge); } }
+  .support-runbar--mark { width: 22px; height: 8px; gap: 1px; }
+  @media (forced-colors: active) { .support-runbar > i { forced-color-adjust: none; } }
+  .support-wf-eyebrow::before { display: none; }
+
+  /* ===== Workflows hub: title left, lede right; the cards follow straight on ===== */
+  @media (width >= 64rem) {
+    .support-hero-split .c-hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap) clamp(40px, 5vw, 80px); align-items: end; }
+    .support-hero-split .c-hero-lede { margin-top: 0; }
+  }
+  .support-wf-list { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+
+  /* ===== Workflow cards: the title's link covers the card ===== */
+  .support-wfcard { position: relative; padding-top: 0; overflow: hidden; border-top: 0; transition: border-color var(--d-1) var(--e-cut);
+    & > .support-runbar { margin: 0 -20px 10px; }
+    & .c-card-title { font-size: var(--fs-4); }
+    & .c-card-title a { text-decoration: none; }
+    & .c-card-title a::after { content: ""; position: absolute; inset: 0; }
+    & .c-card-title a:focus-visible { outline: none; }
+    &:hover { border-color: var(--text-2); & .c-card-title a { text-decoration: underline; text-underline-offset: 0.2em; } }
+    &:has(.c-card-title a:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; } }
+  .support-wfcard-foot { display: grid; gap: 10px; }
+  .support-wfcard-apps { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .support-wfcard-time { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-0); color: var(--text-2);
+    & .c-icon { margin-top: 1px; color: var(--text-3); } }
+
+  /* ===== Workflows by app ===== */
+  .support-byapp > div { align-items: start; }
+  .support-byapp-name { display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-2); font-weight: 650; color: var(--text); text-decoration: none;
+    &:hover { text-decoration: underline; text-decoration-color: var(--accent-line); } }
+  .support-byapp-links { list-style: none; padding: 0; display: grid; gap: 6px;
+    & a { font-size: var(--fs-2); font-weight: 520; text-decoration-color: var(--accent-line); } }
+
+  /* ===== Closing call to action ===== */
+  .support-closer { display: grid; gap: var(--sp-6); align-items: center; grid-template-columns: minmax(0, 1fr); }
+  @media (width >= 64rem) { .support-closer { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); } }
+  .support-closer-actions { display: grid; gap: var(--sp-5); justify-items: start;
+    & .l-cluster { gap: 8px 20px; font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui); } }
+
+  /* ===== Workflow page: the hero with the "before you start" panel ===== */
+  .support-wf-hero .c-hero-grid { display: grid; align-items: start; }
+  @media (width >= 64rem) { .support-wf-hero .c-hero-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); } }
+  .support-wf-hero .c-hero-title { max-width: 16ch; }
+  .support-glance { overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); box-shadow: var(--shadow-1); }
+  .support-glance-title { padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--s2); font: 650 var(--fs-1)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; }
+  .support-glance-list > div { display: grid; gap: 6px; padding: 14px 18px; & + div { border-top: 1px solid var(--line); } }
+  .support-glance-list dt { font-size: var(--fs-0); font-weight: 600; color: var(--text-3); }
+  .support-glance-list dd { font-size: var(--fs-2); line-height: 1.45; }
+  .support-glance-apps { --cluster: 6px; & .c-app { text-decoration: none; } & .c-app:hover { border-color: var(--text-2); } }
+  .support-glance-needs { gap: 8px; font-size: var(--fs-2); line-height: 1.45; & li::before { translate: 0 -5px; } }
+
+  /* ===== Cue ladders without a "Takes" column (workflow steps carry no times) ===== */
+  @container ladder (width >= 46rem) {
+    .support-ladder-app :is(.c-ladder-head, .c-cue) { grid-template-columns: 72px minmax(0, 1fr) 150px 124px; }
+  }
+  .support-ladder-app { overflow: clip; }
+  .support-ladder-app .c-cue { align-items: start; }
+  .support-ladder-app .c-cue-q { padding-top: 2px; }
+  .support-ladder-app .c-cue-body p { max-width: 68ch; font-size: var(--fs-2); line-height: 1.55; }
+  /* GO stays under the hand while the steps scroll past (wide screens; the assistant's launcher sits to its right). */
+  @media (width >= 40rem) { .support-ladder-app .c-ladder-controls { position: sticky; bottom: 0; z-index: 2; } }
+  @media (scripting: none) { .c-ladder[data-ladder] .c-ladder-controls > :is(button, .c-ladder-status) { display: none; } }
+  .support-wf-outcome { margin-top: var(--sp-5); padding: 18px 20px; font-size: var(--fs-2);
+    & .c-callout-title { font-size: var(--fs-3); } }
+
+  /* ===== Tips ===== */
+  .support-tips { list-style: none; padding: 0; display: grid; gap: 0 clamp(24px, 3vw, 40px); grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+    & li { padding: 16px 0 22px; border-top: 1px solid var(--line-2); font-size: var(--fs-2); line-height: 1.5; color: var(--text-2); } }
+
+  /* ===== The apps in a workflow ===== */
+  .support-wf-apps { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+  .support-wf-app .c-card-body { font-size: var(--fs-2); }
+  @media (width >= 48rem) {
+    .support-wf-app--wide { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 48px; padding: 24px 28px;
+      & > :not(.c-card-footer) { grid-column: 1; max-width: 64ch; }
+      & > .c-card-footer { grid-column: 2; grid-row: 1 / span 3; align-self: center; margin: 0; padding: 0; border: 0; }
+      & .c-btn { min-height: 48px; padding-inline: 22px; font-size: var(--fs-2); } }
+  }
+  .support-wf-app-name { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: var(--fs-4);
+    & .c-swatch { width: 12px; height: 12px; } }
+  .support-wf-app-links { margin-top: 0; }
+  .support-wf-all { font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui); }
+
+  /* ===== Support hub: the assistant beside what it can help with ===== */
+  .support-help-hero .c-hero-grid { display: grid; align-items: start; }
+  @media (width >= 64rem) { .support-help-hero .c-hero-grid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); } }
+  .support-help-hero .c-hero-title { max-width: none; }
+  .support-can { margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--line);
+    & .c-facts { margin-top: var(--sp-3); gap: 8px; font-size: var(--fs-2); color: var(--text); } & .c-facts li::before { translate: 0 -5px; } }
+  .support-can-title { font: 650 var(--fs-2)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; }
+  .support-can-note { margin-top: var(--sp-4); max-width: 52ch; font-size: var(--fs-1); color: var(--text-2); & a { color: var(--text); font-weight: 620; } }
+  .support-help-chat { min-width: 0; display: grid; }
+  .support-help-chat .c-chat--inline { display: grid; }
+  .support-help-chat .c-chat--inline .c-chat-panel { max-width: none; }
+  @media (width >= 64rem) { .support-help-chat .c-chat--inline .c-chat-panel { max-width: 500px; } }
+
+  /* ===== Support hub: the help pages, the portal's actions, the account note ===== */
+  .support-links a { min-height: 64px; }
+  .support-actions { list-style: none; padding: 0; display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    & > li { display: grid; } }
+  .support-action { height: 100%; & > .c-icon { color: var(--text-2); margin-bottom: 4px; } }
+  .support-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4) var(--sp-6); margin-top: var(--sp-6); padding-top: var(--sp-5); border-top: 1px solid var(--line);
+    & > p { display: flex; gap: 10px; align-items: flex-start; max-width: 60ch; font-size: var(--fs-2); color: var(--text-2); }
+    & > p .c-icon { margin-top: 4px; color: var(--text-3); } }
+  .support-more { align-items: stretch;
+    & .c-card > .c-icon { color: var(--text-2); margin-bottom: 4px; }
+    & .c-callout { align-content: start; } }
+  .support-showday { padding: 20px; & p { margin-top: 4px; font-size: var(--fs-2); } }
+
+  /* ===== FAQ: the groups, with an index that stays in view on wide screens ===== */
+  .support-faq { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+  .support-faq-side { align-self: stretch; }
+  .support-index { display: grid; gap: var(--sp-4); }
+  @media (width >= 64rem) { .support-index { position: sticky; top: calc(var(--header-h) + 24px); } }
+  .support-index-title { font: 650 var(--fs-1)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; color: var(--text-2); }
+  .support-index-list { list-style: none; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s1);
+    & li + li { border-top: 1px solid var(--line); }
+    & a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 14px; font-size: var(--fs-2); font-weight: 600; font-stretch: var(--wd-ui); text-decoration: none; }
+    & a:hover { background: var(--s2); } }
+  @media (width >= 40rem) and (width < 64rem) { .support-index-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); & li + li { border-top: 0; } & li { box-shadow: -1px -1px 0 var(--line); } } }
+  .support-index-ask { margin-top: var(--sp-2); }
+  @media (width < 64rem) { .support-index-ask { display: none; } }
+  .support-faq-groups { display: grid; gap: clamp(48px, 6vw, 80px); }
+  .support-faq-group { scroll-margin-top: calc(var(--header-h) + 24px);
+    & > h2 { margin-bottom: var(--sp-5); font-size: var(--fs-5); } }
+  .support-links--stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); width: 100%; }
+
+  /* ===== Product help: the hero with an on-page index, numbered steps, requirements, the two portal cards ===== */
+  .support-ph-hero .c-hero-grid { display: grid; align-items: start; padding-bottom: clamp(32px, 4vw, 48px); }
+  @media (width >= 64rem) { .support-ph-hero .c-hero-grid { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); } }
+  .support-ph-hero .c-hero-title { max-width: 16ch; }
+  .support-ph-hero .c-hero-lede { max-width: 52ch; }
+  .support-ph-jump { padding: 16px 18px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--r-2); background: var(--s1);
+    & ol { list-style: none; padding: 0; display: grid; gap: 2px; margin-top: var(--sp-2); }
+    & a { display: block; padding: 6px 0; font-size: var(--fs-2); font-weight: 560; text-decoration: none; }
+    & a:hover { text-decoration: underline; text-decoration-color: var(--accent-line); } }
+  @media (width >= 64rem) { .support-ph-jump { margin-top: 52px; } }
+  .support-ph-jump-title { font: 650 var(--fs-1)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; color: var(--text-2); }
+  .support-ph-first { padding-top: clamp(48px, 5vw, 80px); }
+  @media (width >= 64rem) { .support-ph-side { position: sticky; top: calc(var(--header-h) + 32px); } }
+  @container ladder (width >= 46rem) { .support-ladder-plain .c-cue { grid-template-columns: 56px minmax(0, 1fr); } }
+  @container ladder (width < 46rem) { .support-ladder-plain .c-cue { grid-template-areas: "q body"; } }
+  .support-ladder-plain .c-cue { align-items: start; }
+  .support-ladder-plain .c-cue-q { padding-top: 2px; color: var(--accent-ink); }
+  .support-ladder-plain .c-cue-body p { max-width: 72ch; font-size: var(--fs-2); line-height: 1.55; }
+  .support-ph-reqs dd { font-size: var(--fs-2); font-stretch: 100%; font-weight: 400; line-height: 1.5; }
+  .support-ph-reqs dt { font-size: var(--fs-1); color: var(--text-2); }
+  .support-ph-card { padding: 24px; gap: 14px;
+    & > .c-icon { color: var(--accent-ink); } & .c-card-title { font-size: var(--fs-4); } & .c-card-body { font-size: var(--fs-2); }
+    & .c-kv { font-size: var(--fs-2); & dt { color: var(--text-3); } } }
+  .support-ph-steps { display: grid; gap: 8px; padding-left: 1.75em; font-size: var(--fs-2); color: var(--text-2); & li::marker { font-family: var(--font-mono); color: var(--text-3); } }
+  .support-ph-faqlinks { list-style: none; padding: 0; display: grid; gap: 8px; margin-top: var(--sp-4);
+    & a { font-size: var(--fs-2); font-weight: 600; text-decoration-color: var(--accent-line); } }
+  .support-ph-back { font-size: var(--fs-2); font-weight: 620; & a { text-decoration-color: var(--accent-line); } }
+
+  /* ===== Downloads: how it works, the index, one block per app, the Companion modules ===== */
+  .support-dl-hero .c-hero-grid { display: grid; align-items: start; }
+  @media (width >= 64rem) { .support-dl-hero .c-hero-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); } }
+  .support-dl-how { list-style: none; padding: 0;
+    & li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 14px 18px; }
+    & li + li { border-top: 1px solid var(--line); }
+    & b { display: block; font-size: var(--fs-2); font-weight: 650; }
+    & div span { display: block; margin-top: 2px; font-size: var(--fs-1); color: var(--text-2); } }
+  .support-dl-n { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line-2); border-radius: var(--r-1); font: 600 var(--fs-1)/1 var(--font-mono); color: var(--text-2); }
+  .support-dl-index { padding-block: clamp(32px, 4vw, 48px) 0; }
+  .support-dl-index + .support-dl-app { margin-top: clamp(32px, 4vw, 48px); }
+  .support-dl-app { scroll-margin-top: var(--header-h); border-top: 3px solid var(--accent); }
+  .support-dl-name { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-6);
+    & > .c-swatch { width: 16px; height: 16px; } & .c-role { font-size: 13px; } }
+  .support-dl-specs { margin-top: var(--sp-5); }
+  .support-dl-h { margin-top: var(--sp-6); font: 650 var(--fs-2)/1.3 var(--font-sans); font-stretch: var(--wd-ui); letter-spacing: 0; }
+  .support-dl-reqs > .support-dl-h:first-child { margin-top: 0; margin-bottom: var(--sp-3); }
+  .support-dl-p { margin-top: var(--sp-2); max-width: 60ch; color: var(--text-2); }
+  .support-dl-reqs .c-specs--rows dd { font-weight: 400; font-stretch: 100%; line-height: 1.45; }
+  @media (width >= 64rem) { .support-dl-reqs { padding-top: 6px; } }
+  .support-dl-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: var(--sp-4); font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui);
+    & a { text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; } }
+  .support-dl-modules dt .c-app { font-size: var(--fs-1); }
+  .support-dl-modules dd { font-weight: 400; font-stretch: 100%; line-height: 1.45; }
+  .support-dl-note { padding: 18px 20px; & p { margin-top: 4px; font-size: var(--fs-2); } }
+  .support-dl-help { max-width: 72ch; color: var(--text-2); & a { color: var(--text); font-weight: 600; } }
+
+  /* ===== Contact: the form beside the other routes to help ===== */
+  .support-contact-hero .c-hero-grid { display: grid; gap: var(--sp-6); align-items: end; }
+  @media (width >= 64rem) { .support-contact-hero .c-hero-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap) clamp(40px, 5vw, 80px); } }
+  .support-contact { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+  .support-contact-main { display: grid; gap: var(--sp-5); align-content: start; min-width: 0; }
+  .support-contact-main :is(.c-form, .c-error-summary) { scroll-margin-top: calc(var(--header-h) + 16px); }
+  .support-sent:focus { outline: none; }
+  .support-contact-title { font-size: var(--fs-5); }
+  .support-sent { scroll-margin-top: calc(var(--header-h) + 16px); padding: 20px 22px;
+    & .c-callout-title { font-size: var(--fs-4); font-family: var(--font-display); font-stretch: 108%; }
+    & p { font-size: var(--fs-2); } }
+  .support-sent-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: var(--sp-3); }
+  .support-contact-aside { display: grid; gap: 0; align-content: start; }
+  @media (width >= 64rem) { .support-contact-aside { position: sticky; top: calc(var(--header-h) + 24px); } }
+  .support-contact-block { display: grid; gap: var(--sp-3); padding-block: var(--sp-5); border-top: 1px solid var(--line);
+    &:first-child { padding-top: 0; border-top: 0; }
+    & > p { font-size: var(--fs-2); color: var(--text-2); } }
+  .support-contact-h { font-size: var(--fs-4); font-stretch: 108%; letter-spacing: -0.01em; }
+  .support-contact-links { --cluster: 8px 20px; font-size: var(--fs-1); font-weight: 620; }
+  .support-contact-next { display: grid; gap: 8px; padding-left: 1.75em; font-size: var(--fs-2); color: var(--text-2);
+    & li::marker { font-family: var(--font-mono); color: var(--text-3); } }
+}

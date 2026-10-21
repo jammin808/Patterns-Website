@@ -1,0 +1,110 @@
+/*
+ * The hub pages (home, ecosystem, integrations, AI, licensing, about): the few arrangements site.css does not have.
+ * Everything here uses the design tokens and sits in the components layer, so the system's own rules still apply.
+ */
+@layer components {
+  /* Home hero: the H1 is a full sentence, so it runs wider and a step smaller than a slogan would. */
+  .hub-home-hero .c-hero-title { max-width: 15ch; font-size: clamp(2.5rem, 1.35rem + 3vw, 4.125rem); }
+  .hub-home-hero .c-hero-lede { max-width: 50ch; }
+
+  /* A cue ladder whose steps have no duration: the Takes column is dropped (the narrow layout is the system's). */
+  @container ladder (width >= 46rem) {
+    .hub-ladder-untimed :is(.c-ladder-head, .c-cue) { grid-template-columns: 84px minmax(0, 1fr) 160px 124px; }
+    .hub-ladder-untimed.c-ladder--static :is(.c-ladder-head, .c-cue) { grid-template-columns: 84px minmax(0, 1fr) 160px; }
+  }
+
+  /* Links that continue a section: descriptive anchors in one row. */
+  .hub-more { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: var(--sp-5); font-size: var(--fs-1); font-weight: 620; font-stretch: var(--wd-ui);
+    & a { text-decoration-color: var(--line-2); text-decoration-thickness: 2px; text-underline-offset: 0.3em; }
+    & a:hover { text-decoration-color: currentColor; } }
+
+  /* A status tag on a multiview tile's UMD strip (early access), between the name and the role. */
+  .hub-umd-tag { padding-block: 1px; font-size: 12px; }
+  .hub-umd-tag + .c-umd-role { margin-left: 0; }
+  .c-umd h3 + .hub-umd-tag { margin-left: auto; }
+
+  /* The licensing rate card: one row per app, its status beside its name. */
+  .hub-rates dt { display: flex; flex-wrap: wrap; align-items: center; align-content: start; gap: 8px; }
+  .hub-rates dd { display: grid; gap: 6px; align-content: start; font-weight: 400; font-stretch: 100%; color: var(--text-2);
+    & a { font-weight: 620; font-stretch: var(--wd-ui); color: var(--text); text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 0.25em; } }
+  .hub-rate-prices { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; color: var(--text); font-weight: 560; font-stretch: var(--wd-ui);
+    & b { margin-left: 4px; font: 720 1.375rem/1.1 var(--font-display); font-stretch: 112%; letter-spacing: -0.02em; font-variant-numeric: lining-nums tabular-nums; }
+    & s { color: var(--text-3); font-variant-numeric: tabular-nums; } }
+
+  /* The closing call to action: the four app bars, a heading, a line and the actions. */
+  .hub-cta-bars { width: 112px; height: 6px; margin-bottom: var(--sp-6); }
+  .hub-cta-grid { display: grid; gap: var(--sp-5) var(--gap); grid-template-columns: minmax(0, 1fr);
+    & h2 { max-width: 18ch; } & .c-hero-actions { margin-top: var(--sp-5); } }
+  @media (width >= 64rem) { .hub-cta-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: end; } }
+
+  /* Ecosystem: the tagline over the pillars, each full stop in its app's bar. */
+  .hub-stops { margin-bottom: clamp(28px, 4vw, 48px); font: 680 var(--fs-6)/1.05 var(--font-display); font-stretch: 116%; letter-spacing: -0.022em; text-wrap: balance; }
+
+  /* Connections grouped by the apps they join: a group title with the apps' bars, then the cards. */
+  .hub-pair + .hub-pair { margin-top: clamp(40px, 5vw, 64px); }
+  .hub-pair-title { display: flex; align-items: center; gap: 12px; margin-bottom: var(--sp-5); font-size: var(--fs-4); }
+  .hub-pair-apps { display: inline-flex; gap: 3px; & .c-swatch { width: 6px; height: 20px; border-radius: 0; } }
+  .hub-card-apps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .c-feature .hub-card-apps { margin-top: 2px; }
+  .hub-wire { width: 14px; height: 2px; flex: none; background: var(--line-2); }
+  .hub-needs { flex-wrap: nowrap; align-items: flex-start; gap: 8px; font-size: var(--fs-0); color: var(--text-2); & .c-icon { margin-top: 1px; color: var(--text-3); } }
+
+  /* The show network beside what works offline. */
+  .hub-offline { align-items: center; }
+
+  /* Roadmap items: dashed like every planned thing in the system, and always labelled. */
+  .hub-coming { list-style: none; padding: 0; }
+  .hub-coming-item { display: grid; gap: 10px; align-content: start; justify-items: start; padding: 18px 18px 20px; border: 1px dashed var(--line-2); border-radius: var(--r-3);
+    & h3 { font-size: var(--fs-3); font-stretch: 108%; } & p { font-size: var(--fs-1); color: var(--text-2); } }
+
+  /* Jump links under a page hero, to the sections below. */
+  .hub-jump { display: flex; flex-wrap: wrap; gap: 8px;
+    & a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--s1);
+      font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); text-decoration: none; }
+    & a:hover { color: var(--text); border-color: var(--field); } }
+
+  /* Integration categories: blocks with a hairline top, each with its chips. */
+  .hub-cats { display: grid; gap: clamp(32px, 4vw, 48px) var(--gap); grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr)); }
+  .hub-cat { display: grid; gap: 10px; align-content: start; padding-top: 18px; border-top: 1px solid var(--line-2); scroll-margin-top: calc(var(--header-h) + 16px);
+    & > p { max-width: 52ch; font-size: var(--fs-1); color: var(--text-2); } & .c-chips { margin-top: 6px; } }
+
+  /* The integration matrix: names with their words, a tick or a dash per app. */
+  .hub-matrix { & tbody th[scope="row"] { width: 48%; font-weight: 600; font-stretch: var(--wd-ui); }
+    & tbody th small { display: block; max-width: 72ch; margin-top: 4px; font-size: var(--fs-0); font-weight: 400; font-stretch: 100%; line-height: 1.45; color: var(--text-2); }
+    & td { text-align: center; } & thead th.hub-matrix-app { text-align: center; } & tbody th { border-bottom-color: var(--line); }
+    & .hub-matrix-group th { padding-top: 18px; background: var(--s2); font: 650 var(--fs-0)/1.3 var(--font-sans); font-stretch: var(--wd-ui); color: var(--text-2); } }
+  @container table (width < 40rem) {
+    .c-table.hub-matrix tbody tr:not(.hub-matrix-group) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 6px; }
+    .c-table.hub-matrix tbody tr:not(.hub-matrix-group) > th { grid-column: 1 / -1; width: auto; padding-bottom: 4px; }
+    .c-table.hub-matrix tr.hub-matrix-group { padding-block: 10px 8px; background: var(--s2); }
+    .c-table.hub-matrix .hub-matrix-group th { padding: 0; }
+    .c-table.hub-matrix td[data-label] { grid-template-columns: minmax(0, 1fr); gap: 4px; justify-items: start; }
+    .c-table.hub-matrix td[data-label]::before { grid-row: auto; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  }
+
+  /* A list reset for grids of link cards. */
+  .hub-plain { list-style: none; padding: 0; & > li { display: grid; } }
+
+  /* The approval gate on its own: proposal, the amber gate, the app's own checks. */
+  .hub-gate { display: grid; gap: 12px; margin: 0; padding: clamp(20px, 3vw, 36px); border: 1px solid var(--line); border-radius: var(--r-3);
+    background: linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 24px 24px, var(--s1); }
+  .hub-gate-app { border-left: 3px solid var(--text-2); }
+  @media (width >= 64rem) {
+    .hub-gate { grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1.15fr) 104px minmax(0, 1fr); align-items: center; gap: 16px 8px; }
+    .hub-gate-wire { flex-direction: column; align-items: stretch; gap: 6px; text-align: center; &::after { flex: none; } }
+    .hub-gate .c-flow-note { grid-column: 1 / -1; margin-top: 8px; }
+  }
+
+  /* "What it sends" under each app's AI. */
+  .hub-sends { flex-wrap: nowrap; align-items: flex-start; gap: 10px; font-size: var(--fs-1); color: var(--text-2);
+    & .c-icon { margin-top: 2px; color: var(--text-3); } & b { color: var(--text); } }
+  .c-card .c-links { margin-top: 0; padding-top: 4px; }
+
+  /* Licensing: a "from" price on a status card, and the titles over the model's two lists. */
+  .hub-from { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--fs-1); color: var(--text-2);
+    & b { font: 720 2rem/1 var(--font-display); font-stretch: 112%; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: lining-nums tabular-nums; } }
+  .hub-group-title { margin-bottom: var(--sp-4); font-size: var(--fs-4); }
+
+  /* Product help links in two columns, so four links never leave one alone on a row. */
+  @media (width >= 40rem) { .hub-support-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+}

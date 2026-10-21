@@ -298,6 +298,26 @@
   }
   .pt-badge--admin, .pt-badge--beta { border-style: dashed; }
   .c-badge--tier { border-color: var(--accent-line); color: var(--text); }
+  /* Severity: a three-step level meter beside the word (bars lit = how bad), so it never rests on colour.
+     Low and normal are neutral, high is amber (a warning), show-stopper is the only filled pill (red, PGM). */
+  .pt-badge:where(.pt-badge--low, .pt-badge--normal, .pt-badge--high, .pt-badge--show_stopper) {
+    --lit: var(--b); --unlit: color-mix(in srgb, var(--b) 28%, transparent); --l1: var(--lit); --l2: var(--unlit); --l3: var(--unlit);
+    &::before { width: 11px; height: 10px; border-radius: 0; background:
+      linear-gradient(var(--l1), var(--l1)) 0 100% / 3px 40% no-repeat, linear-gradient(var(--l2), var(--l2)) 4px 100% / 3px 70% no-repeat,
+      linear-gradient(var(--l3), var(--l3)) 8px 100% / 3px 100% no-repeat; }
+  }
+  .pt-badge--low { --b: var(--text-3); --b-ink: var(--text-2); background: transparent; }
+  .pt-badge--normal { --b: var(--text-2); --b-ink: var(--text); --l2: var(--lit); }
+  .pt-badge--high { --b: var(--lamp-standby); --b-ink: var(--ink-standby); --l2: var(--lit); --l3: var(--lit); }
+  .pt-badge--show_stopper { --b: var(--lamp-pgm); --b-ink: var(--on-lamp); --l2: var(--lit); --l3: var(--lit); --lit: var(--on-lamp); border-color: var(--lamp-pgm); background: var(--lamp-pgm); font-weight: 700; }
+  /* Assistant verdicts (admin transcripts): answered is done, needs a person is standing by, the refusals are
+     declined (red with a dash) and abuse is the filled alert. */
+  .pt-badge--in_scope { --b: var(--lamp-pvw); --b-ink: var(--ink-pvw); }
+  .pt-badge--needs_human { --b: var(--lamp-standby); --b-ink: var(--ink-standby); }
+  .pt-badge:where(.pt-badge--out_of_scope, .pt-badge--code_or_internals, .pt-badge--code_guard, .pt-badge--abuse) { --b: var(--lamp-pgm); --b-ink: var(--ink-pgm);
+    &::before { height: 2px; width: 8px; border-radius: 0; } }
+  .pt-badge--code_or_internals, .pt-badge--code_guard { border-style: dashed; }
+  .pt-badge--abuse { --b-ink: var(--on-lamp); border-color: var(--lamp-pgm); background: var(--lamp-pgm); font-weight: 700; &::before { background: var(--on-lamp); } }
 
   /* ===== Buttons (portal: .pt-btn) ===== */
   .c-btn, .pt-btn {
@@ -848,7 +868,9 @@
   }
   .c-callout > :not(.c-icon) { grid-column: 2; }
   .c-callout-title { display: block; font-size: var(--fs-2); font-weight: 650; }
-  .pt-alert { grid-template-columns: minmax(0, 1fr); margin-bottom: 16px; }
+  /* A flash is one line of mixed text and links, so it flows as a block (with an icon it takes the callout grid). */
+  .pt-alert { display: block; margin-bottom: 16px; & > * + * { margin-top: 6px; } }
+  .pt-alert:has(> .c-icon) { display: grid; }
   .c-callout--success, .pt-alert--success { --a: var(--lamp-pvw); --a-ink: var(--ink-pvw); }
   .c-callout--warning, .pt-alert--warning { --a: var(--lamp-standby); --a-ink: var(--ink-standby); --focus: var(--text); }
   .c-callout--danger, .pt-alert--danger { --a: var(--lamp-pgm); --a-ink: var(--ink-pgm); }
@@ -924,17 +946,36 @@
     & input { padding-left: 38px !important; max-width: none !important; } }
 
   /* ===== Data tables (portal and admin: .pt-table) ===== */
-  .c-table-wrap, .pt-table-wrap { container: table / inline-size; overflow-x: auto; margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); }
+  .c-table-wrap, .pt-table-wrap { --edge: color-mix(in srgb, var(--text) 14%, transparent);
+    container: table / inline-size; overflow-x: auto; margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--r-3);
+    /* Edge shadows only where columns are scrolled out of view: the s1 covers move with the content. */
+    background: linear-gradient(90deg, var(--s1) 40%, transparent) 0 0 / 32px 100% no-repeat local, linear-gradient(270deg, var(--s1) 40%, transparent) 100% 0 / 32px 100% no-repeat local,
+      linear-gradient(90deg, var(--edge), transparent) 0 0 / 12px 100% no-repeat scroll, linear-gradient(270deg, var(--edge), transparent) 100% 0 / 12px 100% no-repeat scroll, var(--s1); }
   .c-table, .pt-table { width: 100%; border-collapse: collapse; font-size: var(--fs-1); font-variant-numeric: tabular-nums;
     & caption { padding: 14px 16px 4px; caption-side: top; text-align: left; font-weight: 650; }
     & th { padding: 10px 14px; text-align: left; vertical-align: bottom; border-bottom: 1px solid var(--line-2); background: var(--s2); font: 620 var(--fs-0)/1.3 var(--font-sans); font-stretch: var(--wd-ui); color: var(--text-2); white-space: nowrap; }
-    & tbody th { background: none; font-size: var(--fs-1); color: var(--text); vertical-align: middle; white-space: normal; }
+    & tbody th { background: none; border-bottom-color: var(--line); font-size: var(--fs-1); color: var(--text); vertical-align: middle; white-space: normal; }
     & td { padding: 12px 14px; vertical-align: middle; border-bottom: 1px solid var(--line); }
     & tbody tr:last-child > * { border-bottom: 0; }
     & tbody tr:hover > * { background: color-mix(in srgb, var(--text) 3%, transparent); }
     & td a { font-weight: 600; } & td small { display: block; margin-top: 2px; font-size: var(--fs-0); color: var(--text-2); }
     & tr.is-unread > * { font-weight: 620; } & tr.is-unread > :first-child { box-shadow: inset 3px 0 0 var(--text); }
     & tr.is-selected > * { background: color-mix(in srgb, var(--text) 6%, transparent); }
+    & td pre { margin: 0; max-width: 30rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; color: var(--text-2); }
+    & td > form { margin: 0; }
+  }
+  /* The row title never shrinks below a readable measure; a table of nine or more columns (admin lists) is set
+     compact so it fits the main column on a laptop, and scrolls past that rather than crushing its titles. */
+  :is(.c-table, .pt-table) tbody th[scope="row"] { min-width: 11rem; }
+  :is(.c-table, .pt-table):has(thead th:nth-child(9)) { font-size: var(--fs-0);
+    & :is(th, td) { padding: 9px 10px; } & tbody th { font-size: var(--fs-0); } & .pt-badge { padding-inline: 7px 8px; } }
+  /* A narrow table without the stacked variant keeps its columns: cells stop wrapping, the row title keeps a
+     readable measure, and the wrapper scrolls sideways (site.js makes it keyboard-reachable). */
+  @container table (width < 40rem) {
+    :is(.c-table, .pt-table):not(.c-table--stack, .pt-table--stack) {
+      & :is(td, thead th) { white-space: nowrap; }
+      & tbody th { min-width: 12.5rem; }
+    }
   }
   .c-num, .pt-num { text-align: right !important; font-family: var(--font-mono); }
   .c-id { font: 500 12px/1 var(--font-mono); color: var(--text-2); white-space: nowrap; }
@@ -972,7 +1013,14 @@
   /* ===== Dashboard stats (portal: .pt-stats) ===== */
   .c-stats, .pt-stats { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); margin-bottom: 24px; }
   .c-stat, .pt-stat { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); color: var(--text); text-decoration: none; }
-  a:is(.c-stat, .pt-stat):hover { border-color: var(--text-2); }
+  a:is(.c-stat, .pt-stat):hover, :is(.c-stat, .pt-stat):has(a:hover) { border-color: var(--text-2); }
+  /* A stat whose label is a link: the whole tile is the link's target, and the label reads as its name. */
+  :is(.c-stat, .pt-stat):has(a) { position: relative;
+    & a { color: inherit; font-weight: 600; text-decoration-color: var(--line-2); text-underline-offset: 0.25em; }
+    & a::after { content: ""; position: absolute; inset: -1px; border-radius: var(--r-3); }
+    & a:focus-visible { outline: 0; }
+    & a:focus-visible::after { outline: 2px solid var(--focus); outline-offset: 2px; } }
+  :is(.c-stat, .pt-stat):has(a:hover) a { text-decoration-color: currentColor; }
   .c-stat-value, .pt-stat-value { font: 700 2rem/1 var(--font-mono); letter-spacing: -0.02em; }
   .c-stat-label, .pt-stat-label { font-size: var(--fs-1); color: var(--text-2); }
   .c-stat-meta { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-0); color: var(--text-3); }
@@ -980,11 +1028,13 @@
   /* ===== Votes (portal: .pt-vote, a toggle with aria-pressed) ===== */
   .c-vote, .pt-vote { display: inline-flex; align-items: center; gap: 6px; min-width: 64px; min-height: 36px; padding: 0 10px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1); color: var(--text); font-size: var(--fs-1);
     transition: border-color var(--d-1) var(--e-cut), background-color var(--d-1) var(--e-cut);
-    &::before { content: ""; width: 0; height: 0; border-inline: 5px solid transparent; border-bottom: 7px solid var(--text-2); }
+    &::before { content: ""; width: 11px; height: 9px; flex: none; background: var(--text-2); clip-path: path(evenodd, "M5.5 0L11 9H0Z M5.5 3.6L8.05 7.5H2.95Z"); }
     &:hover { border-color: var(--text-2); }
     &[aria-pressed="true"] { border-color: var(--ink-pvw); background: color-mix(in srgb, var(--lamp-pvw) 14%, var(--s1)); color: var(--ink-pvw); box-shadow: inset 0 0 0 1px var(--ink-pvw); }
-    &[aria-pressed="true"]::before { border-bottom-color: var(--ink-pvw); }
+    &[aria-pressed="true"]::before { background: var(--ink-pvw); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
     & .pt-small { color: inherit; } }
+  /* The vote's form sits inline with its "You voted" line, in a table cell or the page's header actions. */
+  form:has(> :is(.pt-vote, .c-vote)) { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   .c-vote-count, .pt-vote-count, .c-vote { font-family: var(--font-mono); font-weight: 700; }
   .pt-vote .pt-small { font-family: var(--font-sans); font-weight: 500; }
 
@@ -1000,9 +1050,13 @@
   .pt-comment-body { font-size: var(--fs-2); }
   .pt-files { list-style: none; padding: 0; display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--line);
     & li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 14px; background: var(--s1); font-size: var(--fs-1); }
-    & li > :last-child:not(:first-child) { margin-left: auto; } & a { font-weight: 600; overflow-wrap: anywhere; } }
-  .c-empty, .pt-empty { display: grid; justify-items: center; gap: 14px; padding: clamp(28px, 5vw, 48px) 20px; text-align: center; border: 1px dashed var(--field); border-radius: var(--r-3); background: var(--s1);
-    & p { max-width: 56ch; color: var(--text-2); } }
+    & li > :last-child:not(:first-child) { margin-left: auto; } & a { font-weight: 600; overflow-wrap: anywhere; }
+    & li:not(:has(> .c-icon))::before { content: ""; width: 16px; height: 16px; flex: none; background: var(--text-3);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='square'%3E%3Cpath d='M6 3h8.5L19 7.5V21H6z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat; }
+    & li > form { margin: 0; } & li > form.pt-actions, & li > form .pt-actions { margin-top: 0; } }
+  .c-empty, .pt-empty { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 10px; padding: clamp(28px, 5vw, 48px) 20px; text-align: center; border: 1px dashed var(--field); border-radius: var(--r-3); background: var(--s1);
+    & > :not(.c-btn, .pt-btn) { flex-basis: 100%; } & > .c-empty-mark { flex: 0 0 64px; margin-inline: calc((100% - 64px) / 2); }
+    & p { max-width: 56ch; margin-inline: auto; color: var(--text-2); } }
   .c-empty-mark { width: 64px; height: 40px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: linear-gradient(90deg, transparent 49.5%, var(--line-2) 0 50.5%, transparent 0), linear-gradient(transparent 49%, var(--line-2) 0 51%, transparent 0), var(--bg); }
 
   /* ===== Copy-to-clipboard and code lines ===== */
@@ -1127,6 +1181,15 @@
     & a:is([aria-current="page"], [aria-current="true"]) { color: var(--text); border-color: var(--text-2); box-shadow: inset 0 -2px 0 var(--text); } }
   .pt-nav-heading { margin: 14px 0 8px; font-size: var(--fs-0); font-weight: 650; color: var(--text-3); }
   .pt-nav-signout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  /* Phones and tablets: the rail is a compact band of sideways-scrolling rows above the page; the faded right edge
+     says there is more, and the padding lets the last link scroll clear of the fade. */
+  @media (width < 64rem) {
+    .pt-nav { display: grid; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--line);
+      & ul { padding: 0 28px 2px 0; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+      & a { min-height: 36px; padding: 6px 12px; } }
+    .pt-nav-heading { margin: 6px 0 0; }
+    .pt-nav-signout { margin-top: 2px; padding-top: 0; border-top: 0; }
+  }
   @media (width >= 64rem) {
     .pt-nav { position: sticky; top: calc(var(--header-h) + 24px); align-self: start;
       & ul { flex-direction: column; overflow: visible; gap: 2px; padding: 0; }
@@ -1135,21 +1198,100 @@
       & a:is([aria-current="page"], [aria-current="true"]) { background: var(--s1); border-color: var(--line); box-shadow: inset 3px 0 0 var(--text); } }
     .pt-nav-signout { flex-direction: column; align-items: flex-start; }
   }
+  /* Signed out (sign-in, register, reset): no rail; the two links become one segmented switch above the card. */
+  .pt-shell:has(.pt-auth):not(:has(.pt-nav-signout)) { grid-template-columns: minmax(0, 1fr);
+    & > .pt-nav { position: static; justify-self: center; width: min(100%, 30rem); margin-top: clamp(0px, 3vw, 24px); padding: 0; border: 0; }
+    & > .pt-nav ul { flex-direction: row; gap: 2px; padding: 2px; overflow: visible; mask-image: none; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1); }
+    & > .pt-nav li { flex: 1 1 0; }
+    & > .pt-nav a { justify-content: center; min-height: 40px; border: 0; border-radius: var(--r-1); background: none; box-shadow: none; }
+    & > .pt-nav a:hover { background: var(--s2); }
+    & > .pt-nav a[aria-current] { background: var(--s3); color: var(--text); box-shadow: inset 0 -2px 0 var(--text-2); }
+    & .pt-auth { margin-top: 16px; }
+  }
   .pt-main { min-width: 0; }
   .pt-header { display: grid; gap: 6px; margin-bottom: 28px; padding-bottom: 22px; border-bottom: 1px solid var(--line);
     & .pt-eyebrow { margin-bottom: 4px; } }
-  .pt-title { font-size: var(--fs-6); font-stretch: 112%; }
-  .pt-lede { max-width: 60ch; font-size: var(--fs-2); color: var(--text-2); }
+  .pt-title { font-size: var(--fs-6); font-stretch: 112%;
+    & .pt-mono { font-weight: 650; font-size: 0.88em; letter-spacing: -0.03em; } }
+  .pt-lede { max-width: 60ch; font-size: var(--fs-2); color: var(--text-2);
+    & .pt-badge { margin-right: 2px; } }
   .pt-header-actions, .pt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .pt-header-actions { margin-top: 12px; }
   .pt-actions { margin-top: 16px; }
+  /* A ghost button standing alone in the header reads as a button, with a hairline; first in a row of actions it
+     lines its words up with the text above (the hover fill still shows the whole target). */
+  .pt-header-actions .pt-btn--ghost { --btn-bd: var(--line-2); }
+  .pt-header-actions .pt-btn--ghost:hover { --btn-bd: var(--text-2); }
+  .pt-header-actions .pt-vote { min-height: 48px; padding-inline: 14px; font-size: var(--fs-2); }
+  @media (width >= 40rem) {
+    .pt-actions > .pt-btn--ghost:first-child { margin-left: -22px; }
+    .pt-actions > .pt-btn--ghost.pt-btn--small:first-child { margin-left: -14px; }
+  }
+  .pt-actions > .pt-small { color: var(--text-2); }
   .pt-section { margin-top: 40px; &:first-child, .pt-grid > & { margin-top: 0; } }
-  .pt-h2 { margin-bottom: 14px; font-size: var(--fs-4); font-stretch: 110%; }
+  .pt-h2 { margin-bottom: 14px; font-size: var(--fs-4); font-stretch: 110%;
+    & .pt-muted { font-weight: 500; } }
+  /* Page flow: blocks in the main column, a section or the sign-in card are spaced evenly unless they set their own. */
+  :where(.pt-main, .pt-section, .pt-auth) > :where(* + *) { margin-top: 16px; }
+  :where(.pt-section) > :where(ul:not([class]), ol:not([class])) { padding-left: 1.3em; & > li + li { margin-top: 6px; } }
+  .pt-section h3:not([class]), .pt-section > h3 { margin-top: 24px; font-size: var(--fs-3); font-stretch: 108%; }
   .pt-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr); }
   @media (width >= 40rem) { .pt-grid--2, .pt-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (width >= 80rem) { .pt-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .pt-auth { width: min(100%, 30rem); margin: clamp(24px, 6vw, 72px) auto; padding: clamp(20px, 4vw, 36px); border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); box-shadow: var(--shadow-2);
-    & .pt-header { margin-bottom: 20px; padding-bottom: 16px; } & .pt-title { font-size: var(--fs-5); } }
+    & .pt-header { margin-bottom: 20px; padding-bottom: 16px; } & .pt-title { font-size: var(--fs-5); }
+    & .pt-card { box-shadow: none; background: var(--s2); } }
+
+  /* ===== Portal cards: titles, whole-card links, lists of rows, footers ===== */
+  .pt-card > :is(h2, h3).pt-card-title { margin: 0; }
+  .pt-card-title a { text-decoration-color: var(--line-2); } .pt-card-title a:hover { text-decoration-color: currentColor; }
+  .pt-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .pt-card-body :is(h2, h3, h4) { margin-top: 16px; font: 650 var(--fs-2)/1.3 var(--font-display); font-stretch: 108%; letter-spacing: -0.005em; color: var(--text); }
+  .pt-card-body .pt-prose { font-size: var(--fs-1); color: var(--text-2); & :is(h2, h3, h4) { margin-top: 1.2em; } & :is(h2, h3, h4):first-child { margin-top: 0; } }
+  .pt-card-body .pt-kv { margin-top: 12px; }
+  /* A plain list in a card body is a list of rows: the link first, its badges beside it, the meta line under it. */
+  .pt-card-body > ul { list-style: none; padding: 0; display: grid;
+    & > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+    & > li:first-child { padding-top: 2px; border-top: 0; }
+    & > li > a { font-weight: 600; color: var(--text); }
+    & > li > .pt-small { flex-basis: 100%; } }
+  .pt-card-footer { & > .pt-actions { margin-top: 0; } & > p { margin: 0; color: var(--text-2); } & a:not([class]) { font-weight: 600; } }
+  .pt-card--link { & .pt-badge { align-self: flex-start; } & .pt-card-body { color: var(--text-2); } & .pt-card-footer { color: var(--text-2); } }
+  .pt-card--link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  form.pt-card { margin: 0; }
+
+  /* ===== Portal forms: a readable measure, the hint above the control, checkboxes and radios with their words ===== */
+  .pt-form { max-width: 46rem; }
+  .pt-card .pt-form, .pt-auth .pt-form { max-width: none; }
+  /* The contract's order is label, control, hint, error; the hint is shown above the control, as on every form. */
+  .pt-form .pt-field:not(.pt-field--inline) {
+    & > .pt-help { order: 1; margin-top: -2px; } & > :is(input, select, textarea, .c-input, .c-select, .c-textarea) { order: 2; } & > .pt-error { order: 3; } }
+  .pt-field > label .pt-muted { font-weight: 400; color: var(--text-3); }
+  .pt-fieldset > .pt-help { margin-top: -6px; }
+  .pt-field--inline { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 4px 12px; align-items: start; font-size: var(--fs-1);
+    & > input { grid-column: 1; grid-row: 1; }
+    & > :not(input) { grid-column: 2; }
+    & > label { display: block; font-size: var(--fs-1); font-weight: 560; font-stretch: var(--wd-ui); line-height: 1.45; color: var(--text); }
+    & > label a { font-weight: 620; }
+    & > .pt-help { margin-top: -2px; } }
+  .pt-fieldset:has(> .pt-field--inline) { gap: 12px; }
+  :is(input, textarea).pt-mono { font-family: var(--font-mono); font-size: var(--fs-1); letter-spacing: 0.02em; }
+  .pt-kv dt abbr[title], abbr[title] { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-underline-offset: 0.22em; cursor: help; }
+
+  /* ===== Portal filter bar (pt-search): labelled fields or a bare label, select and button, in one row ===== */
+  .pt-search { align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
+    & > label { min-height: 40px; display: inline-flex; align-items: center; }
+    & > :is(input, select) { flex: 0 1 16rem; min-width: 10rem; }
+    & .pt-btn { min-height: 40px; }
+    & > .pt-field { flex: 1 1 10rem; max-width: 16rem; gap: 6px;
+      & > label { font-size: var(--fs-0); line-height: 18px; color: var(--text-2); }
+      & :is(input, select) { width: 100%; min-width: 0; max-width: none; } }
+    & > .pt-field:has(input[type="search"]) { flex: 2 1 15rem; max-width: 24rem; }
+    & > .pt-actions { margin: 24px 0 0; gap: 8px; } }
+  @media (width < 40rem) {
+    .pt-search { padding: 12px;
+      & > .pt-field { flex: 1 1 9rem; max-width: none; } & > .pt-field:has(input[type="search"]) { flex-basis: 100%; max-width: none; } }
+  }
 
   /* ===== Reveal on scroll (site.js arms it only below the fold, never under reduced motion) ===== */
   @media (prefers-reduced-motion: no-preference) {
@@ -1184,6 +1326,7 @@
     .c-tier.is-rec, .c-compare-table .is-rec { outline: 2px solid Highlight; outline-offset: -2px; }
     input:is([type="checkbox"], [type="radio"]) { appearance: auto; }
     .c-cue[data-state="standby"], .c-flow-gate { outline: 2px dashed Highlight; }
+    .c-vote::before, .pt-vote::before, .pt-files li::before, .pt-badge--show_stopper, .pt-badge--abuse { forced-color-adjust: none; }
   }
 
   @media print {

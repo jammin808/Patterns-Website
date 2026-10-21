@@ -13,7 +13,10 @@ the browser blocks the fonts and the module scripts.
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
-| `public/assets/img/icons.svg` | The icon sprite (42 symbols) |
+| `public/assets/img/icons.svg` | The icon sprite (96 symbols, 8.30) |
+| `public/favicon.svg`, `public/favicon.ico`, `public/assets/img/brand/` | The brand mark as favicons, touch, app and logo icons (8.33) |
+| `public/assets/img/og/` | The Open Graph cards, one per `og` image in `content/pages.php` (8.34) |
+| `tools/og/` | The generators for both: `brand.py` and `build.mjs` (see `tools/og/README.md`) |
 | `public/assets/fonts/` | Archivo and JetBrains Mono, self-hosted WOFF2 subsets, with `LICENSES.txt` (SIL OFL 1.1) |
 
 ---
@@ -414,6 +417,19 @@ Portal aliases: `pt-btn`, `pt-btn--primary|secondary|ghost|danger|small`. Disabl
 Portal: `pt-badge pt-badge--{open, triaged, planned, in_progress, done, declined, closed, requested,
 awaiting_payment, issued, revoked, active, pending, approval, disabled, new, read, archived}` are status pills.
 `admin, client, bug, feature, question, stable, beta, private, public` are square tags without a dot.
+
+| Variant | Colour | Marker (the cue that is not colour) |
+|---|---|---|
+| `open`, `requested` / `triaged` / `planned` | neutral | hollow dot / half dot / dashed edge |
+| `new` / `closed`, `read`, `archived` | neutral / muted, no fill | solid dot / grey dot |
+| `in_progress`, `awaiting_payment`, `pending`, `approval` | amber (standing by) | dot |
+| `done`, `issued`, `active` | green | dot |
+| `declined`, `revoked`, `disabled` | red | dash instead of a dot |
+| Severity `low`, `normal`, `high`, `show_stopper` | muted, neutral, amber, red | a three-bar level meter with 1, 2, 3 and 3 bars lit; show-stopper is the only filled pill |
+| Assistant verdicts `in_scope` (Answered), `needs_human` (Needs a person) | green, amber | dot |
+| `out_of_scope`, `code_or_internals`, `code_guard` / `abuse` | red | dash (the last two with a dashed edge) / a filled pill |
+
+Status never uses a product colour, and the word is always inside the badge.
 
 ### 8.8 Tallies and lamps (cue dots)
 
@@ -817,6 +833,13 @@ Toasts never time out on their own (WCAG 2.2.1); they have a close button.
   <span class="c-stat-meta"><i class="c-lamp c-lamp--standby"></i>3 waiting on you</span></div>…</div>   <!-- portal: pt-stats -->
 <button type="submit" class="pt-vote" aria-pressed="true"><span class="pt-vote-count">48</span> <span class="pt-small">votes</span><span class="u-visually-hidden"> — vote for “…”</span></button>
 ```
+- A vote's triangle is hollow; pressed, it fills, the border doubles and the button turns green, with the
+  template's "You voted" line beside it. A `form` that holds a vote is inline, so it sits in a table cell or in
+  `.pt-header-actions` (where the vote grows to the 48px of the buttons beside it).
+- `pt-search` is the portal's filter bar: a panel holding either labelled `div.pt-field` blocks (search fields take
+  more room, help sits under the field) and a `.pt-actions` row aligned to the controls, or a bare label, select and
+  button in one row. On phones the fields go two to a row and the search field takes a row of its own.
+- A stat whose label is a link (`pt-stat-label > a`) makes the whole tile the target, with the focus ring round it.
 
 ### 8.27 Portal shell and parts (docs/PORTAL-UI.md)
 
@@ -828,6 +851,34 @@ Administration links stay visible), `pt-nav` (links with `aria-current`), `pt-na
 amber and dashed), `pt-comment-meta`, `pt-comment-body`, `pt-files`, `pt-tabs`, `pt-pager`, `pt-vote`,
 `pt-search`, `pt-prose`, `pt-auth` (the narrow sign-in card), and `pt-muted`, `pt-small`, `pt-mono`. Every one is
 in the kitchen sink.
+
+How the portal's markup is laid out (everything below is CSS; the templates keep the contract's markup):
+
+- **Rail.** From 64rem a sticky 15rem rail. Below it, a compact band of sideways-scrolling rows with a faded right
+  edge, the Administration row under it and the sign-out line last. Signed out (the rail has no sign-out form and
+  the page is a `pt-auth` card), there is no rail: "Sign in" and "Create an account" become one segmented switch
+  centred above the card.
+- **Page flow.** Blocks in `pt-main`, a `pt-section` and `pt-auth` are 16px apart unless they set their own space;
+  plain lists in a section are indented with 6px between items; an `h3` in a section is 17px with 24px above it.
+- **Header.** `pt-title` may hold a `pt-mono` reference; badges in `pt-lede` sit on the text line. A ghost button
+  in `pt-header-actions` has a hairline so it reads as a button; the first ghost button in a `pt-actions` row lines
+  its words up with the text above (from 40rem).
+- **Cards.** `pt-card--link` is one target: its `span` parts (`-title`, `-meta`, `-body`, `-footer`) are blocks and a
+  badge sits at its top left. A bare `ul` in `pt-card-body` is a list of rows: the link, its badges beside it, the
+  `pt-small` meta line under it, hairlines between. Headings in a card body are 16px; release notes (`pt-prose`)
+  are 14px. A `pt-actions` row or `p` in `pt-card-footer` loses its own margin. A `form` can be the card.
+- **Forms.** `pt-form` keeps a 46rem measure (the full width inside a card or `pt-auth`). The contract's order is
+  label, control, `pt-help`, `pt-error`; the hint is shown above the control and the error below it, as in 8.24.
+  `pt-field--inline` is a two-column grid: the checkbox or radio, then its label with `pt-help` and `pt-error`
+  under the label. `input.pt-mono` (hardware IDs) is mono at 14px. `abbr[title]` has a dotted underline.
+- **Tables.** Edge shadows appear only where columns are scrolled out of view. A table narrower than 40rem without
+  `--stack` keeps its columns: cells stop wrapping, the row title (`tbody th`) keeps 12.5rem, and the wrapper
+  scrolls. Give every `td` a `data-label` and add `pt-table--stack` to get one card per row instead. `pre` in a
+  cell (audit details) wraps at 30rem.
+- **Files.** Each `pt-files` item without an icon gets a document glyph; the size, or a small delete `form.pt-actions`,
+  sits at the end of the row.
+- **Flashes and empty states.** `pt-alert` flows as a block (text and links on one line). `pt-empty` puts its words on
+  rows of their own and its buttons side by side.
 
 ### 8.28 Support assistant: launcher, panel, bottom sheet (`chat.js`)
 
@@ -886,13 +937,22 @@ in the kitchen sink.
 
 ### 8.30 Icons
 
-The sprite is `public/assets/img/icons.svg`: check, dash, close, menu, chevron, arrow, external, sun, moon, system,
-chat, send, info, alert, ok, error, bus, deck, approve, search, doc, download, copy, ticket, key, user, plus, minus,
-filter, attach, play, pause, reset, pattern, clock, people, projector, mail, bug, idea, question and lock. They sit
-on a 24px grid with a 1.5px stroke, square caps, mitred joins and no fills, like front-panel silkscreen. Use
-`.c-icon` (20px), `--sm` (16px) or `--lg` (28px); the colour is `currentColor`. An icon goes with words; an
+The sprite is `public/assets/img/icons.svg`, 96 symbols in five groups:
+
+| Group | Icons |
+|---|---|
+| Interface | check, dash, close, menu, chevron, arrow, external, sun, moon, system, chat, send, info, alert, ok, error, bus, deck, approve, search, doc, download, copy, ticket, key, user, plus, minus, filter, attach, play, pause, reset, pattern, clock, people, projector, mail, bug, idea, question, lock |
+| Pictures, screens and media | monitor, laptop, phone, grid, layout, layers, blend, mesh, cube, scan, camera, video, film, slides, speaker, mic |
+| Signals, networks and control | broadcast, sync, link, plug, network, wifi, offline, globe, radar, pulse, cue (a cue-light box), timer, keyboard, settings (sliders), chip, usb, zap |
+| People, places and messages | users (as people), message, building, home, calendar, book |
+| Files, actions and states | file, list, chart, receipt, tag, upload, edit, trash, eye, logout, flag, star, shield (with a tick), sparkles, bulb (as idea) |
+
+They sit on a 24px grid with a 1.5px stroke, square caps, mitred joins and no fills, like front-panel silkscreen.
+Use `.c-icon` (20px), `--sm` (16px) or `--lg` (28px); the colour is `currentColor`. An icon goes with words; an
 icon-only button has an `aria-label`. Tallies, lamps, registration crosses, the FAQ crosshair, the vote triangle and
-the brand mark are CSS, not icons. Add new icons to the same grid and stroke.
+the brand mark are CSS, not icons. Add new icons to the same grid and stroke, in their group, and check them at 16px
+beside their neighbours. Every name used in `content/` (`'icon' => '…'`) and in templates (`icon('…')`) must be a
+symbol here.
 
 ### 8.31 Long-form text, error pages, print
 
@@ -913,6 +973,44 @@ colour), `u-nowrap`, `u-center`, `u-mt-0|2|4|6|8`, `u-hide-sm` and `u-show-sm` (
 `u-theme-dark` (switch a container's theme).
 
 ---
+
+### 8.33 Brand mark, favicons and app icons
+
+The brand mark is the seven 75% bars over a dark strip holding one short light segment (`.c-brand-mark`: 28 × 22,
+bars 16 tall, a 1-unit gap, the segment 5 tall and 9 wide). `tools/og/brand.py` draws it on whole pixels at every
+size, so the bars stay crisp; only tile corners are smoothed.
+
+| File | Size | Shape |
+|---|---|---|
+| `public/favicon.svg` | 32-unit grid | dark rounded tile (`#090C10`, radius 6); every edge lands on a whole pixel at 16 and 32px |
+| `public/favicon.ico` | 16, 32, 48 | the same tile, laid out per size (the light segment is two bars wide) |
+| `brand/apple-touch-icon.png` | 180 | full bleed (iOS rounds it), mark at 62% |
+| `brand/icon-192.png`, `brand/icon-512.png` | 192, 512 | rounded tiles for the web manifest's "any" purpose |
+| `brand/icon-maskable-512.png` | 512 | full bleed, the whole mark inside the 80% safe circle |
+| `brand/logo-512.png` | 512 | full bleed, for the Organization JSON-LD (`Schema.php`) |
+
+The mark is never recoloured or redrawn with other bars, and the tile stays dark in both themes (principle 3).
+
+### 8.34 Open Graph cards
+
+`public/assets/img/og/*.png` are 1200 × 630, built by `node tools/og/build.mjs` from `tools/og/template.html` with
+this stylesheet, the fonts and the sprite. Each card is the dark room with the 48px grid, the brand mark and
+wordmark, the domain, the SMPTE bar strip along the bottom, and a headline from the page's H1 (or its title) beside
+one drawn visual. Product cards add the product's 8px top bar, its swatch, name and filled role chip, and a faint
+followspot in its colour; PlayMap's card says "Early access".
+
+| Card | Pages | Visual |
+|---|---|---|
+| `home`, `default` | home; any page without its own | the multiview of the four drawn screens; the four apps as a router panel |
+| `ecosystem`, `integrations`, `ai` | the ecosystem pages | the apps on Show Bus; integration chips; the proposal reaching only the amber gate |
+| `patterns`, `stagewatch`, `agmessage`, `playmap` | each product's overview, features and licensing | the product's drawn screen on a monitor with its UMD |
+| `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production with their prices from `content/licensing/stagewatch.php` |
+| `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list; what the downloads hold; the assistant; the contact topics; the facts |
+
+Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines; hyphenated words never
+break. Text is sized to stay legible at a 400px thumbnail. Words and prices come from `content/`; the build fails if
+`content/pages.php` names an `og` image with no card. Cards are palette PNGs when that is visually identical, and stay
+under 150 KB (25–90 KB today).
 
 ## 9. Imagery: real screenshots
 
