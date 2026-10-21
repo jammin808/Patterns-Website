@@ -14,6 +14,7 @@
  * @var array<string, string> $licenceStatuses
  * @var array<string, string> $products
  * @var array<string, string> $topics
+ * @var bool $configShadowed a config/local.php in the web root is not the file being read
  */
 $time = static fn (mixed $ts): string => (int) $ts > 0
     ? '<time datetime="' . e(date(DATE_ATOM, (int) $ts)) . '">' . e(ago((int) $ts)) . '</time>'
@@ -26,6 +27,10 @@ $typeTabs = ['bug' => 'Open bug reports', 'feature' => 'Open feature requests', 
     <h1 class="pt-title">Admin overview</h1>
     <p class="pt-lede">What is waiting for you, and how the site is being used.</p>
 </header>
+
+<?php if (!empty($configShadowed)): ?>
+<div class="pt-alert pt-alert--warning" role="status">A settings file was uploaded as <code>public_html/config/local.php</code>, but the site reads <code>patterns-data/config.php</code> outside <code>public_html</code>, so the upload has no effect. Make the change in <code>patterns-data/config.php</code>, then delete <code>config/local.php</code> from <code>public_html</code>.</div>
+<?php endif; ?>
 
 <section class="pt-section" aria-labelledby="ov-waiting">
     <h2 class="pt-h2" id="ov-waiting">Waiting for you</h2>

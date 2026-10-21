@@ -16,7 +16,7 @@ $updated = '2026-10-20';
 return [
     '/' => [
         'template' => 'pages/home',
-        'title' => 'Show Control Software for Live Events | Patterns',
+        'title' => 'Live Event Show Control Software | Patterns Show Control',
         'description' => 'Test patterns, stage timers, back-room messaging and projection mapping for live events. Four Windows apps, one show network. Made in the UK.',
         'crumb' => 'Home',
         'parent' => null,
@@ -49,8 +49,8 @@ return [
     ],
     '/ecosystem/ai/' => [
         'template' => 'pages/ecosystem/ai',
-        'title' => 'AI in Show Control, with a Person Always Approving',
-        'description' => 'How the Patterns apps use AI: drafts, proposals and assistants that a person approves before anything reaches the room. Offline-first, never in charge.',
+        'title' => 'AI in Show Control, with People in Charge',
+        'description' => 'How the Patterns apps use AI: drafts, proposals and assistants, with a person approving each high-risk step before it reaches the room. Never in charge.',
         'crumb' => 'AI with approval',
         'parent' => '/ecosystem/',
         'section' => 'ecosystem',
@@ -143,6 +143,7 @@ return [
         'type' => 'licensing',
         'product' => 'stagewatch',
         'og' => '/assets/img/og/stagewatch-licensing.png',
+        'og_alt' => 'StageWatch prices: Standard £9, Pro £29, Production £59 launch price (was £79)',
         'updated' => $updated,
     ],
 
@@ -238,7 +239,7 @@ return [
         'template' => 'pages/workflows/show',
         'workflow' => 'led-wall-line-up',
         'title' => 'How to Line Up and Test an LED Wall at Load-In',
-        'description' => 'A load-in checklist for LED walls: native raster, 1:1 pixel checks, cabinet and port maps, colour and low-grey tests, then hand the canvas to the show.',
+        'description' => 'LED wall load-in checklist: native raster, 1:1 pixel checks, panel maps and data-run numbering, colour and low-grey tests, then hand over the canvas.',
         'crumb' => 'LED wall line-up',
         'parent' => '/workflows/',
         'section' => 'workflows',

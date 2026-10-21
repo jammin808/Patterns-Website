@@ -141,7 +141,7 @@ return [
             ],
             [
                 'q' => 'Will an AI change my show by itself?',
-                'a' => 'Not unless you choose to let it. Out of the box, AI features only propose and a person decides, and anything that would change what the audience sees is never pre-ticked. With StageWatch Pro or higher on the network, suggestions from the other apps wait in one list for the show caller.',
+                'a' => 'In Patterns, StageWatch and AGMessage, not unless you choose to let it: out of the box, AI features only propose and a person decides, and anything that would change what the audience sees is never pre-ticked. In PlayMap, everyday steps run straight away through PlayMap\'s own checks, and high-risk actions always wait for a person. With StageWatch Pro or higher on the network, suggestions from Patterns\' assistant, AI tools connected to StageWatch and AGMessage\'s research team wait in one list for the show caller.',
             ],
             [
                 'q' => 'What happens if a computer crashes mid-show?',

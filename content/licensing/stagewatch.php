@@ -7,7 +7,10 @@ declare(strict_types=1);
  * table. This file is the reference shape for every product's licensing data:
  *
  *   pricing_status  'live' (prices shown, licences requestable) | 'coming-soon' (structure shown, no prices)
+ *   llms_note       optional: what the licensing page holds, for its line in llms.txt (default by pricing_status)
  *   tiers[]         id, name, price (numeric string, or null when not sold), price_label (display), period,
+ *                   launch_price (numeric string: the price charged while a launch offer runs; price is then the
+ *                   list price, shown struck through, and removing it ends the offer everywhere at once),
  *                   machines, summary, includes[], highlight, badge, requestable (a licence can be requested),
  *                   hardware_ids (how many IDs the request needs), cta {label, href}
  *   matrix          columns (tier ids) and groups of rows: feature => values per column (true, false, or text)
@@ -85,7 +88,7 @@ return [
             'name' => 'Production',
             'price' => '79',
             'price_label' => '£79',
-            'price_note' => 'Launch price £59',
+            'launch_price' => '59',
             'period' => 'one-off',
             'machines' => 2,
             'summary' => 'The crew loop and multi-room kit, for a main and a backup PC.',

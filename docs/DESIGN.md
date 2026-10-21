@@ -522,11 +522,11 @@ The eyebrow's marker is the four app bars on ecosystem pages and the product's b
       <div class="c-pvw-text"><span class="c-tally c-tally--pvw">PVW</span><span class="c-pvw-name" data-hero-pvw-name>Crosshatch 16×10</span></div></div>
     <div class="c-take-actions">
       <fieldset class="c-seg"><legend class="u-visually-hidden">Transition</legend>
-        <label><input type="radio" name="hero-trans" value="mix" data-hero-trans><span>Mix</span></label>
+        <label><input type="radio" name="hero-trans" value="dissolve" data-hero-trans checked><span>Dissolve</span></label>
+        <label><input type="radio" name="hero-trans" value="dip" data-hero-trans><span>Dip</span></label>
         <label><input type="radio" name="hero-trans" value="wipe" data-hero-trans><span>Wipe</span></label>
-        <label><input type="radio" name="hero-trans" value="pixels" data-hero-trans checked><span>Pixels</span></label>
-        <label><input type="radio" name="hero-trans" value="iris" data-hero-trans><span>Iris</span></label></fieldset>
-      <button class="c-btn c-btn--secondary c-btn--sm c-auto" type="button" aria-pressed="true" data-hero-auto><i class="c-lamp" aria-hidden="true"></i>Auto</button>
+        <label><input type="radio" name="hero-trans" value="push" data-hero-trans><span>Push</span></label></fieldset>
+      <button class="c-btn c-btn--secondary c-btn--sm c-auto" type="button" aria-pressed="true" data-hero-auto><i class="c-lamp" aria-hidden="true"></i>Auto demo</button>
       <button class="c-take" type="button" data-hero-take>TAKE</button>
     </div>
   </div>
@@ -534,8 +534,10 @@ The eyebrow's marker is the four app bars on ecosystem pages and the product's b
 ```
 It draws six real patterns: SMPTE bars with PLUGE, a crosshatch, an LED cabinet map, a zone plate, ramps with a
 step wedge, and a checkerboard. Before the script runs, or without it, the monitor shows the CSS bars poster
-(`.c-bars-poster`) and the server's time. The page's LCP is the h1, not the canvas. Measured cost is 0.6 ms of
-script per transition frame at 2× density. The loop stops off screen and in hidden tabs. Put `data-chat-tuck` on
+(`.c-bars-poster`) and the server's time. The page's LCP is the h1, not the canvas. The transitions are four of
+Patterns' own (Dissolve, Dip, Wipe, Push); each frame of one is at most two drawImage calls and a fill. Auto demo
+is the demo's own control, not a Patterns feature: it pauses and resumes the automatic takes (WCAG 2.2.2). The
+loop stops off screen and in hidden tabs. Put `data-chat-tuck` on
 the hero so the floating launcher stays out of the picture.
 
 ### 8.12 Product cards (the multiview)

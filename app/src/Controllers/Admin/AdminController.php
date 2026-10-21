@@ -115,6 +115,7 @@ final class AdminController extends Controller
             'licenceStatuses' => LicenceController::STATUSES,
             'products' => DownloadController::productNames(),
             'topics' => ContactController::TOPICS,
+            'configShadowed' => $this->app->config->shadowed(),
         ], 'Admin overview');
     }
 

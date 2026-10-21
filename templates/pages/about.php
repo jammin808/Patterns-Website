@@ -2,27 +2,18 @@
 /**
  * About (/about/): who makes the apps and for whom, the principles the four apps share, the four products and how
  * to get in touch. Only what content/site.php, content/pages.php and content/ecosystem.php say; no biography beyond
- * them. Adds the Person node the AboutPage is about.
+ * them. The Person node the AboutPage is about is in every page's base graph (Schema::person()).
  *
  * @var \Psc\View\Seo $seo
  * @var array<string, mixed> $page
  */
 use Psc\Content\Content;
-use Psc\View\Schema;
 
 $site = content('site');
 $eco = content('ecosystem');
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/hub.css')) . '">');
 
 $publisher = (string) ($site['publisher']['name'] ?? 'Ben Rohleder');
-$base = rtrim(url('/'), '/');
-$seo->add([
-    '@type' => 'Person',
-    '@id' => $base . '/about/#ben',
-    'name' => $publisher,
-    'url' => $base . '/about/',
-    'worksFor' => ['@id' => Schema::organizationId($base)],
-]);
 
 $intro = preg_split('/(?<=\.)\s+/', (string) ($site['llms_intro'] ?? '')) ?: [];
 $arch = [];
@@ -33,7 +24,8 @@ $aiFirst = $eco['ai']['principles'][0]['text'] ?? '';
 $principles = [
     ['icon' => 'bus', 'title' => 'Offline on the venue network', 'text' => $arch['The venue network is enough'] ?? ''],
     ['icon' => 'reset', 'title' => 'Built to keep running', 'text' => (string) ($eco['reliability']['intro'] ?? '')],
-    ['icon' => 'approve', 'title' => 'A person decides', 'text' => implode(' ', array_slice(preg_split('/(?<=\.)\s+/', (string) $aiFirst) ?: [], 0, 2))],
+    // The principle whole: what Patterns, StageWatch and AGMessage hold for a person, and what PlayMap does.
+    ['icon' => 'approve', 'title' => 'People stay in charge', 'text' => implode(' ', array_slice(preg_split('/(?<=\.)\s+/', (string) $aiFirst) ?: [], 0, 3))],
     ['icon' => 'check', 'title' => 'Confirmed, not hopeful', 'text' => $arch['Confirmed, not hopeful'] ?? ''],
 ];
 $email = (string) ($site['email'] ?? '');
@@ -43,7 +35,7 @@ $apps = array_map(static fn (string $k): string => (string) (product($k)['name']
     <div class="l-wrap">
         <div class="c-hero-grid">
             <p class="c-eyebrow"><?= e($site['name'] ?? 'Patterns Show Control') ?></p>
-            <h1 class="c-hero-title" id="about-title">About</h1>
+            <h1 class="c-hero-title" id="about-title">About Patterns Show Control</h1>
             <p class="c-hero-lede"><?= e($page['description'] ?? '') ?></p>
             <div class="c-hero-actions">
                 <a class="c-btn c-btn--primary" href="/ecosystem/">How the four apps work together</a>

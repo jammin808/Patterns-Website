@@ -1,7 +1,8 @@
 <?php
 /**
  * /support/faq/: every group of content/faq.php under its own h2, with an in-page index that stays in view on wide
- * screens. One FAQPage node covers every question on the page (the accordions themselves add none).
+ * screens. One FAQPage node covers every question the page owns (Content::faqOwner(): a product's own question is
+ * marked up on its product page instead); the accordions themselves add none.
  *
  * @var array<string, mixed> $page
  * @var \Psc\View\Seo $seo
@@ -13,11 +14,19 @@ $all = [];
 $total = 0;
 foreach ($groups as $g) {
     foreach ($g['items'] as $f) {
-        $all[] = ['q' => (string) $f['q'], 'a' => trim((string) preg_replace('/\[([^\]]+)\]\([^)]+\)/', '$1', (string) $f['a']))];
+        if (\Psc\Content\Content::faqOwner((string) $f['q']) === '/support/faq/') {
+            $all[] = ['q' => (string) $f['q'], 'a' => trim((string) preg_replace('/\[([^\]]+)\]\([^)]+\)/', '$1', (string) $f['a']))];
+        }
         $total++;
     }
 }
-$seo->add(\Psc\View\Schema::faq($seo->canonical(), $all));
+// The FAQ page has no WebPage node of its own (PageController skips type "faq"), so this node carries the page.
+$seo->add(\Psc\View\Schema::faq($seo->canonical(), $all, [
+    'url' => $seo->canonical(),
+    'name' => (string) ($page['title'] ?? $seo->title),
+    'inLanguage' => 'en-GB',
+    'isPartOf' => ['@id' => \Psc\View\Schema::websiteId(rtrim(url('/'), '/'))],
+]));
 ?>
 <section class="c-hero c-hero--page" aria-labelledby="page-title">
     <div class="l-wrap">

@@ -10,11 +10,13 @@ use Psc\Chat\ChatStore;
 use Psc\Chat\Knowledge;
 use Psc\Chat\ModelGateway;
 use Psc\Config;
+use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
 
 /**
- * POST /api/chat {message, page} → a Server-Sent Events stream (meta, delta…, done | error).
+ * POST /api/chat {message, page} → a Server-Sent Events stream (meta, delta…, replace?, done | error). page is the
+ * path the visitor is on; only a page the site knows is kept (knownPage()).
  * Refused before the stream starts, as JSON: 400 invalid, 429 rate_limited / turn_limit, 503 unavailable / busy.
  * The conversation belongs to the visitor's session; its id never comes from the browser.
  */
@@ -50,7 +52,7 @@ final class ChatController extends Controller
         }
         $body = $request->json();
         $message = is_string($body['message'] ?? null) ? self::clean($body['message']) : '';
-        $page = is_string($body['page'] ?? null) ? self::cleanPath($body['page']) : '';
+        $page = is_string($body['page'] ?? null) ? self::knownPage($body['page']) : null;
         $max = $cfg->int('chat.max_input_chars', 1200);
         if ($message === '') {
             return Response::json(['error' => 'invalid', 'message' => 'Type a question first.'], 400);
@@ -77,7 +79,7 @@ final class ChatController extends Controller
         $conversation = $id !== '' ? $store->find($id) : null;
         if ($conversation === null) {
             $id = ChatStore::newId();
-            $store->create($id, $this->app->auth()->id(), $this->app->ipHash($ip), $page);
+            $store->create($id, $this->app->auth()->id(), $this->app->ipHash($ip), $page['path'] ?? '');
             $session->set('chat_id', $id);
             $conversation = ['turns' => 0];
         }
@@ -124,7 +126,7 @@ final class ChatController extends Controller
         };
 
         return Response::stream($writer, 'text/event-stream; charset=utf-8')
-            ->header('Cache-Control', 'no-cache, no-store, no-transform')
+            ->header('Cache-Control', 'private, no-cache, no-store, no-transform')
             ->header('X-Accel-Buffering', 'no')
             ->header('X-LiteSpeed-Cache-Control', 'no-cache');
     }
@@ -184,9 +186,47 @@ final class ChatController extends Controller
         return trim($s);
     }
 
-    private static function cleanPath(string $p): string
+    /** The portal's sections a visitor can be reading when they ask; a deeper path is named by its section. */
+    public const PORTAL_PAGES = [
+        '/portal/' => 'Client portal dashboard',
+        '/portal/login/' => 'Client portal sign-in',
+        '/portal/register/' => 'Create a client portal account',
+        '/portal/forgot/' => 'Reset a client portal password',
+        '/portal/reset/' => 'Choose a new client portal password',
+        '/portal/verify/' => 'Confirm an email address for the client portal',
+        '/portal/downloads/' => 'Client portal downloads',
+        '/portal/licences/' => 'Client portal licences',
+        '/portal/licences/request/' => 'Request a licence in the client portal',
+        '/portal/tickets/' => 'Client portal support tickets',
+        '/portal/tickets/new/' => 'Open a support ticket in the client portal',
+        '/portal/ideas/' => 'Client portal feature requests',
+        '/portal/account/' => 'Client portal account',
+        '/portal/admin/' => 'Client portal administration',
+    ];
+
+    /**
+     * The page the visitor is on, as the site names it: a public page in the registry, or the portal section that
+     * holds the path. Anything else is dropped, so no text a visitor writes reaches the answer model as a system
+     * note or is stored as the conversation's page.
+     *
+     * @return array{path: string, title: string}|null
+     */
+    public static function knownPage(string $raw): ?array
     {
-        $p = (string) parse_url($p, PHP_URL_PATH);
-        return preg_match('#^/[a-z0-9/_-]{0,120}$#', $p) ? $p : '';
+        $path = (string) parse_url($raw, PHP_URL_PATH);
+        $page = $path !== '' ? Content::page($path) : null;
+        if ($page !== null) {
+            return ['path' => $path, 'title' => (string) $page['title']];
+        }
+        if (!str_starts_with($path, '/portal/')) {
+            return null;
+        }
+        $best = null;
+        foreach (array_keys(self::PORTAL_PAGES) as $prefix) {
+            if (str_starts_with($path, $prefix) && ($best === null || strlen($prefix) > strlen($best))) {
+                $best = $prefix;
+            }
+        }
+        return $best === null ? null : ['path' => $best, 'title' => self::PORTAL_PAGES[$best]];
     }
 }

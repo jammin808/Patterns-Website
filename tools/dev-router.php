@@ -15,7 +15,8 @@ if ($path !== '/' && $file !== false && is_file($file) && str_starts_with($file,
     $types = ['css' => 'text/css', 'js' => 'text/javascript', 'svg' => 'image/svg+xml', 'woff2' => 'font/woff2', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'webp' => 'image/webp', 'avif' => 'image/avif', 'ico' => 'image/x-icon', 'txt' => 'text/plain', 'webmanifest' => 'application/manifest+json'];
     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
     header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
-    header('Cache-Control: public, max-age=31536000, immutable');
+    // As public/.htaccess: versioned stylesheets and scripts for a year, images and fonts (unversioned) for a week.
+    header('Cache-Control: ' . (in_array($ext, ['css', 'js'], true) ? 'public, max-age=31536000, immutable' : 'public, max-age=604800'));
     readfile($file);
     return true;
 }

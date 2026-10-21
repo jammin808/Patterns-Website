@@ -16,6 +16,12 @@ final class Response
     /** @var (callable(): void)|null */
     private $stream = null;
 
+    /**
+     * Statuses a server may not know by number, sent with their reason phrase: Apache answers an unknown bare code
+     * with 500, so a "Session expired" page would read as a server fault.
+     */
+    private const REASONS = [419 => 'Page Expired'];
+
     public function __construct(public string $body = '', public int $status = 200, array $headers = [])
     {
         foreach ($headers as $k => $v) {
@@ -98,7 +104,12 @@ final class Response
     {
         if (!headers_sent()) {
             header_remove('X-Powered-By');
-            http_response_code($this->status);
+            if (isset(self::REASONS[$this->status])) {
+                $protocol = (string) ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1');
+                header($protocol . ' ' . $this->status . ' ' . self::REASONS[$this->status], true, $this->status);
+            } else {
+                http_response_code($this->status);
+            }
             foreach ($this->headers as $k => $v) {
                 header($k . ': ' . $v, true);
             }

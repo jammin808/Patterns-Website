@@ -467,9 +467,21 @@ function initTabs() {
 /* --------------------------------------------------------------------------------- forms */
 /*
  * textarea[data-count="#id"] writes "n / max" into the element #id. A server-rendered [data-error-summary] takes
- * focus on load so the first thing read after a failed submit is what to fix.
+ * focus on load so the first thing read after a failed submit is what to fix. input[type=file][data-max-bytes]
+ * refuses files over that size before the form is sent, with the field's data-max-message; the server still
+ * checks, this only saves sending a large file that would be refused.
  */
 function initForms() {
+  for (const input of $$('input[type="file"][data-max-bytes]')) {
+    const max = Number(input.dataset.maxBytes) || 0;
+    if (!max) continue;
+    const check = () => {
+      const total = Array.from(input.files || []).reduce((sum, f) => sum + f.size, 0);
+      input.setCustomValidity(total > max ? (input.dataset.maxMessage || 'This file is too large.') : '');
+    };
+    input.addEventListener('change', () => { check(); input.reportValidity(); });
+    check();
+  }
   for (const field of $$('textarea[data-count], input[data-count]')) {
     const out = $(field.dataset.count);
     if (!out) continue;

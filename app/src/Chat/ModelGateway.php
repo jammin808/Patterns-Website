@@ -24,7 +24,17 @@ interface ModelGateway
      * @param list<array<string, mixed>> $system system blocks (the last one carries the cache breakpoint)
      * @param list<array{role: string, content: string}> $messages
      * @param callable(string): void $onText
-     * @return array{text: string, stop: string, tokens_in: int, tokens_out: int, cache_read: int, model: string}
+     * @return array{text: string, stop: string, tokens_in: int, tokens_out: int, cache_write: int, cache_read: int, model: string}
+     *   tokens_in excludes the cached prompt, which the API reports apart: cache_write tokens written to the
+     *   cache, cache_read tokens read from it
      */
     public function stream(array $system, array $messages, callable $onText): array;
+
+    /**
+     * What the latest stream() spent so far, including one that stopped early because $onText threw or the
+     * connection failed, so a withdrawn or cut-off answer still counts towards the daily budget.
+     *
+     * @return array{tokens_in: int, tokens_out: int, cache_write: int, cache_read: int}
+     */
+    public function lastUsage(): array;
 }

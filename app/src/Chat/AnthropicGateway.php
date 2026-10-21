@@ -18,12 +18,17 @@ use Anthropic\Client;
  * - The answer streams from the answer model (Claude Sonnet 5.5) with thinking off (between_tools: no tools are
  *   offered, so no reasoning is generated or replayed) and low effort; the long system prompt is cached.
  *   Server-side fallbacks ("default") retry a classifier decline on the model Anthropic recommends.
+ * - Usage is kept as the stream runs, cache writes and reads included (the API reports them apart from
+ *   input_tokens), so lastUsage() answers for a stream that was stopped early too.
  */
 final class AnthropicGateway implements ModelGateway
 {
     private const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
     private Client $client;
+
+    /** @var array{tokens_in: int, tokens_out: int, cache_write: int, cache_read: int} */
+    private array $usage = ['tokens_in' => 0, 'tokens_out' => 0, 'cache_write' => 0, 'cache_read' => 0];
 
     /** @param array<string, mixed> $requestOptions extra SDK request options (tests pass a transporter) */
     public function __construct(
@@ -76,6 +81,7 @@ final class AnthropicGateway implements ModelGateway
 
     public function stream(array $system, array $messages, callable $onText): array
     {
+        $this->usage = ['tokens_in' => 0, 'tokens_out' => 0, 'cache_write' => 0, 'cache_read' => 0];
         $stream = $this->client->beta->messages->createStream(
             maxTokens: $this->maxTokens,
             messages: $messages,
@@ -90,24 +96,45 @@ final class AnthropicGateway implements ModelGateway
         $stop = 'end_turn';
         $in = 0;
         $out = 0;
+        $cacheWrite = 0;
         $cacheRead = 0;
         $served = $this->model;
-        foreach ($stream as $event) {
-            if ($event instanceof BetaRawMessageStartEvent) {
-                $in = (int) $event->message->usage->inputTokens;
-                $cacheRead = (int) ($event->message->usage->cacheReadInputTokens ?? 0);
-                $served = (string) $event->message->model;
-            } elseif ($event instanceof BetaRawContentBlockDeltaEvent && $event->delta instanceof BetaTextDelta) {
-                $text .= $event->delta->text;
-                $onText($event->delta->text);
-            } elseif ($event instanceof BetaRawMessageDeltaEvent) {
-                $stop = (string) ($event->delta->stopReason ?? $stop);
-                $out = (int) $event->usage->outputTokens;
-                if ($event->usage->inputTokens !== null) {
-                    $in = (int) $event->usage->inputTokens;
+        $complete = false;
+        try {
+            foreach ($stream as $event) {
+                if ($event instanceof BetaRawMessageStartEvent) {
+                    $u = $event->message->usage;
+                    $in = (int) $u->inputTokens;
+                    $out = (int) $u->outputTokens;
+                    $cacheWrite = (int) ($u->cacheCreationInputTokens ?? 0);
+                    $cacheRead = (int) ($u->cacheReadInputTokens ?? 0);
+                    $served = (string) $event->message->model;
+                } elseif ($event instanceof BetaRawContentBlockDeltaEvent && $event->delta instanceof BetaTextDelta) {
+                    $text .= $event->delta->text;
+                    $onText($event->delta->text);
+                } elseif ($event instanceof BetaRawMessageDeltaEvent) {
+                    // message_delta carries cumulative counts; a field it leaves out keeps message_start's value.
+                    $stop = (string) ($event->delta->stopReason ?? $stop);
+                    $out = (int) $event->usage->outputTokens;
+                    $in = $event->usage->inputTokens !== null ? (int) $event->usage->inputTokens : $in;
+                    $cacheWrite = $event->usage->cacheCreationInputTokens !== null ? (int) $event->usage->cacheCreationInputTokens : $cacheWrite;
+                    $cacheRead = $event->usage->cacheReadInputTokens !== null ? (int) $event->usage->cacheReadInputTokens : $cacheRead;
                 }
+                $this->usage = ['tokens_in' => $in, 'tokens_out' => $out, 'cache_write' => $cacheWrite, 'cache_read' => $cacheRead];
+            }
+            $complete = true;
+        } finally {
+            if (!$complete) {
+                // Output is counted only at the end of a stream: one cut short counts the text it produced at about
+                // four characters a token, so the budget never takes a withdrawn answer as free.
+                $this->usage['tokens_out'] = max($out, intdiv(strlen($text) + 3, 4));
             }
         }
-        return ['text' => $text, 'stop' => $stop, 'tokens_in' => $in, 'tokens_out' => $out, 'cache_read' => $cacheRead, 'model' => $served];
+        return ['text' => $text, 'stop' => $stop, 'tokens_in' => $in, 'tokens_out' => $out, 'cache_write' => $cacheWrite, 'cache_read' => $cacheRead, 'model' => $served];
+    }
+
+    public function lastUsage(): array
+    {
+        return $this->usage;
     }
 }

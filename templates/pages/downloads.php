@@ -51,7 +51,7 @@ foreach ($products as $key => $p) {
         '@id' => $base . '/' . $key . '/#software',
         'name' => (string) $p['name'],
         'url' => $base . '/' . $key . '/',
-        'operatingSystem' => (string) ($p['os'] ?? ''),
+        'operatingSystem' => (string) ($p['schema_os'] ?? $p['os'] ?? ''),
         'applicationCategory' => (string) ($p['schema_category'] ?? 'MultimediaApplication'),
         'downloadUrl' => $seo->canonical() . '#' . $key,
     ];
@@ -66,7 +66,7 @@ foreach ($products as $key => $p) {
         <div class="c-hero-grid">
             <div>
                 <p class="c-eyebrow">Windows builds and Companion modules</p>
-                <h1 class="c-hero-title" id="page-title">Downloads</h1>
+                <h1 class="c-hero-title" id="page-title">Download Patterns, StageWatch, AGMessage and PlayMap</h1>
                 <p class="c-hero-lede">The Windows builds of the four apps, the Bitfocus Companion modules and their release notes are all in the client portal. Start StageWatch's 14-day trial or PlayMap's early access with a free account.</p>
                 <div class="c-hero-actions">
                     <a class="c-btn c-btn--primary" href="/portal/downloads/">Sign in to download</a>

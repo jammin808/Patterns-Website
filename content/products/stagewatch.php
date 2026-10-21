@@ -16,6 +16,7 @@ return [
     'pitch' => 'StageWatch puts one clock on every screen in the room, from confidence monitors and vision mixers to NDI, phones, tablets and TVs. The running order wins back time before the curfew, speakers and crew confirm cues with a tap, and a forecast tells you when the show will really end. It all runs on the venue\'s own network, and by default every AI suggestion waits for your approval.',
     'version' => '2.16.0',
     'os' => 'Windows 10 and 11 (64-bit)',
+    'schema_os' => 'Windows 10, Windows 11 (64-bit)',
     'distribution' => 'Installer',
     'schema_category' => 'BusinessApplication',
     'status' => 'available',

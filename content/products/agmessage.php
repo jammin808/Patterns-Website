@@ -16,6 +16,7 @@ return [
     'pitch' => 'When a shareholder asks the hard question, the answer is usually in the back-room. AGMessage gets it to the chair quietly: the research team pushes the right document from the board pack onto the directors\' screen, confirms the wording and asks a question the board answers with a tap. It runs from one Windows laptop on the venue network, everyone joins from their own browser, and the conversation rides out Wi-Fi drops and restarts.',
     'version' => '0.4.0',
     'os' => 'A 64-bit Windows laptop hosts the meeting; everyone joins from a web browser',
+    'schema_os' => 'Windows (64-bit)',
     'distribution' => 'Portable app (no install)',
     'schema_category' => 'BusinessApplication',
     'status' => 'available',
@@ -210,7 +211,7 @@ return [
         ['label' => 'Remote access (optional)', 'value' => 'An internet connection on the host laptop'],
     ],
     'getting_started' => [
-        ['title' => 'Get AGMessage', 'text' => 'Download AGMessage from your client portal. For a managed AGM, your technician brings the laptop ready to go.'],
+        ['title' => 'Get AGMessage', 'text' => 'For a managed AGM, your technician brings the laptop ready to go. If AGMessage is set up for your account, download it from your client portal.'],
         ['title' => 'Unzip and start', 'text' => 'Unzip the folder anywhere on the meeting laptop, such as the desktop, and double-click the start file at the top of the folder. If Windows SmartScreen asks, choose More info, then Run anyway. Keep the AGMessage window open while the meeting runs.'],
         ['title' => 'Open the admin page', 'text' => 'Your browser opens AGMessage on the laptop. Open the admin page with the address and admin token shown in the AGMessage window.'],
         ['title' => 'Start a meeting', 'text' => 'Choose Start new session and name it after the meeting. AGMessage gives it a six-character meeting code.'],

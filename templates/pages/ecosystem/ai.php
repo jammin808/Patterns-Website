@@ -11,7 +11,7 @@ $ai = $eco['ai'];
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/hub.css')) . '">');
 
 $name = static fn (string $key): string => (string) (product($key)['name'] ?? ucfirst($key));
-$icons = ['A person always decides' => 'approve', 'One place to decide' => 'ticket', 'Risk rated by the app, not the model' => 'alert',
+$icons = ['People stay in charge' => 'approve', 'One place to decide' => 'ticket', 'Risk rated by the app, not the model' => 'alert',
     'Offline first' => 'bus', 'Your own key, on your machine' => 'key', 'Nothing in charge' => 'system', 'Every decision on the record' => 'doc'];
 $privacy = [];
 foreach ($ai['privacy'] as $pv) {
@@ -40,7 +40,7 @@ $steps = [
     <div class="l-wrap">
         <div class="c-hero-grid">
             <p class="c-eyebrow">Ecosystem</p>
-            <h1 class="c-hero-title" id="ai-title">AI in show control, with a person always approving</h1>
+            <h1 class="c-hero-title" id="ai-title">AI in show control, with people in charge</h1>
             <p class="c-hero-lede"><?= e($ai['intro']) ?></p>
             <nav class="hub-jump u-mt-6" aria-label="On this page">
                 <a href="#gate">The approval gate</a><a href="#principles">The rules</a><a href="#apps">What each app sends</a><a href="#mcp">AI agents over MCP</a><a href="#assistant">This site's assistant</a>
@@ -53,7 +53,7 @@ $steps = [
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">The approval gate</p><h2 id="gate-title"><?= e($ai['title']) ?></h2></div>
-            <p class="c-lede">Out of the box, an AI's suggestion stops at an amber gate. It reaches the room only after a person says yes, and the app still runs its own checks.</p>
+            <p class="c-lede">Out of the box, an AI's suggestion to Patterns, StageWatch or AGMessage stops at an amber gate and reaches the room only after a person says yes; in PlayMap, every high-risk step stops there. The app still runs its own checks.</p>
         </div>
         <figure class="hub-gate">
             <div class="c-flow-node c-flow-node--ai"><h3>AI tools and assistants</h3><p>Read the show, propose a change</p></div>
@@ -61,7 +61,7 @@ $steps = [
             <div class="c-flow-gate"><h3><?= icon('approve', 'c-icon--sm') ?>A person approves</h3><p>Approve or discard, in one list</p><span class="c-flow-gate-state"><i class="c-lamp c-lamp--standby" aria-hidden="true"></i>Standing by for you</span></div>
             <span class="c-flow-wire hub-gate-wire">Approved</span>
             <div class="c-flow-node hub-gate-app"><h3>The app's own checks</h3><p>Then done, refused or not delivered</p></div>
-            <figcaption class="c-flow-note">Letting an AI act directly is only ever a choice an operator makes, and PlayMap's high-risk actions wait for a person whatever the settings.</figcaption>
+            <figcaption class="c-flow-note">In Patterns, StageWatch and AGMessage, letting an AI act directly is only ever a choice an operator makes. In PlayMap, everyday steps run straight away through its own checks, and high-risk actions wait for a person whatever the settings.</figcaption>
         </figure>
         <div class="c-ladder c-ladder--static hub-ladder-untimed u-mt-8">
             <div class="c-ladder-head" aria-hidden="true"><span>Step</span><span>What happens</span><span>Where</span></div>

@@ -20,8 +20,26 @@ final class Schema
         return $base . '/#website';
     }
 
+    /** The publisher as a person: described on the About page, and pointed at as founder and author everywhere. */
+    public static function personId(string $base): string
+    {
+        return $base . '/about/#ben';
+    }
+
     /** @return array<string, mixed> */
-    public static function organization(string $base, string $name, string $publisher, string $email): array
+    public static function person(string $base, string $name): array
+    {
+        return [
+            '@type' => 'Person',
+            '@id' => self::personId($base),
+            'name' => $name,
+            'url' => $base . '/about/',
+            'worksFor' => ['@id' => self::organizationId($base)],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function organization(string $base, string $name, string $email): array
     {
         return [
             '@type' => 'Organization',
@@ -34,7 +52,7 @@ final class Schema
                 'width' => 512,
                 'height' => 512,
             ],
-            'founder' => ['@type' => 'Person', 'name' => $publisher],
+            'founder' => ['@id' => self::personId($base)],
             'contactPoint' => [[
                 '@type' => 'ContactPoint',
                 'contactType' => 'customer support',
@@ -144,13 +162,15 @@ final class Schema
 
     /**
      * @param list<array{q: string, a: string}> $faqs answers as plain text
+     * @param array<string, mixed> $extra page fields, for an FAQPage that stands in for the page's WebPage
      * @return array<string, mixed>
      */
-    public static function faq(string $url, array $faqs): array
+    public static function faq(string $url, array $faqs, array $extra = []): array
     {
         return [
             '@type' => 'FAQPage',
             '@id' => $url . '#faq',
+        ] + $extra + [
             'mainEntity' => array_map(static fn (array $f): array => [
                 '@type' => 'Question',
                 'name' => $f['q'],

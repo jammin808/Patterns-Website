@@ -56,7 +56,8 @@ foreach ($usable as $f) {
             'label' => 'Upload a file',
             'error' => $fileError,
             'help' => 'Up to ' . filesize_human($maxBytes) . '.',
-            'attrs' => ['accept' => $accept],
+            // The browser checks the size before sending, so an over-large file is never uploaded only to be refused.
+            'attrs' => ['accept' => $accept, 'data-max-bytes' => $maxBytes, 'data-max-message' => 'This file is larger than ' . filesize_human($maxBytes) . '. Upload it to the downloads-vault/incoming/ folder with the File Manager or FTP, then pick it from the list.'],
             'markOptional' => false,
         ]) ?>
         <?php if ($usable !== []): ?>

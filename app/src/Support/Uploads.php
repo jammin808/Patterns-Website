@@ -116,6 +116,20 @@ final class Uploads
     }
 
     /** A display-safe file name: no path, no control characters, at most 150 characters. */
+    /** A php.ini size ("64M", "2G", "512K", "1048576") in bytes; 0 when it is unset or unreadable. */
+    public static function iniBytes(string $value): int
+    {
+        if (!preg_match('/^(\d+)\s*([KMG]?)/i', trim($value), $m)) {
+            return 0;
+        }
+        return (int) $m[1] * match (strtoupper($m[2])) {
+            'G' => 1024 ** 3,
+            'M' => 1024 ** 2,
+            'K' => 1024,
+            default => 1,
+        };
+    }
+
     public static function cleanName(string $name): string
     {
         $name = basename(str_replace('\\', '/', $name));

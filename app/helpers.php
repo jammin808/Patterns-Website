@@ -92,6 +92,29 @@ if (!function_exists('e')) {
         return '';
     }
 
+    /**
+     * A screenshot's srcset: its 800-pixel copy, a 1200-pixel copy where one sits beside the original
+     * ("name-1200.webp", so a phone at three times density takes about 1200 pixels, not the full 1600), and the
+     * original. Empty without a small copy.
+     *
+     * @param array<string, mixed> $shot a screenshots entry: src, src_small
+     */
+    function shot_srcset(array $shot): string
+    {
+        $src = (string) ($shot['src'] ?? '');
+        $small = (string) ($shot['src_small'] ?? '');
+        if ($small === '' || $src === '') {
+            return '';
+        }
+        $set = [$small . ' 800w'];
+        $mid = (string) preg_replace('/(\.[a-z0-9]+)$/i', '-1200$1', $src);
+        if ($mid !== $src && is_file(PSC_ROOT . '/public' . $mid)) {
+            $set[] = $mid . ' 1200w';
+        }
+        $set[] = $src . ' 1600w';
+        return implode(', ', $set);
+    }
+
     /** A price for display: "£29", or the fallback when not yet announced. */
     function price(?string $amount, string $fallback = 'Coming soon'): string
     {

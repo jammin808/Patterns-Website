@@ -47,11 +47,12 @@ abstract class Controller
         return $this->page($template, $data + ['title' => $title, 'section' => 'portal'], $seo, 'layouts/portal', $status);
     }
 
-    /** The default graph every public page carries: the organisation and the website. */
+    /** The default graph every public page carries: the organisation, its founder and the website. */
     protected function baseGraph(Seo $seo): Seo
     {
         $base = $this->app->baseUrl();
-        $seo->add(Schema::organization($base, $this->app->name(), $this->app->config->string('app.publisher'), $this->app->config->string('app.support_email')));
+        $seo->add(Schema::organization($base, $this->app->name(), $this->app->config->string('app.support_email')));
+        $seo->add(Schema::person($base, $this->app->config->string('app.publisher')));
         $seo->add(Schema::website($base, $this->app->name(), 'Show control software for live events: Patterns, StageWatch, AGMessage and PlayMap.'));
         return $seo;
     }
@@ -94,11 +95,17 @@ abstract class Controller
         return $this->app->errorResponse($req, 403);
     }
 
-    /** A same-site relative path from a ?next= value, or the fallback (no open redirects). */
+    /**
+     * A same-site relative path from a ?next= value, or the fallback (no open redirects). The value is judged as
+     * sent and once decoded, because the page it leads to decodes its own path: an encoded backslash or a second
+     * slash must not become a protocol-relative address one hop later.
+     */
     protected function safeNext(string $next, string $fallback = '/portal/'): string
     {
-        if ($next === '' || !str_starts_with($next, '/') || str_starts_with($next, '//') || str_contains($next, '\\') || preg_match('/[\x00-\x1f]/', $next)) {
-            return $fallback;
+        foreach ([$next, rawurldecode($next)] as $form) {
+            if ($form === '' || !str_starts_with($form, '/') || str_starts_with($form, '//') || str_contains($form, '\\') || preg_match('/[\x00-\x1f\x7f]/', $form)) {
+                return $fallback;
+            }
         }
         return $next;
     }

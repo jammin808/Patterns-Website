@@ -20,7 +20,11 @@ return [
         'admin_emails' => [],             // verified accounts with these emails are administrators
         'support_email' => 'support@patternsshowcontrol.co.uk',
         'publisher' => 'Ben Rohleder',
-        'trusted_proxy_header' => null,   // e.g. 'HTTP_CF_CONNECTING_IP' when a CDN sits in front
+        // The client's address behind a CDN or proxy (docs/DEPLOY.md §4). null: REMOTE_ADDR. 'HTTP_X_FORWARDED_FOR'
+        // is read from the right (the address the proxy saw, never one a visitor wrote); any other header only from
+        // a request whose REMOTE_ADDR is in trusted_proxies.
+        'trusted_proxy_header' => null,
+        'trusted_proxies' => [],          // the CDN's or proxy's addresses or CIDR ranges, e.g. ['192.0.2.0/24']
         'page_cache_seconds' => 300,      // public pages: browser/CDN cache life
     ],
 

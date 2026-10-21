@@ -7,10 +7,11 @@
  *   canvas[data-hero-pgm]            programme monitor (16:10; its CSS background is an SMPTE bars poster)
  *   canvas[data-hero-pvw]            preview thumbnail
  *   [data-hero-pgm-name] [data-hero-pvw-name] [data-hero-tc]   UMD texts (server renders sensible defaults)
- *   input[data-hero-trans] (radios: mix | wipe | pixels | iris)  [data-hero-take]  [data-hero-auto][aria-pressed]
+ *   input[data-hero-trans] (radios: dissolve | dip | wipe | push, Patterns' own transitions)  [data-hero-take]
+ *   [data-hero-auto][aria-pressed]   the demo's pause and play for its automatic takes (WCAG 2.2.2)
  *
- * Budget: each pattern is drawn once per size into an offscreen canvas; a frame is at most two drawImage calls
- * (mix, wipe, iris) or the handful of blocks a pixel dissolve adds that frame, so a frame costs well under 2 ms.
+ * Budget: each pattern is drawn once per size into an offscreen canvas; a frame is at most two drawImage calls and
+ * one fill, so a frame costs well under 2 ms.
  * The loop runs only while the mixer is on screen and the tab is visible, and between takes it only updates the
  * timecode. Reduced motion: no auto takes, TAKE is a cut, the timecode shows whole seconds.
  */
@@ -148,49 +149,42 @@ function start(el) {
   }
 
   /* -------------------------------------------------------------------- transitions */
-  const BC = 32, BR = 20;
-  const order = (() => {
-    let s = 0x9e3779b9;
-    const rnd = () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const a = [...Array(BC * BR).keys()];
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a;
-  })();
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
   function composite(t) {
     const a = frame(trans.from), b = frame(trans.to), kind = trans.kind;
-    if (kind === 'pixels') {
-      // Cumulative: only the blocks revealed since the last frame are drawn.
-      const n = Math.floor(order.length * t), bw = W / BC, bh = H / BR;
-      for (let k = trans.drawn; k < n; k++) {
-        const idx = order[k], cx = idx % BC, cy = (idx / BC) | 0;
-        const x = Math.floor(cx * bw), y = Math.floor(cy * bh), w = Math.ceil((cx + 1) * bw) - x, h = Math.ceil((cy + 1) * bh) - y;
-        gP.drawImage(b, x, y, w, h, x, y, w, h);
-      }
-      trans.drawn = n;
+    gP.globalAlpha = 1;
+    if (kind === 'push') {
+      // The new pattern pushes the old one off to the left.
+      const x = Math.round(W * t);
+      gP.drawImage(a, -x, 0);
+      gP.drawImage(b, W - x, 0);
       return;
     }
-    gP.globalAlpha = 1; gP.drawImage(a, 0, 0);
-    if (kind === 'mix') { gP.globalAlpha = t; gP.drawImage(b, 0, 0); gP.globalAlpha = 1; return; }
+    if (kind === 'dip') {
+      // Through black: the old pattern fades down, the new one fades up.
+      gP.drawImage(t < 0.5 ? a : b, 0, 0);
+      gP.fillStyle = '#000'; gP.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2; gP.fillRect(0, 0, W, H); gP.globalAlpha = 1;
+      return;
+    }
+    gP.drawImage(a, 0, 0);
     if (kind === 'wipe') {
       const x = Math.round(W * t);
       if (x > 0) gP.drawImage(b, 0, 0, x, H, 0, 0, x, H);
       gP.fillStyle = '#fff'; gP.fillRect(x - Math.round(dpr), 0, Math.max(2, Math.round(2 * dpr)), H);
       return;
     }
-    gP.save(); gP.beginPath(); gP.arc(W / 2, H / 2, (Math.hypot(W, H) / 2) * t, 0, Math.PI * 2); gP.clip(); gP.drawImage(b, 0, 0); gP.restore();
+    gP.globalAlpha = t; gP.drawImage(b, 0, 0); gP.globalAlpha = 1;
   }
   function kindNow() {
     const checked = el.querySelector('input[data-hero-trans]:checked');
-    return checked ? checked.value : 'pixels';
+    return checked ? checked.value : 'dissolve';
   }
   function take() {
     if (trans || !W) return;
     takeBtn?.setAttribute('data-busy', '');
     if (reducedQ.matches) { finish(nxt); return; }
-    trans = { from: cur, to: nxt, kind: kindNow(), t0: performance.now(), drawn: 0 };
-    if (trans.kind === 'pixels') { gP.globalAlpha = 1; gP.drawImage(frame(cur), 0, 0); }
+    trans = { from: cur, to: nxt, kind: kindNow(), t0: performance.now() };
     run();
   }
   function finish(to) {

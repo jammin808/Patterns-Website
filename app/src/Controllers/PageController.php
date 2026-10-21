@@ -76,7 +76,8 @@ final class PageController extends Controller
             if (!is_array($tier) || !array_key_exists('price', $tier)) {
                 continue;
             }
-            $price = $tier['price'];
+            // The price charged is the one marked up: the launch price while it runs, the list price otherwise.
+            $price = Content::launchPrice($tier) ?? $tier['price'];
             $offers[] = [
                 'name' => ($product['name'] ?? $key) . ' ' . ($tier['name'] ?? ''),
                 'price' => is_numeric($price) ? (string) $price : null,
@@ -102,7 +103,8 @@ final class PageController extends Controller
             (string) ($product['name'] ?? $key),
             (string) ($product['summary'] ?? $product['tagline'] ?? ''),
             (string) ($product['schema_category'] ?? 'MultimediaApplication'),
-            (string) ($product['os'] ?? 'Windows 10, Windows 11'),
+            // The schema names operating systems; the page's 'os' line may be a sentence.
+            (string) ($product['schema_os'] ?? $product['os'] ?? 'Windows 10, Windows 11'),
             $offers,
             $features,
             $shots,

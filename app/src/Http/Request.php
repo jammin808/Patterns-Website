@@ -139,16 +139,73 @@ final class Request
         return strtolower($this->header('x-forwarded-proto')) === 'https';
     }
 
-    public function ip(?string $trustedHeader = null): string
+    /**
+     * The client's address. A forwarding header is believed only as far as the proxies that wrote it:
+     *  - with $trustedProxies (addresses or CIDR ranges), only a request whose REMOTE_ADDR is one of them has its
+     *    header read at all;
+     *  - X-Forwarded-For is read from the right, skipping trusted proxies, because every proxy appends the address
+     *    it saw and only the leftmost entries are the client's own writing;
+     *  - any other header (a single value, such as CF-Connecting-IP) is read only behind a listed proxy, since a
+     *    client can send it too when nothing in front replaces it.
+     *
+     * @param list<string> $trustedProxies
+     */
+    public function ip(?string $trustedHeader = null, array $trustedProxies = []): string
     {
-        if ($trustedHeader !== null && isset($this->server[$trustedHeader]) && is_string($this->server[$trustedHeader])) {
-            $candidate = trim(explode(',', $this->server[$trustedHeader])[0]);
-            if (filter_var($candidate, FILTER_VALIDATE_IP)) {
-                return $candidate;
+        $addr = $this->server['REMOTE_ADDR'] ?? '0.0.0.0';
+        $addr = is_string($addr) ? $addr : '0.0.0.0';
+        if ($trustedHeader === null || !isset($this->server[$trustedHeader]) || !is_string($this->server[$trustedHeader])) {
+            return $addr;
+        }
+        $behindProxy = $trustedProxies !== [] && self::inRanges($addr, $trustedProxies);
+        if ($trustedProxies !== [] && !$behindProxy) {
+            return $addr;
+        }
+        $value = $this->server[$trustedHeader];
+        if (strtoupper($trustedHeader) === 'HTTP_X_FORWARDED_FOR') {
+            foreach (array_reverse(explode(',', $value)) as $entry) {
+                $candidate = trim($entry);
+                if (filter_var($candidate, FILTER_VALIDATE_IP) === false) {
+                    return $addr;
+                }
+                if (!$behindProxy || !self::inRanges($candidate, $trustedProxies)) {
+                    return $candidate;
+                }
+            }
+            return $addr;
+        }
+        $candidate = trim($value);
+        return $behindProxy && filter_var($candidate, FILTER_VALIDATE_IP) !== false ? $candidate : $addr;
+    }
+
+    /** @param list<string> $ranges addresses or CIDR ranges, IPv4 or IPv6 */
+    public static function inRanges(string $ip, array $ranges): bool
+    {
+        $bin = @inet_pton($ip);
+        if ($bin === false) {
+            return false;
+        }
+        foreach ($ranges as $range) {
+            [$net, $bits] = array_pad(explode('/', trim((string) $range), 2), 2, null);
+            $netBin = @inet_pton((string) $net);
+            if ($netBin === false || strlen($netBin) !== strlen($bin)) {
+                continue;
+            }
+            $bits = $bits === null ? strlen($bin) * 8 : max(0, min(strlen($bin) * 8, (int) $bits));
+            $bytes = intdiv($bits, 8);
+            $rest = $bits % 8;
+            if (substr($bin, 0, $bytes) !== substr($netBin, 0, $bytes)) {
+                continue;
+            }
+            if ($rest === 0) {
+                return true;
+            }
+            $mask = (0xFF << (8 - $rest)) & 0xFF;
+            if ((ord($bin[$bytes]) & $mask) === (ord($netBin[$bytes]) & $mask)) {
+                return true;
             }
         }
-        $addr = $this->server['REMOTE_ADDR'] ?? '0.0.0.0';
-        return is_string($addr) ? $addr : '0.0.0.0';
+        return false;
     }
 
     public function userAgent(): string

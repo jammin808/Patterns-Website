@@ -46,11 +46,12 @@ $store->create($cid, $uid, 'h', '/');
 $store->add($cid, 'user', 'hello');
 $usageBefore = $store->usageToday();
 $store->addUsage(10, 5);
-$store->addUsage(1, 1);
+// Cached prompt tokens count at their weight: 8 written x 1.25 + 100 read x 0.1 = 20 on top of 1 + 1.
+$store->addUsage(1, 1, 8, 100);
 $like = $db->value("SELECT COUNT(*) FROM tickets WHERE user_id = ? AND title LIKE ? ESCAPE '!'", [$uid, Psc\Db\Database::like('T')]);
 $page = Psc\Support\Paginator::class;
 $count = (int) $db->value('SELECT COUNT(*) FROM (SELECT id FROM tickets WHERE user_id = ?) AS counted', [$uid]);
-if ((int) $like !== 1 || $count !== 1 || $store->usageToday() - $usageBefore !== 17 || count($store->history($cid, 5)) !== 1) {
+if ((int) $like !== 1 || $count !== 1 || $store->usageToday() - $usageBefore !== 37 || count($store->history($cid, 5)) !== 1) {
     fwrite(STDERR, "query checks failed\n");
     exit(1);
 }

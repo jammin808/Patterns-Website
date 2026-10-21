@@ -115,6 +115,11 @@ final class Knowledge
                 }
                 foreach ($lic['tiers'] ?? [] as $t) {
                     $price = $t['price_label'] ?? (isset($t['price']) && $t['price'] !== null ? '£' . $t['price'] : 'price not announced');
+                    // While a launch offer runs, the launch price is the price, as every page shows it.
+                    $launch = Content::launchPrice($t);
+                    if ($launch !== null) {
+                        $price = price($launch) . ' launch price (list price ' . price(isset($t['price']) ? (string) $t['price'] : null) . ')';
+                    }
                     $out[] = '- ' . ($t['name'] ?? '') . ' — ' . $price . (!empty($t['machines']) ? ', ' . $t['machines'] . ' machine(s)' : '') . (!empty($t['summary']) ? ': ' . self::plain($t['summary']) : '');
                 }
                 foreach ($lic['extras'] ?? [] as $x) {

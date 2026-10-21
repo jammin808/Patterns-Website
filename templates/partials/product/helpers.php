@@ -56,10 +56,7 @@ return (static function (): array {
         $price = isset($t['price']) && is_numeric($t['price']) ? (string) $t['price'] : null;
         $label = (string) ($t['price_label'] ?? '');
         $name = (string) ($t['name'] ?? '');
-        $launch = null;
-        if (!empty($t['price_note']) && preg_match('/£\s?(\d+(?:\.\d+)?)/', (string) $t['price_note'], $m)) {
-            $launch = $m[1];
-        }
+        $launch = \Psc\Content\Content::launchPrice($t);
         $figure = $launch !== null ? price($launch) : ($price !== null ? price($price) : null);
         $free = $price !== null && (float) $price === 0.0;
         // A free tier reads "Free" on its card, unless its name already says so; tables keep the figure (£0).

@@ -49,13 +49,39 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'chat' => ['api_key' => ''],
         ];
         $merged = array_replace_recursive($base, $config);
-        $this->app = App::boot(Config::fromArray(PSC_ROOT, $merged));
+        $this->app = App::boot($this->shadowRoot !== null ? $this->shadowedConfig($merged) : Config::fromArray(PSC_ROOT, $merged));
         $this->db = self::database($this->storage);
         $this->app->useDatabase($this->db);
         $this->mail = $this->app->mailer();
         $_SESSION = [];
         $this->jar = [];
         Content::flush();
+    }
+
+    /** A site root whose config/local.php is shadowed by the server file outside it (bootShadowed()). */
+    private ?string $shadowRoot = null;
+
+    /**
+     * Boots as a server where config/local.php was uploaded after the file outside the web root existed: the
+     * settings come from that outside file, and the local one is ignored and reported.
+     *
+     * @param array<string, mixed> $config
+     */
+    protected function bootShadowed(array $config = []): void
+    {
+        $this->shadowRoot = sys_get_temp_dir() . '/psc-shadow-' . bin2hex(random_bytes(6));
+        mkdir($this->shadowRoot . '/site/config', 0777, true);
+        mkdir($this->shadowRoot . '/patterns-data', 0777, true);
+        copy(PSC_ROOT . '/config/defaults.php', $this->shadowRoot . '/site/config/defaults.php');
+        file_put_contents($this->shadowRoot . '/site/config/local.php', '<?php return ' . var_export(['app' => ['page_cache_seconds' => 42]], true) . ';');
+        $this->bootApp($config);
+    }
+
+    /** @param array<string, mixed> $values */
+    private function shadowedConfig(array $values): Config
+    {
+        file_put_contents($this->shadowRoot . '/patterns-data/config.php', '<?php return ' . var_export($values, true) . ';');
+        return Config::load($this->shadowRoot . '/site');
     }
 
     private static ?Database $shared = null;
@@ -125,6 +151,10 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         $_SESSION = [];
         if (isset($this->storage) && is_dir($this->storage)) {
             self::rmrf($this->storage);
+        }
+        if ($this->shadowRoot !== null) {
+            self::rmrf($this->shadowRoot);
+            $this->shadowRoot = null;
         }
         parent::tearDown();
     }

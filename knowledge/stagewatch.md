@@ -35,7 +35,7 @@ StageWatch is a Windows stage timer and show-calling app for conferences and liv
 - Production updates: early licences get lifetime updates. Later Production licences include a year of updates, then £20 a year to keep updating. Any version released inside your update period keeps running as Production for ever. A version released after the period ends runs as Pro, says why and offers renewal; you can renew, or reinstall a version from inside your period.
 - Standard and Pro include updates for their tier for life.
 - Nonprofit buyers name their organisation when they request the licence. Rental houses ask for a 5-pack when they request.
-- Not announced yet: when the Production launch price ends, when early Production licences (with lifetime updates) stop being issued, upgrade prices between tiers, 5-pack totals, VAT handling and the refund terms. Do not guess; point people to the contact page with the sales topic.
+- Not announced yet: when the Production launch price ends, when early Production licences (with lifetime updates) stop being issued, upgrade prices between tiers, 5-pack totals, VAT handling and the refund terms. Do not guess; point people to the contact page with the Buying a licence or pricing topic.
 
 ## Internet and privacy
 

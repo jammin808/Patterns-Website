@@ -23,7 +23,7 @@ $small = (string) ($shot['src_small'] ?? '');
 ?>
 <figure class="c-shot">
     <div class="c-shot-frame <?= $frame ?>">
-        <img src="<?= e($small !== '' ? $small : $shot['src']) ?>"<?php if ($small !== ''): ?> srcset="<?= e($small) ?> 800w, <?= e($shot['src']) ?> 1600w" sizes="<?= e($sizes) ?>"<?php endif; ?>
+        <img src="<?= e($small !== '' ? $small : $shot['src']) ?>"<?php if ($small !== ''): ?> srcset="<?= e(shot_srcset($shot)) ?>" sizes="<?= e($sizes) ?>"<?php endif; ?>
              width="<?= e($w) ?>" height="<?= e($hgt) ?>" alt="<?= e($shot['alt']) ?>" <?= $eager ? 'fetchpriority="high"' : 'loading="lazy"' ?> decoding="async">
     </div>
     <?php if (!empty($shot['caption'])): ?><figcaption class="c-shot-caption"><?= e($shot['caption']) ?></figcaption><?php endif; ?>

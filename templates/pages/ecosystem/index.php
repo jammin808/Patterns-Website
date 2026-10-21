@@ -95,7 +95,7 @@ foreach ($ai['principles'] as $pr) {
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">Signal flow</p><h2 id="flow-title">How they connect</h2></div>
-            <p class="c-lede">Controllers reach the apps, the apps share Show Bus, and each one feeds its part of the room. Out of the box, an AI's proposal stops at the amber gate.</p>
+            <p class="c-lede">Controllers reach the apps, the apps share Show Bus, and each one feeds its part of the room. Out of the box, an AI's proposal to Patterns, StageWatch or AGMessage stops at the amber gate, and so does every high-risk step in PlayMap.</p>
         </div>
         <?= $this->partial('hub/flow') ?>
     </div>

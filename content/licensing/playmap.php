@@ -7,6 +7,7 @@ declare(strict_types=1);
 return [
     'product' => 'playmap',
     'pricing_status' => 'coming-soon',
+    'llms_note' => 'early access today, how licensing will work and how to register interest',
     'model' => 'PlayMap will follow the same one-off, offline licensing as StageWatch: a licence you buy once, activated with a licence file on your show machine, with no subscription and no licence server.',
     'intro' => 'PlayMap is in early access. Today\'s portable build is in the client portal, so you can put it through its paces on your own rig while licences are prepared. Licensing will follow StageWatch\'s one-off, offline model, and prices and what each licence includes will be announced together. Register your interest and you will be among the first to hear about pricing and trials.',
     'tiers' => [
@@ -91,7 +92,7 @@ return [
         ['q' => 'Will PlayMap be a subscription?', 'a' => 'No. PlayMap will follow the same one-off licensing as StageWatch, which is bought once with no subscription.'],
         ['q' => 'Will a PlayMap licence need the internet?', 'a' => 'No. PlayMap will follow StageWatch\'s offline model, where a licence is a file you install on the show machine, with no licence server.'],
         ['q' => 'Do FFmpeg, NDI or a hosted AI model cost anything?', 'a' => 'FFmpeg\'s shared libraries and the NDI 6 Runtime are free to download. A hosted AI model runs on your own Anthropic API key, which Anthropic bills separately, while a local model runs on your own hardware.'],
-        ['q' => 'Can I ask about licences for a multi-machine rig?', 'a' => 'Yes. Choose Sales and PlayMap on the contact page and tell us about your rig: the machines, sync groups and backups you plan to run.'],
+        ['q' => 'Can I ask about licences for a multi-machine rig?', 'a' => 'Yes. Choose Buying a licence or pricing, and PlayMap, on the contact page and tell us about your rig: the machines, sync groups and backups you plan to run.'],
         ['q' => 'Where do I download PlayMap?', 'a' => 'From the downloads area of the client portal. Create a free client account to sign in.'],
     ],
 ];

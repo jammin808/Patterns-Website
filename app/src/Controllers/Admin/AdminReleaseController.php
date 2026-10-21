@@ -433,26 +433,12 @@ final class AdminReleaseController extends Controller
     {
         $limit = max(1, $this->app->config->int('downloads.max_upload_mb', 512)) * 1024 * 1024;
         foreach (['upload_max_filesize', 'post_max_size'] as $ini) {
-            $bytes = self::iniBytes((string) ini_get($ini));
+            $bytes = Uploads::iniBytes((string) ini_get($ini));
             if ($bytes > 0) {
                 $limit = min($limit, $bytes);
             }
         }
         return $limit;
-    }
-
-    private static function iniBytes(string $value): int
-    {
-        $value = trim($value);
-        if (!preg_match('/^(\d+)\s*([KMG]?)/i', $value, $m)) {
-            return 0;
-        }
-        return (int) $m[1] * match (strtoupper($m[2])) {
-            'G' => 1024 ** 3,
-            'M' => 1024 ** 2,
-            'K' => 1024,
-            default => 1,
-        };
     }
 
     /** @return array<string, mixed>|null */

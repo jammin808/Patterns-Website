@@ -36,7 +36,7 @@ $lines = [];
 foreach ($site['nav'] as $item) { foreach (($item['children'] ?? []) as $ch) { $lines[$ch['product']] = $ch['line'] ?? ''; } }
 $sw = require $root . '/content/licensing/stagewatch.php';
 $tiers = [];
-foreach ($sw['tiers'] as $t) { $tiers[$t['id']] = ['name' => $t['name'], 'price' => $t['price_label'], 'note' => $t['price_note'] ?? '', 'machines' => $t['machines'], 'badge' => $t['badge'] ?? '']; }
+foreach ($sw['tiers'] as $t) { $tiers[$t['id']] = ['name' => $t['name'], 'price' => $t['price_label'], 'launch' => isset($t['launch_price']) && is_numeric($t['launch_price']) ? (string) $t['launch_price'] : null, 'machines' => $t['machines'], 'badge' => $t['badge'] ?? '']; }
 $wf = require $root . '/content/pages.php';
 $workflows = [];
 foreach ($wf as $path => $p) { if (($p['type'] ?? '') === 'workflow') { $workflows[] = ['crumb' => $p['crumb'], 'key' => $p['workflow']]; } }
@@ -76,14 +76,14 @@ const V = {
   licence: () => `<div class="og-sheet"><div class="og-sheet-head">${icon('key')}Your licence</div><dl>
     <dt>Price</dt><dd>One-off</dd><dt>Tied to</dt><dd>Your show PC</dd><dt>Activated</dt><dd>Offline, with a licence file</dd>
     <dt>Also</dt><dd>Trials, nonprofit and rental pricing</dd></dl></div>`,
-  // The tiers as the pricing page shows them: a launch price in the price note is the figure, with the list price
-  // struck through and an outlined "Launch price" flag; the recommended tier carries its badge.
+  // The tiers as the pricing page shows them: a tier's launch_price is the figure, with the list price struck
+  // through and an outlined "Launch price" flag; the recommended tier carries its badge.
   tiers: () => {
     const t = data.tiers;
     const tier = (id) => {
       const x = t[id];
-      const launch = /£\s?(\d+(?:\.\d+)?)/.exec(x.note ?? '');
-      const price = launch ? `£${launch[1]}` : x.price;
+      const launch = x.launch;
+      const price = launch ? `£${launch}` : x.price;
       const flag = x.badge ? `<span class="og-flagline">${esc(x.badge)}</span>` : (launch ? '<span class="og-flagline og-flagline--outline">Launch price</span>' : '');
       const unit = x.machines === 2 ? 'One-off, main and backup PC' : 'One-off, one PC';
       return `<div class="og-tier${x.badge ? ' is-rec' : ''}">${flag}<h3>${esc(x.name)}</h3>
@@ -119,7 +119,7 @@ const cards = {
   home: { title: 'Show control software for the people who run the room', sub: 'Four Windows apps, one show network. Made in the UK.', visual: V.multiview(), lines: 4 },
   ecosystem: { eyebrow: 'Ecosystem', title: 'Four apps. One show network.', sub: 'Pictures, time, people and media, working together on the venue LAN.', visual: V.bus() },
   integrations: { eyebrow: 'Integrations', title: 'Companion, Stream Deck, NDI, OSC and MIDI', sub: 'The apps work with the kit already in your rack.', visual: V.chips() },
-  ai: { eyebrow: 'AI with approval', title: 'AI in show control, with a person always approving', sub: '', visual: V.approval() },
+  ai: { eyebrow: 'AI with approval', title: 'AI in show control, with people in charge', sub: '', visual: V.approval() },
   licensing: { eyebrow: 'Licensing', title: 'How licensing works', sub: 'One-off licences tied to your show PC and activated offline with a licence file.', visual: V.licence() },
   patterns: { product: 'patterns', title: 'Test patterns and show display for every screen in the room', visual: V.monitor('patterns') },
   stagewatch: { product: 'stagewatch', title: 'The stage timer and show-calling desk for live events', visual: V.monitor('stagewatch') },

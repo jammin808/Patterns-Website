@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Controllers;
 
+use Psc\Chat\AnthropicGateway;
 use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
@@ -69,8 +70,9 @@ final class SeoController extends Controller
         $out[] = '';
         foreach (Content::products() as $key => $p) {
             $out[] = '- [' . $p['name'] . '](' . $base . '/' . $key . '/): ' . ($p['summary'] ?? $p['tagline'] ?? '');
-            if (Content::licensing($key) !== null) {
-                $out[] = '- [' . $p['name'] . ' licensing](' . $base . '/' . $key . '/licensing/): tiers, prices and licence terms';
+            $lic = Content::licensing($key);
+            if ($lic !== null) {
+                $out[] = '- [' . $p['name'] . ' licensing](' . $base . '/' . $key . '/licensing/): ' . self::licensingNote($lic);
             }
         }
         $out[] = '';
@@ -91,6 +93,22 @@ final class SeoController extends Controller
             }
         }
         return Response::text(implode("\n", $out))->header('Cache-Control', 'public, max-age=3600');
+    }
+
+    /**
+     * What a product's licensing page holds, for llms.txt: its own note, or by its pricing status. Only a page with
+     * prices on it is said to have prices.
+     *
+     * @param array<string, mixed> $licensing
+     */
+    public static function licensingNote(array $licensing): string
+    {
+        if (is_string($licensing['llms_note'] ?? null) && $licensing['llms_note'] !== '') {
+            return $licensing['llms_note'];
+        }
+        return ($licensing['pricing_status'] ?? 'live') === 'live'
+            ? 'tiers, prices and licence terms'
+            : 'how licensing will work and how to register interest';
     }
 
     public function manifest(Request $request): Response
@@ -115,25 +133,37 @@ final class SeoController extends Controller
             ->header('Cache-Control', 'public, max-age=86400');
     }
 
+    /** Days ahead security.txt's Expires stands: always far beyond its one-day cache life, within RFC 9116's year. */
+    public const SECURITY_TXT_DAYS = 180;
+
+    /**
+     * security.txt (RFC 9116). It names no Policy: that field is for a vulnerability disclosure policy, which the
+     * site does not publish, and a privacy notice is not one.
+     */
     public function security(Request $request): Response
     {
         $base = $this->app->baseUrl();
         $lines = [
             'Contact: mailto:' . $this->app->config->string('app.support_email'),
-            'Expires: ' . gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 year', strtotime(gmdate('Y-01-01')))),
+            'Expires: ' . gmdate('Y-m-d\T00:00:00\Z', time() + self::SECURITY_TXT_DAYS * 86400),
             'Preferred-Languages: en',
             'Canonical: ' . $base . '/.well-known/security.txt',
-            'Policy: ' . $base . '/legal/privacy/',
         ];
         return Response::text(implode("\n", $lines) . "\n")->header('Cache-Control', 'public, max-age=86400');
     }
 
-    /** A health check for uptime monitors: booleans only, nothing sensitive. */
+    /**
+     * A health check for uptime monitors: booleans only, nothing sensitive. The site is healthy only when every
+     * part it is configured to use works: storage and the database always, the assistant's SDK once the assistant
+     * is switched on with a key. config_shadowed is true when a config/local.php sits in the web root unread,
+     * because the configuration outside it wins (a change uploaded there has no effect).
+     */
     public function health(Request $request): Response
     {
+        $cfg = $this->app->config;
         $checks = [
             'storage' => is_writable($this->app->storage->root()),
-            'vendor' => class_exists(\Anthropic\Client::class),
+            'vendor' => AnthropicGateway::available(),
         ];
         try {
             $this->app->db()->value('SELECT 1');
@@ -142,8 +172,20 @@ final class SeoController extends Controller
             $this->app->log->exception($e, 'health');
             $checks['database'] = false;
         }
-        $ok = $checks['storage'] && $checks['database'];
+        $checks['config_shadowed'] = $cfg->shadowed();
+        $ok = self::healthy($checks, $cfg->bool('chat.enabled', true) && $cfg->string('chat.api_key') !== '');
         return Response::json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks], $ok ? 200 : 503)
             ->header('X-Robots-Tag', 'noindex');
+    }
+
+    /**
+     * Whether the checks add up to a working site. A shadowed configuration file is reported, not failed: the site
+     * runs on the configuration it found.
+     *
+     * @param array{storage: bool, vendor: bool, database: bool} $checks
+     */
+    public static function healthy(array $checks, bool $assistantConfigured): bool
+    {
+        return $checks['storage'] && $checks['database'] && (!$assistantConfigured || $checks['vendor']);
     }
 }

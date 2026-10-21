@@ -303,6 +303,57 @@ final class AccountsTest extends TestCase
         self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM audit_log WHERE action = 'login.throttled'"));
     }
 
+    /**
+     * Five wrong passwords from any one address locked the account for everyone, and a password reset did not lift
+     * it: a stranger could keep anyone, the administrator included, out indefinitely. A reset now lifts the hold.
+     */
+    public function testAPasswordResetLiftsTheSignInHold(): void
+    {
+        $id = $this->makeUser();
+        for ($i = 0; $i < 5; $i++) {
+            $this->freshBrowser();
+            $this->signIn('client@example.test', 'wrong guess ' . $i);
+        }
+        $this->freshBrowser();
+        $this->signIn();
+        self::assertNull(self::signedInId(), 'held after five failures');
+
+        $this->post('/portal/forgot/', ['email' => 'client@example.test']);
+        $token = self::tokenFrom($this->mailUrl('client@example.test', 'reset-password'));
+        $ok = $this->post('/portal/reset/', ['token' => $token, 'purpose' => 'reset', 'password' => self::NEW_PASSWORD, 'password_confirm' => self::NEW_PASSWORD]);
+        self::assertRedirect($ok, '/portal/login/');
+
+        $this->freshBrowser();
+        self::assertRedirect($this->signIn('client@example.test', self::NEW_PASSWORD), '/portal/');
+        self::assertSame($id, self::signedInId(), 'the new password works at once');
+    }
+
+    /** Failures from one address hold the account at that address only, up to a far higher ceiling for all of them. */
+    public function testAStrangersFailuresDoNotLockTheOwnerOut(): void
+    {
+        $this->bootApp(['app' => ['trusted_proxy_header' => 'HTTP_X_TEST_CLIENT', 'trusted_proxies' => ['203.0.113.7']]]);
+        $id = $this->makeUser();
+        $from = function (string $ip, string $password): Response {
+            $this->freshBrowser();
+            return $this->request('POST', '/portal/login/', ['email' => 'client@example.test', 'password' => $password, '_csrf' => $this->csrf()], [], null, true, [], ['HTTP_X_TEST_CLIENT' => $ip]);
+        };
+        for ($i = 0; $i < 5; $i++) {
+            $from('198.51.100.9', 'wrong guess ' . $i);
+        }
+        $from('198.51.100.9', self::PASSWORD);
+        self::assertNull(self::signedInId(), 'the guessing address waits out its window');
+
+        self::assertRedirect($from('192.0.2.44', self::PASSWORD), '/portal/');
+        self::assertSame($id, self::signedInId(), 'the owner, elsewhere, signs in');
+
+        // Spread over many addresses, failures still meet a ceiling for the account (ten times the limit).
+        for ($i = 0; $i < 50; $i++) {
+            $from('198.51.' . intdiv($i, 4) . '.' . ($i % 4 + 1), 'wrong guess ' . $i);
+        }
+        $from('192.0.2.45', self::PASSWORD);
+        self::assertNull(self::signedInId(), 'fifty failures across addresses hold the account everywhere');
+    }
+
     public function testAnUnconfirmedAccountIsOfferedANewLink(): void
     {
         $id = $this->makeUser('pending@example.test', self::PASSWORD, 'client', 'pending');
@@ -368,7 +419,13 @@ final class AccountsTest extends TestCase
         self::assertSame(200, $page->status);
         self::assertStringNotContainsString('evil.example', $page->body);
 
-        foreach (['//evil.example', 'https://evil.example/', '/\\evil.example', "/portal/\r\nX: y"] as $next) {
+        // Encoded forms too: the page a next= leads to decodes its own path, so /%5CEvil.example/ would become
+        // /\evil.example/ one redirect later.
+        $encoded = $this->request('GET', '/portal/login/?next=' . rawurlencode('/%5CEvil.example/'));
+        self::assertSame(200, $encoded->status);
+        self::assertStringNotContainsString('Evil.example', $encoded->body);
+
+        foreach (['//evil.example', 'https://evil.example/', '/\\evil.example', "/portal/\r\nX: y", '/%5CEvil.example/', '/%5c%5cevil.example/', '/%2F%2Fevil.example/', '/%2fevil.example', '/%09/evil.example', '/%7F/evil.example'] as $next) {
             $this->freshBrowser();
             $r = $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'next' => $next]);
             self::assertRedirect($r, '/portal/');

@@ -123,7 +123,8 @@ if ($questions !== []) {
             <h2 id="trouble-title">Troubleshooting</h2>
             <p class="c-lede u-mt-4">Fixes for the things people run into most. If yours is not here, <a href="<?= e($bugUrl) ?>">report a bug</a> with what you see on screen.</p>
         </div>
-        <?= $this->partial('faq', ['faqs' => $trouble, 'name' => 'trouble']) ?>
+        <?php /* Troubleshooting entries are symptoms, not questions, so they are not marked up as an FAQ. */ ?>
+        <?= $this->partial('faq', ['faqs' => $trouble, 'name' => 'trouble', 'schema' => false]) ?>
     </div>
 </section>
 <?php endif; ?>

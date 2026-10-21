@@ -54,17 +54,17 @@ PlayMap is made in the UK by Ben Rohleder and is part of the Patterns ecosystem,
 ## AI
 
 - The built-in assistant is optional and off until the operator turns it on. It turns plain words into PlayMap actions. It runs on Anthropic's Claude with the customer's own API key, which Anthropic bills separately, or on a local model on the customer's own machine (for example through Ollama, LM Studio or llama.cpp), so it can stay offline.
-- High-risk actions always wait for a person's approval, and no setting changes that. Whether everyday low-risk steps run straight away is the operator's choice. While the show is armed, the assistant only proposes.
+- High-risk actions always wait for a person's approval, and no setting changes that. Whether everyday low-risk steps run straight away is the operator's choice; they do by default. While the show is armed, the assistant only proposes.
 - Today a person asks the built-in assistant from a Companion key or through PlayMap's network control. The AI pill on the desk's top bar shows how many proposals are waiting, and a person approves them from Companion (two presses) or through the network control; surface suggestions after a scan are approved on the desk. An assistant pane on the desk is coming.
 - An assistant can never approve its own or another AI's proposals. Pairing and secrets are never the assistant's.
-- Any AI tool on the show network can read what PlayMap is doing and propose actions through MCP; proposals land on PlayMap's own list for a person to approve.
+- Any AI tool on the show network can read what PlayMap is doing and send it actions through MCP. Everyday and review steps run straight away through PlayMap's own checks; high-risk actions land on PlayMap's own list for a person to approve.
 - After a scan, PlayMap suggests surfaces from what it measured, and each becomes a surface only when a person approves it. Click-to-surface and phone scanning run locally.
 - PlayMap works fully without any assistant.
 
 ## Early access and licensing
 
 - Today's portable build is in the downloads area of the client portal; a free client account is needed to sign in.
-- Licensing will follow StageWatch's one-off, offline model, with no subscription and no licence server. Prices, tiers and what each includes are not announced. Never quote or guess a price, a date or a discount; point people to the contact page with the sales topic and PlayMap.
+- Licensing will follow StageWatch's one-off, offline model, with no subscription and no licence server. Prices, tiers and what each includes are not announced. Never quote or guess a price, a date or a discount; point people to the contact page with the Buying a licence or pricing topic and PlayMap.
 - Each new build is downloaded from the client portal, like the first.
 
 ## Coming (never present as available)
@@ -75,7 +75,7 @@ PlayMap is made in the UK by Ben Rohleder and is part of the Patterns ecosystem,
 - Guided workflows on the desk, a menu bar with every command, a command palette and a typed console, and dockable panes with dim and daylight themes.
 - One canvas spanning outputs stacked as well as side by side, and capture cards passed straight through to the air.
 - Dedicated desk views for effects, tempo, bindings, timecode, LED patching, live video, phone scanning, camera align and the facade guide, and an assistant pane with Show me, Approve and Reject.
-- An undo history panel and faster previews on the desk.
+- An undo history panel, and desk previews shared straight from the graphics card where the hardware allows.
 - Timecode output over LTC, MTC and Art-Net.
 - When asked about any of these, say they are coming and give no date.
 

@@ -41,16 +41,21 @@ final class ChatStore
         return $this->db->one('SELECT * FROM chat_conversations WHERE id = ?', [$id]);
     }
 
-    /** @return list<array{role: string, content: string}> the last $limit user/assistant messages, oldest first */
+    /**
+     * The last $limit user/assistant messages, oldest first, each with the verdict stored beside it (null on a
+     * visitor's message), so the answer model's history can leave out refused exchanges.
+     *
+     * @return list<array{role: string, content: string, verdict: string|null}>
+     */
     public function history(string $id, int $limit): array
     {
         $rows = $this->db->all(
-            "SELECT role, content FROM chat_messages WHERE conversation_id = ? AND role IN ('user', 'assistant') ORDER BY id DESC LIMIT " . max(1, $limit),
+            "SELECT role, content, verdict FROM chat_messages WHERE conversation_id = ? AND role IN ('user', 'assistant') ORDER BY id DESC LIMIT " . max(1, $limit),
             [$id]
         );
         $out = [];
         foreach (array_reverse($rows) as $r) {
-            $out[] = ['role' => (string) $r['role'], 'content' => (string) $r['content']];
+            $out[] = ['role' => (string) $r['role'], 'content' => (string) $r['content'], 'verdict' => $r['verdict'] !== null ? (string) $r['verdict'] : null];
         }
         return $out;
     }
@@ -73,19 +78,33 @@ final class ChatStore
         return $msgId;
     }
 
+    /**
+     * Prompt tokens written to the cache count at 1.25 and tokens read from it at 0.1 of an uncached input token,
+     * the ratio at which they are billed, so the budget follows spend: every answer carries the long cached system
+     * prompt, which the API reports apart from input_tokens.
+     */
+    public const CACHE_WRITE_WEIGHT = 1.25;
+    public const CACHE_READ_WEIGHT = 0.1;
+
+    /** Today's usage against chat.daily_token_budget: input and output tokens plus the weighted cached prompt. */
     public function usageToday(): int
     {
-        $row = $this->db->one('SELECT tokens_in, tokens_out FROM chat_usage WHERE day = ?', [gmdate('Y-m-d')]);
-        return $row === null ? 0 : (int) $row['tokens_in'] + (int) $row['tokens_out'];
+        $row = $this->db->one('SELECT tokens_in, tokens_out, cache_write, cache_read FROM chat_usage WHERE day = ?', [gmdate('Y-m-d')]);
+        if ($row === null) {
+            return 0;
+        }
+        return (int) $row['tokens_in'] + (int) $row['tokens_out']
+            + (int) ceil((int) $row['cache_write'] * self::CACHE_WRITE_WEIGHT)
+            + (int) ceil((int) $row['cache_read'] * self::CACHE_READ_WEIGHT);
     }
 
-    public function addUsage(int $in, int $out): void
+    public function addUsage(int $in, int $out, int $cacheWrite = 0, int $cacheRead = 0): void
     {
         $day = gmdate('Y-m-d');
-        $this->db->transaction(function (Database $db) use ($day, $in, $out): void {
-            $n = $db->exec('UPDATE chat_usage SET requests = requests + 1, tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE day = ?', [$in, $out, $day]);
+        $this->db->transaction(function (Database $db) use ($day, $in, $out, $cacheWrite, $cacheRead): void {
+            $n = $db->exec('UPDATE chat_usage SET requests = requests + 1, tokens_in = tokens_in + ?, tokens_out = tokens_out + ?, cache_write = cache_write + ?, cache_read = cache_read + ? WHERE day = ?', [$in, $out, $cacheWrite, $cacheRead, $day]);
             if ($n === 0) {
-                $db->insert('chat_usage', ['day' => $day, 'requests' => 1, 'tokens_in' => $in, 'tokens_out' => $out]);
+                $db->insert('chat_usage', ['day' => $day, 'requests' => 1, 'tokens_in' => $in, 'tokens_out' => $out, 'cache_write' => $cacheWrite, 'cache_read' => $cacheRead]);
             }
         });
     }

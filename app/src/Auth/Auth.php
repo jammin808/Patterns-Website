@@ -35,6 +35,9 @@ final class Auth
     /** Emails an address with an account receives from repeated sign-up attempts, per hour (the rest are silent). */
     private const EXISTING_ACCOUNT_NOTICES_PER_HOUR = 3;
 
+    /** The per-account ceiling on failed sign-ins from all addresses together, as a multiple of the per-address limit. */
+    private const ACCOUNT_CEILING_FACTOR = 10;
+
     /** @var array<string, mixed>|null|false false = not looked up yet */
     private array|null|false $user = false;
 
@@ -151,10 +154,13 @@ final class Auth
         $limiter = $this->app->limiter();
         $window = $this->app->config->int('security.login_window_seconds', 900);
         $max = $this->app->config->int('security.login_max_attempts', 5);
-        // Failures count per account and per address, so people signing in correctly from one shared network (a
-        // venue, an office) never use up each other's attempts. Every attempt also counts against a far higher
-        // ceiling per address, because each one costs a full password verify (Argon2id: 64 MiB of memory).
-        if ($limiter->peek('login-acct:' . $email) >= $max
+        // Failures count per account from each address, so a stranger guessing at an account from their own
+        // address never locks out its owner signing in from theirs; a far higher ceiling per account holds guessing
+        // spread over many addresses. Failures also count per address, so people signing in correctly from one
+        // shared network (a venue, an office) never use up each other's attempts. Every attempt counts against a
+        // far higher ceiling per address too, because each one costs a full password verify (Argon2id: 64 MiB).
+        if ($limiter->peek(self::accountBucket($email, $ip)) >= $max
+            || $limiter->peek('login-acct:' . $email) >= $max * self::ACCOUNT_CEILING_FACTOR
             || $limiter->peek('login-ip:' . $ip) >= $max * 4
             || !$limiter->hit('login-ip-all:' . $ip, $max * 20, $window)) {
             Audit::log($this->app, null, 'login.throttled', null, ['email_hash' => hash('sha256', $email)]);
@@ -164,12 +170,13 @@ final class Auth
         // An unknown email costs one verify, as a wrong password does, so timing does not reveal which emails have accounts.
         $valid = password_verify($password, $row !== null ? (string) $row['password_hash'] : $this->dummyHash());
         if ($row === null || !$valid) {
+            $limiter->hits(self::accountBucket($email, $ip), $window);
             $limiter->hits('login-acct:' . $email, $window);
             $limiter->hits('login-ip:' . $ip, $window);
             Audit::log($this->app, $row !== null ? (int) $row['id'] : null, 'login.failed');
             return ['ok' => false, 'reason' => 'invalid'];
         }
-        $limiter->clear('login-acct:' . $email);
+        $this->clearSignInFailures($email);
         if ($row['status'] === 'pending') {
             return ['ok' => false, 'reason' => 'unverified', 'user' => $row];
         }
@@ -288,6 +295,8 @@ final class Auth
         if ($row === null) {
             return null;
         }
+        // The link proves control of the mailbox, which lifts any hold strangers' failed sign-ins put on the account.
+        $this->clearSignInFailures((string) $row['email']);
         // As in resetPassword(): an account an administrator invited never waits for an administrator's approval.
         $needsApproval = $this->app->config->string('security.registration') === 'approval'
             && !$this->isAdminEmail((string) $row['email'])
@@ -350,6 +359,8 @@ final class Auth
         if ($row === null) {
             return ['ok' => false, 'errors' => ['token' => 'This link has expired or was already used. Ask for a new one.']];
         }
+        // The link proves control of the mailbox: the new password works at once, whatever failed sign-ins came before.
+        $this->clearSignInFailures((string) $row['email']);
         $set = ['password_hash' => self::hash($password), 'updated_at' => time(), 'failed_logins' => 0, 'locked_until' => null];
         $needsApproval = false;
         if ($row['status'] === 'pending') {
@@ -515,6 +526,23 @@ final class Auth
         foreach ($recipients as $r) {
             $this->app->mailer()->send($r, $subject, $template, $data);
         }
+    }
+
+    /** The failed sign-ins for one account from one address. */
+    private static function accountBucket(string $email, string $ip): string
+    {
+        return 'login-acct-ip:' . self::normaliseEmail($email) . '|' . $ip;
+    }
+
+    /**
+     * Lifts the account's sign-in holds: its ceiling across all addresses and its count from this address. Called
+     * after a correct password and after an emailed link proves the mailbox.
+     */
+    private function clearSignInFailures(string $email): void
+    {
+        $limiter = $this->app->limiter();
+        $limiter->clear('login-acct:' . self::normaliseEmail($email));
+        $limiter->clear(self::accountBucket($email, $this->app->clientIp()));
     }
 
     public static function hash(string $password): string

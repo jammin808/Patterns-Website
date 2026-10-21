@@ -16,6 +16,7 @@ return [
     'pitch' => 'Patterns is a portable Windows app that puts pixel-exact test patterns and show content on every LED wall, projector, display and NDI receiver in the room. You build in a safe preview, take it to air when it is ready, and run the day from looks and a cue stack, at the desk or from a phone or Stream Deck. A watchdog, a one-button health check and an optional standby twin keep the screens up from load-in to the last cue.',
     'version' => null,
     'os' => 'Windows 10 and 11 (64-bit)',
+    'schema_os' => 'Windows 10, Windows 11 (64-bit)',
     'distribution' => 'Portable app (no install)',
     'schema_category' => 'MultimediaApplication',
     'status' => 'available',

@@ -40,7 +40,7 @@ $portal = [
         <div class="c-hero-grid support-help-grid">
             <div class="support-help-intro">
                 <p class="c-eyebrow">Help for all four apps</p>
-                <h1 class="c-hero-title" id="page-title">Support</h1>
+                <h1 class="c-hero-title" id="page-title">Help and support for the four apps</h1>
                 <p class="c-hero-lede">Ask the show assistant, work through a getting-started guide, or sign in to the client portal to report a bug.</p>
             </div>
             <div class="support-help-chat" id="assistant">

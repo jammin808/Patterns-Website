@@ -56,6 +56,35 @@ final class ContactTest extends TestCase
         self::assertStringContainsString('Message sent', $this->request('GET', '/contact/')->body);
     }
 
+    /**
+     * The receipt printed the name typed into the form, so anyone could have the site mail any address words of
+     * their own ("your licence is suspended, pay at …") from its own domain. It now carries only the site's words,
+     * and an address receives at most two a day; every message is still stored and passed on.
+     */
+    public function testTheReceiptCarriesNoVisitorTextAndIsCappedPerAddress(): void
+    {
+        $bait = 'customer. URGENT: your Patterns licence is suspended, re-activate at patterns-licence.example/pay within 24h';
+        for ($i = 0; $i < 3; $i++) {
+            $this->openForm(30);
+            $this->post('/contact/', self::message(['name' => $bait, 'email' => 'victim@example.test', 'message' => 'Pay now at patterns-licence.example/pay ' . $i]));
+        }
+        self::assertSame(3, $this->storedMessages(), 'every message is kept');
+        $admin = array_filter($this->mails(), static fn (array $m): bool => $m['to'] === 'owner@example.test');
+        self::assertCount(3, $admin, 'and passed on to the administrator');
+        $receipts = array_values(array_filter($this->mails(), static fn (array $m): bool => $m['to'] === 'victim@example.test'));
+        self::assertCount(ContactController::RECEIPTS_PER_DAY, $receipts, 'two receipts a day for one address');
+        foreach ($receipts as $r) {
+            self::assertSame('contact-receipt', $r['template']);
+            self::assertArrayNotHasKey('name', $r['data']);
+            foreach (['URGENT', 'suspended', 'patterns-licence.example', 'customer'] as $word) {
+                self::assertStringNotContainsString($word, $r['html']);
+                self::assertStringNotContainsString($word, $r['subject']);
+            }
+            self::assertStringContainsString('Thanks — we have your message', $r['html']);
+            self::assertStringContainsString('help with the software', $r['html'], 'the topic from the fixed list');
+        }
+    }
+
     public function testATooQuickSendKeepsTheInputAndAsksForSendAgain(): void
     {
         $this->openForm(0);

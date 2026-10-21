@@ -20,6 +20,9 @@ final class Content
     /** @var array<string, array<mixed>> */
     private static array $cache = [];
 
+    /** @var array<string, string>|null question key => the path of the page that marks it up */
+    private static ?array $faqOwners = null;
+
     public const PRODUCTS = ['patterns', 'stagewatch', 'agmessage', 'playmap'];
 
     private static function root(): string
@@ -100,8 +103,62 @@ final class Content
         return $trail;
     }
 
+    /**
+     * The price a tier is sold at while its launch offer runs (its 'launch_price'), or null when it has none. Every
+     * reader takes the launch figure from here: the pages, the portal, the structured data and the assistant.
+     *
+     * @param array<string, mixed> $tier
+     */
+    public static function launchPrice(array $tier): ?string
+    {
+        $launch = $tier['launch_price'] ?? null;
+        return is_numeric($launch) ? (string) $launch : null;
+    }
+
+    /**
+     * The one page whose structured data carries an FAQ question (it may be shown on several pages, but is marked
+     * up once site-wide): a product's own question on its overview, then on its licensing page; a general or
+     * licensing question on /support/faq/; then the ecosystem page; then a workflow. A page lower in that order
+     * shows a question it shares without marking it up.
+     */
+    public static function faqOwner(string $question): ?string
+    {
+        if (self::$faqOwners === null) {
+            $owners = [];
+            $claim = static function (string $path, mixed $faqs) use (&$owners): void {
+                foreach (is_array($faqs) ? $faqs : [] as $f) {
+                    if (is_array($f) && isset($f['q'])) {
+                        $owners[self::faqKey((string) $f['q'])] ??= $path;
+                    }
+                }
+            };
+            foreach (self::PRODUCTS as $key) {
+                $claim('/' . $key . '/', self::product($key)['faqs'] ?? []);
+            }
+            foreach (self::PRODUCTS as $key) {
+                $claim('/' . $key . '/licensing/', self::licensing($key)['faqs'] ?? []);
+            }
+            foreach (self::get('faq') as $group) {
+                $claim('/support/faq/', is_array($group) ? ($group['items'] ?? []) : []);
+            }
+            $claim('/ecosystem/', self::get('ecosystem')['faqs'] ?? []);
+            foreach (self::get('workflows') as $slug => $wf) {
+                $claim('/workflows/' . $slug . '/', is_array($wf) ? ($wf['faqs'] ?? []) : []);
+            }
+            self::$faqOwners = $owners;
+        }
+        return self::$faqOwners[self::faqKey($question)] ?? null;
+    }
+
+    /** A question compared as words: case, spacing and closing punctuation do not make it another question. */
+    private static function faqKey(string $question): string
+    {
+        return rtrim(mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $question))), '?.! ');
+    }
+
     public static function flush(): void
     {
+        self::$faqOwners = null;
         self::$cache = [];
     }
 }

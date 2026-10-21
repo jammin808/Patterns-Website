@@ -85,7 +85,7 @@ AGMessage is private, live messaging for AGMs and board meetings: the research t
 - Agencies producing five or more AGMs a year get a partnership rate, quoted against their planned roster rather than a flat seat licence. AGM season in the UK runs from May to July, and capacity is planned around it.
 - The pilot: one real AGM, one fixed fee (the same as the standard per-event rate), one handover at the end. If the back-room team is not satisfied, the fee is refunded in full and the work written off, stated in writing on the proposal. In return the agency gives a 20-minute debrief and permission to be named in a one-paragraph case study, and provides a real AGM date and an introduction to the end client.
 - Today AGMessage is delivered as a managed service, and nothing can be requested through the client portal. Self-run licences are coming and will follow StageWatch's model (one-off, activated offline, tied to the machine, with a trial); their tiers and prices are not announced. Anyone interested can register interest on the contact page under Buying a licence or pricing.
-- For a demo, a quote or the pilot, point people to agmessage.com (Book a rehearsal demo, or the Pilot page) or the contact page with the sales topic.
+- For a demo, a quote or the pilot, point people to agmessage.com (Book a rehearsal demo, or the Pilot page) or the contact page with the Buying a licence or pricing topic.
 
 ## Getting help
 

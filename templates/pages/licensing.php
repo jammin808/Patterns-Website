@@ -31,7 +31,7 @@ foreach (($sw['tiers'] ?? []) as $t) {
     }
 }
 $prod = $find($sw['tiers'] ?? [], 'id', 'production');
-$launch = $prod !== null && preg_match('/£\s?(\d+)/', (string) ($prod['price_note'] ?? ''), $m) ? '£' . $m[1] : null;
+$launch = $prod !== null && \Psc\Content\Content::launchPrice($prod) !== null ? price((string) \Psc\Content\Content::launchPrice($prod)) : null;
 $policy = static fn (string $title): string => (string) ($find($sw['policies'] ?? [], 'title', $title)['text'] ?? '');
 $extra = static fn (string $id): string => (string) ($find($sw['extras'] ?? [], 'id', $id)['text'] ?? '');
 $sentences = preg_split('/(?<=\.)\s+/', (string) ($sw['intro'] ?? '')) ?: [];

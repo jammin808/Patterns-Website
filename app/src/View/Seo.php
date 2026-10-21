@@ -74,7 +74,8 @@ final class Seo
     {
         $e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $image = $this->absolute($this->image ?? '/assets/img/og/default.png');
-        $alt = $this->imageAlt ?? $this->siteName;
+        // A card without its own description is named by the page it stands for, never by the site name alone.
+        $alt = $this->imageAlt ?? $this->title;
         $out = [];
         $out[] = '<title>' . $e($this->title) . '</title>';
         $out[] = '<meta name="description" content="' . $e($this->description) . '">';

@@ -7,6 +7,7 @@ declare(strict_types=1);
 return [
     'product' => 'patterns',
     'pricing_status' => 'coming-soon',
+    'llms_note' => 'how licensing will work and how to register interest',
     'model' => 'Patterns will follow the same one-off, offline licensing as StageWatch: a licence you buy once, activated with a licence file on your show machine, with no subscription and no licence server.',
     'intro' => 'Patterns licences are coming soon. The plan follows StageWatch\'s ladder, from a trial on your own show machine to licences for one operator and for production companies. Prices and what each licence includes will be announced together. Register your interest and you will be among the first to hear.',
     'tiers' => [

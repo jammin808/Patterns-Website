@@ -40,7 +40,7 @@ $std = $tier('standard');
 $pro = $tier('pro');
 $prod = $tier('production');
 $trial = $tier('trial');
-$launch = $prod !== null && preg_match('/£\s?(\d+)/', (string) ($prod['price_note'] ?? ''), $m) ? '£' . $m[1] : null;
+$launch = $prod !== null && \Psc\Content\Content::launchPrice($prod) !== null ? price((string) \Psc\Content\Content::launchPrice($prod)) : null;
 
 // Home FAQ: general questions only (licensing questions live on /licensing/, ecosystem ones on /ecosystem/).
 $pick = ['What is Patterns Show Control?', 'Which app do I need?', 'Is there a Mac or Linux version?', 'Do I need to install anything?', 'Do phones and tablets need an app?'];
@@ -83,12 +83,12 @@ $faqs = array_values($faqs);
                     <div class="c-take-actions">
                         <fieldset class="c-seg">
                             <legend class="u-visually-hidden">Transition</legend>
-                            <label><input type="radio" name="hero-trans" value="mix" data-hero-trans><span>Mix</span></label>
+                            <label><input type="radio" name="hero-trans" value="dissolve" data-hero-trans checked><span>Dissolve</span></label>
+                            <label><input type="radio" name="hero-trans" value="dip" data-hero-trans><span>Dip</span></label>
                             <label><input type="radio" name="hero-trans" value="wipe" data-hero-trans><span>Wipe</span></label>
-                            <label><input type="radio" name="hero-trans" value="pixels" data-hero-trans checked><span>Pixels</span></label>
-                            <label><input type="radio" name="hero-trans" value="iris" data-hero-trans><span>Iris</span></label>
+                            <label><input type="radio" name="hero-trans" value="push" data-hero-trans><span>Push</span></label>
                         </fieldset>
-                        <button class="c-btn c-btn--secondary c-btn--sm c-auto" type="button" aria-pressed="true" data-hero-auto><i class="c-lamp" aria-hidden="true"></i>Auto</button>
+                        <button class="c-btn c-btn--secondary c-btn--sm c-auto" type="button" aria-pressed="true" data-hero-auto><i class="c-lamp" aria-hidden="true"></i>Auto demo</button>
                         <button class="c-take" type="button" data-hero-take>TAKE</button>
                     </div>
                 </div>
@@ -127,7 +127,7 @@ $faqs = array_values($faqs);
     <div class="l-wrap">
         <div class="c-section-head">
             <div><p class="c-eyebrow">Ecosystem</p><h2 id="connect-title">How they connect</h2></div>
-            <p class="c-lede">On the same network the apps find each other, share live status and confirm every command. Out of the box, anything an AI proposes waits for a person.</p>
+            <p class="c-lede">On the same network the apps find each other, share live status and confirm every command. Out of the box, Patterns, StageWatch and AGMessage hold what an AI proposes for a person, and PlayMap's high-risk steps always wait for one.</p>
         </div>
         <?= $this->partial('hub/flow') ?>
         <p class="hub-more"><a href="/ecosystem/">How the four apps work together</a><a href="/ecosystem/integrations/">Every integration, app by app</a></p>

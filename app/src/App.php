@@ -50,6 +50,20 @@ final class App
         date_default_timezone_set($config->string('app.timezone', 'Europe/London'));
         mb_internal_encoding('UTF-8');
         (require $root . '/app/routes.php')($this->router, $this);
+        if ($config->shadowed()) {
+            $this->warnShadowedConfig();
+        }
+    }
+
+    /** Logs, at most once a day, that a config/local.php in the web root is being ignored (see Config::shadowed()). */
+    private function warnShadowedConfig(): void
+    {
+        $stamp = $this->storage->dir('cache') . '/config-shadowed';
+        if (is_file($stamp) && (int) @filemtime($stamp) > time() - 86400) {
+            return;
+        }
+        @touch($stamp);
+        $this->log->warning('config/local.php is ignored: the server file outside the web root is read instead', ['read' => $this->config->source()]);
     }
 
     public static function boot(?Config $config = null): self
@@ -221,7 +235,8 @@ final class App
     public function clientIp(): string
     {
         $header = $this->config->get('app.trusted_proxy_header');
-        return $this->request?->ip(is_string($header) ? $header : null) ?? '0.0.0.0';
+        $proxies = array_values(array_filter($this->config->list('app.trusted_proxies'), 'is_string'));
+        return $this->request?->ip(is_string($header) && $header !== '' ? $header : null, $proxies) ?? '0.0.0.0';
     }
 
     /** A Seo object for a path with the site defaults applied. */
@@ -242,23 +257,35 @@ final class App
         return $this->finalise($request, $response);
     }
 
+    /**
+     * A decoded path holding any of these is no page of this site. Browsers read a backslash as a slash and drop
+     * tabs and line breaks, so such a path echoed into a Location header could name another host.
+     */
+    public const UNSAFE_PATH = '#[\\\\\x00-\x20\x7f]#';
+
     private function dispatch(Request $request): Response
     {
+        if (preg_match(self::UNSAFE_PATH, $request->path)) {
+            return $this->errorResponse($request, 404);
+        }
         if ($this->config->bool('app.force_https', true) && !$request->isHttps() && !$this->isLocalHost($request->host()) && $this->config->isProduction()) {
             return Response::redirect('https://' . $request->host() . $request->path . $this->queryString($request), 301);
         }
         $lower = strtolower($request->path);
         if ($lower !== $request->path && !str_starts_with($request->path, '/portal/') && !str_starts_with($request->path, '/api/')) {
+            // Only a path that exists in lower case is redirected: anything else is a 404, never a permanent hop.
             $again = $this->router->match('GET', $lower);
-            $target = is_array($again) && isset($again['redirect']) ? $again['redirect'] : $lower;
-            return Response::redirect($target . $this->queryString($request), 301);
+            if ($again === null) {
+                return $this->errorResponse($request, 404);
+            }
+            return Response::redirect(self::localTarget($again['redirect'] ?? $lower) . $this->queryString($request), 301);
         }
         $match = $this->router->match($request->method, $request->path);
         if ($match === null) {
             return $this->errorResponse($request, 404);
         }
         if (isset($match['redirect'])) {
-            return Response::redirect($match['redirect'] . $this->queryString($request), 301);
+            return Response::redirect(self::localTarget($match['redirect']) . $this->queryString($request), 301);
         }
         if (isset($match['allowed'])) {
             return $this->errorResponse($request, 405)->header('Allow', implode(', ', $match['allowed']));
@@ -364,6 +391,12 @@ final class App
             $response->header('X-Robots-Tag', 'noindex');
         }
         return $response;
+    }
+
+    /** An internal redirect target: always one slash then a path, so it can never be read as another host. */
+    private static function localTarget(string $target): string
+    {
+        return '/' . ltrim($target, "/\\\t\r\n ");
     }
 
     private function queryString(Request $request): string

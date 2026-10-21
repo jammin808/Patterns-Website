@@ -34,5 +34,5 @@ $apps = [
             <?php endforeach; ?>
         </ul>
     </div>
-    <figcaption class="c-flow-note u-mt-4">Out of the box, anything an AI tool proposes stops at the approval gate until a person decides. Controllers in an operator's hands drive the apps directly, and every app runs its own checks before anything changes.</figcaption>
+    <figcaption class="c-flow-note u-mt-4">Out of the box, what an AI tool proposes to Patterns, StageWatch or AGMessage stops at the approval gate until a person decides, and so does every high-risk step in PlayMap. Controllers in an operator's hands drive the apps directly, and every app runs its own checks before anything changes.</figcaption>
 </figure>

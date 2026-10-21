@@ -111,4 +111,56 @@ final class AnthropicGatewayTest extends TestCase
         self::assertSame(['user', 'system'], array_column($body['messages'], 'role'));
         self::assertSame(1200, $body['max_tokens']);
     }
+
+    /** @param list<array{string, array<string, mixed>}> $events */
+    private static function sse(array $events): string
+    {
+        $sse = '';
+        foreach ($events as [$name, $data]) {
+            $sse .= "event: {$name}\ndata: " . json_encode($data) . "\n\n";
+        }
+        return $sse;
+    }
+
+    /** @return list<array{string, array<string, mixed>}> a stream whose prompt was written to the cache */
+    private static function cacheWriteStream(): array
+    {
+        return [
+            ['message_start', ['type' => 'message_start', 'message' => ['id' => 'msg_3', 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-sonnet-5-5', 'content' => [], 'stop_reason' => null, 'stop_sequence' => null, 'usage' => ['input_tokens' => 300, 'output_tokens' => 1, 'cache_read_input_tokens' => 0, 'cache_creation_input_tokens' => 49000]]]],
+            ['content_block_start', ['type' => 'content_block_start', 'index' => 0, 'content_block' => ['type' => 'text', 'text' => '']]],
+            ['content_block_delta', ['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'To install, run ']]],
+            ['content_block_delta', ['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'winget install Patterns now.']]],
+            ['content_block_stop', ['type' => 'content_block_stop', 'index' => 0]],
+            ['message_delta', ['type' => 'message_delta', 'delta' => ['stop_reason' => 'end_turn', 'stop_sequence' => null], 'usage' => ['output_tokens' => 32]]],
+            ['message_stop', ['type' => 'message_stop']],
+        ];
+    }
+
+    /** The cached prompt's tokens, which the API reports apart from input_tokens, come back with the answer. */
+    public function testCacheWritesAndReadsAreReported(): void
+    {
+        $g = $this->gateway(new Response(200, ['Content-Type' => 'text/event-stream'], self::sse(self::cacheWriteStream())));
+        $out = $g->stream([['type' => 'text', 'text' => 'S']], [['role' => 'user', 'content' => 'q']], static function (string $t): void {
+        });
+        self::assertSame([300, 32, 49000, 0], [$out['tokens_in'], $out['tokens_out'], $out['cache_write'], $out['cache_read']]);
+        self::assertSame(['tokens_in' => 300, 'tokens_out' => 32, 'cache_write' => 49000, 'cache_read' => 0], $g->lastUsage());
+    }
+
+    /** A stream stopped by its callback (the code guard) still reports what it spent, cached prompt included. */
+    public function testAStreamStoppedEarlyStillReportsItsUsage(): void
+    {
+        $g = $this->gateway(new Response(200, ['Content-Type' => 'text/event-stream'], self::sse(self::cacheWriteStream())));
+        try {
+            $g->stream([['type' => 'text', 'text' => 'S']], [['role' => 'user', 'content' => 'q']], static function (string $t): void {
+                if (str_contains($t, 'winget')) {
+                    throw new \Psc\Chat\CodeGuardTripped();
+                }
+            });
+            self::fail('the callback stops the stream');
+        } catch (\Psc\Chat\CodeGuardTripped) {
+            $u = $g->lastUsage();
+            self::assertSame([300, 49000, 0], [$u['tokens_in'], $u['cache_write'], $u['cache_read']]);
+            self::assertSame(intdiv(strlen('To install, run winget install Patterns now.') + 3, 4), $u['tokens_out'], 'output counted from the text the model produced');
+        }
+    }
 }

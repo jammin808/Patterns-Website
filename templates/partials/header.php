@@ -39,7 +39,8 @@ $current = static function (string $href, ?string $navSection) use ($path, $sect
                                             <p class="c-mega-line"><?= e($child['line'] ?? '') ?></p>
                                             <ul class="c-mega-links" role="list">
                                                 <?php foreach (($child['links'] ?? []) as $l): ?>
-                                                    <li><a href="<?= e($l['href']) ?>"<?= $l['href'] === $path ? ' aria-current="page"' : '' ?>><?= e($l['label']) ?></a></li>
+                                                    <?php /* The product's name rides in the link, unseen: "Licensing" alone names four pages. */ ?>
+                                                    <li><a href="<?= e($l['href']) ?>"<?= $l['href'] === $path ? ' aria-current="page"' : '' ?>><span class="u-visually-hidden"><?= e($child['label']) ?> </span><?= e($l['label']) ?></a></li>
                                                 <?php endforeach; ?>
                                             </ul>
                                         </li>

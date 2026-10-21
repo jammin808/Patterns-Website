@@ -318,6 +318,52 @@ final class AdminTest extends TestCase
         self::assertStringNotContainsString('SW-AAAA-0003', $r->body, 'an issued licence waits on nobody');
     }
 
+    /**
+     * A release file larger than post_max_size arrives as an empty request, so the missing form token made it a
+     * "Session expired" page. It now goes back to the form saying the file was too large and where large files go.
+     */
+    public function testAnUploadOverThePostLimitSaysItWasTooLarge(): void
+    {
+        $this->signInAsAdmin();
+        $limit = \Psc\Support\Uploads::iniBytes((string) ini_get('post_max_size'));
+        self::assertGreaterThan(0, $limit);
+        $r = $this->request('POST', '/portal/admin/releases/', [], ['Content-Length' => (string) ($limit + 1), 'Referer' => 'https://patternsshowcontrol.test/portal/admin/releases/new/']);
+        self::assertRedirect($r, '/portal/admin/releases/new/');
+        $flash = self::lastFlash();
+        self::assertSame('danger', $flash['type']);
+        self::assertStringContainsString('larger than the server accepts in one upload', $flash['message']);
+        self::assertStringContainsString('downloads-vault/incoming/', $flash['message']);
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM releases'));
+
+        // A form without its token that is not over the limit is still refused as an expired session.
+        self::assertSame(419, $this->request('POST', '/portal/admin/releases/', ['title' => 'x'], ['Content-Length' => '10'])->status);
+        // A foreign Referer is never followed.
+        $foreign = $this->request('POST', '/portal/admin/releases/', [], ['Content-Length' => (string) ($limit + 1), 'Referer' => 'https://evil.example/x/']);
+        self::assertRedirect($foreign, '/portal/');
+    }
+
+    /** The upload control carries its limit, so the browser can refuse an over-large file before sending it. */
+    public function testTheReleaseFormTellsTheBrowserItsSizeLimit(): void
+    {
+        $this->signInAsAdmin();
+        $body = $this->request('GET', '/portal/admin/releases/new/')->body;
+        self::assertMatchesRegularExpression('#<input type="file"[^>]*data-max-bytes="\d+"[^>]*data-max-message="This file is larger than [^"]+downloads-vault/incoming/#', $body);
+    }
+
+    /** A settings file uploaded into the web root after the outside one existed is ignored: the overview says so. */
+    public function testTheOverviewWarnsWhenAnUploadedSettingsFileIsIgnored(): void
+    {
+        $this->signInAsAdmin();
+        self::assertStringNotContainsString('config/local.php', $this->request('GET', '/portal/admin/')->body);
+
+        $this->bootShadowed();
+        $this->signInAsAdmin();
+        $r = $this->request('GET', '/portal/admin/');
+        self::assertSame(200, $r->status);
+        self::assertTrue($this->app->config->shadowed());
+        self::assertMatchesRegularExpression('#<div class="pt-alert pt-alert--warning" role="status">A settings file was uploaded as <code>public_html/config/local.php</code>#', $r->body);
+    }
+
     // ------------------------------------------------------------ account actions
 
     public function testAnAdministratorApprovesAWaitingAccount(): void

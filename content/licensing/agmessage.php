@@ -8,6 +8,7 @@ declare(strict_types=1);
 return [
     'product' => 'agmessage',
     'pricing_status' => 'coming-soon',
+    'llms_note' => 'managed delivery for each AGM, priced on application, and how to book a demo',
     'model' => 'AGMessage is delivered as a managed service for each AGM: the laptop, the software set up for your client\'s meeting and a technician through setup, rehearsal and the meeting day, quoted on application.',
     'intro' => 'AGMessage arrives as one line item on your invoice: a high-spec venue laptop, AGMessage set up for your client\'s meeting, and a client-facing technician running the back-room through setup, rehearsal and the meeting itself. Agencies with five or more AGMs a year get a partnership rate quoted against their roster, and a pilot lets you try it on one real AGM, refunded in full if the back-room team is not satisfied. Book a rehearsal demo on agmessage.com to see it running.',
     'tiers' => [

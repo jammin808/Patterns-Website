@@ -21,7 +21,7 @@ The Patterns ecosystem is a family of four Windows show apps for live events, ma
 - Countdowns travel as time remaining, so every screen counts the same seconds whatever its own clock says. CLOCKS APART means two computers' clocks differ by more than two seconds: countdowns stay right, but times of day may differ, so set both clocks correctly.
 - Pages and links can run over HTTPS. Each install makes its own certificate, and each app has a certificate trust page that shows the fingerprint and walks Windows, Mac, iPhone, iPad and Android devices through trusting it once. Patterns, StageWatch and AGMessage can also refuse unencrypted connections from other devices with Require HTTPS.
 - Links between apps remember the certificate they first trusted. CERTIFICATE CHANGED means a linked app now shows a different one, for example after a reinstall or on a new machine; the link stays off until the operator accepts it, which they should do only if they know why it changed.
-- StageWatch uses named API keys that can be scoped and revoked. Patterns, PlayMap and their Companion modules pair with a token they prove without ever sending it across the network.
+- StageWatch uses named API keys that can be scoped and revoked. Patterns' and PlayMap's Companion modules prove they know the pairing token without ever sending it across the network, and every app can serve its pages over HTTPS.
 - AGMessage shares only counts, the meeting's state and the titles of open action prompts. Other apps never see AGMessage's message text, names, room names or codes, or documents.
 - If an app does not appear: check both computers are on the same network and that Windows Firewall allows the app on private networks. Questions about network ports or other venue IT details go in a support ticket, so the answer can fit that venue.
 
@@ -61,8 +61,10 @@ Use this to answer "does it work with…" questions. If an app is not listed for
 
 ## AI across the ecosystem
 
-- Everything works without AI; AI makes it faster. AI never holds authority over the show: it proposes, and a person decides.
-- Out of the box, nothing an AI suggests runs until a person approves it, and anything that would change what the audience sees is never pre-ticked. Risk is rated by each app's own rules, never by the model, and anything unknown counts as high risk. In StageWatch an operator can choose to let MCP agents act directly, and in PlayMap whether low-risk steps run directly is the operator's choice; PlayMap's high-risk actions always wait for a person. So say "nothing runs until a person approves it, unless the operator chooses otherwise", never "impossible".
+- Everything works without AI; AI makes it faster. Each app's own rules, never the model, decide what an AI may do, and a person decides anything high-risk.
+- Out of the box, Patterns, StageWatch and AGMessage run nothing an AI suggests until a person approves it, and anything that would change what the audience sees is never pre-ticked. Risk is rated by each app's own rules, never by the model, and anything unknown counts as high risk. In StageWatch an operator can choose to let MCP agents act directly.
+- PlayMap is different: once a person turns its built-in assistant on, the assistant's low-risk steps (a new playlist, an item, a generator) run straight away by default, and whether its review steps run directly is the operator's choice. AI tools connected to PlayMap over MCP run everyday and review steps directly, through PlayMap's own checks. Only high-risk actions wait for a person, and that holds whatever the settings.
+- So for Patterns, StageWatch and AGMessage say "nothing runs until a person approves it, unless the operator chooses otherwise"; for PlayMap say "everyday steps run straight away and high-risk actions always wait for a person". Never say "impossible".
 - With a StageWatch on the network (Pro or higher, or the trial, because the other apps reach it through its network features), it is the show's approval desk: suggestions from Patterns' assistant, from AI tools connected to StageWatch and from AGMessage's research team (messages proposed for the speaker's screen) wait in StageWatch's Copilot list. Each shows who suggested it, which app it is for, why and how risky it is. Approve or discard once; the target app runs approved items through its own checks and reports done, refused or not delivered. With no StageWatch on the network, each app approves its own.
 - PlayMap's own assistant keeps its suggestions on PlayMap's own approval list; it does not send them to StageWatch.
 - Cloud AI uses Claude by Anthropic with the customer's own API key, added on their own machine. AI usage is between the customer and Anthropic, on the account that owns the key. PlayMap's assistant can also run on a local model, such as Ollama, LM Studio or llama.cpp.
@@ -90,8 +92,8 @@ Use this to answer "does it work with…" questions. If an app is not listed for
 
 - StageWatch is on sale: a 14-day trial, a free watermarked timer after it, and one-off licences in GBP. The StageWatch licensing page has the prices; quote only those.
 - Patterns and PlayMap will follow StageWatch's one-off, offline model; their prices are not announced. PlayMap's early-access build is in the client portal now.
-- AGMessage is delivered as a managed service for each AGM, quoted on application. There is no AGMessage licence to request in the portal; anyone who wants to run it on their own laptop should say so on the contact page (sales topic). Do not say self-run licences are coming.
-- Never guess a price, a date or a discount that is not on a licensing page. For pricing questions not covered, point to the contact page with the sales topic.
+- AGMessage is delivered as a managed service for each AGM, quoted on application. There is no AGMessage licence to request in the portal; anyone who wants to run it on their own laptop should say so on the contact page (the Buying a licence or pricing topic).
+- Never guess a price, a date or a discount that is not on a licensing page. For pricing questions not covered, point to the contact page with the Buying a licence or pricing topic.
 
 ## Coming to the ecosystem (not available yet)
 

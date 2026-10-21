@@ -1,10 +1,19 @@
-# public/ is the only web-reachable directory. Static files are served with long cache lives (their URLs carry a
-# content version, ?v=…); anything else goes to the front controller.
+# public/ is the only web-reachable directory. Stylesheets and scripts are cached for a year as immutable (their
+# URLs carry a content version, ?v=…); images and fonts keep their names when they are replaced, so they are cached
+# for a week. Anything else goes to the front controller, whose responses set their own Cache-Control.
 
 Options -Indexes -MultiViews
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # A request that names /public/... is sent to the clean URL, so nothing is reachable twice. This rule lives
+    # here, not in the root .htaccess, because this file's own RewriteEngine replaces the root's rules for every
+    # path inside public/. THE_REQUEST is the visitor's request line, so the root's internal rewrite into public/
+    # never matches it; the scheme is written out so a proxy reaching the origin over http adds no extra hop.
+    RewriteCond %{THE_REQUEST} \s/public/([^\s?]*) [NC]
+    RewriteRule ^ https://%{HTTP_HOST}/%1 [L,R=301]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L,QSA]
 </IfModule>
@@ -18,25 +27,29 @@ Options -Indexes -MultiViews
     AddCharset utf-8 .css .js .svg .txt .webmanifest
 </IfModule>
 
+# Static types only, and no ExpiresDefault: a default would also stamp the front controller's responses, adding a
+# second max-age to the Cache-Control the application already sends.
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresDefault "access plus 1 hour"
     ExpiresByType text/css "access plus 1 year"
     ExpiresByType text/javascript "access plus 1 year"
     ExpiresByType application/javascript "access plus 1 year"
-    ExpiresByType font/woff2 "access plus 1 year"
-    ExpiresByType image/png "access plus 1 year"
-    ExpiresByType image/jpeg "access plus 1 year"
-    ExpiresByType image/webp "access plus 1 year"
-    ExpiresByType image/avif "access plus 1 year"
-    ExpiresByType image/svg+xml "access plus 1 year"
-    ExpiresByType image/x-icon "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 week"
+    ExpiresByType image/png "access plus 1 week"
+    ExpiresByType image/jpeg "access plus 1 week"
+    ExpiresByType image/webp "access plus 1 week"
+    ExpiresByType image/avif "access plus 1 week"
+    ExpiresByType image/svg+xml "access plus 1 week"
+    ExpiresByType image/x-icon "access plus 1 week"
     ExpiresByType application/manifest+json "access plus 1 day"
 </IfModule>
 
 <IfModule mod_headers.c>
-    <FilesMatch "\.(css|js|woff2|png|jpe?g|webp|avif|svg)$">
+    <FilesMatch "\.(css|js)$">
         Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(woff2|png|jpe?g|webp|avif|svg|ico)$">
+        Header set Cache-Control "public, max-age=604800"
     </FilesMatch>
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"

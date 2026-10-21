@@ -326,7 +326,7 @@ final class LicenceController extends Controller
      * The licences a product offers for request: its requestable tiers, then its requestable extras (an event
      * pass, for example). Each needs at least one hardware ID.
      *
-     * @return array<string, array{id: string, kind: string, name: string, price: string|null, price_label: string, price_note: string, summary: string, machines: int, hardware_ids: int}>
+     * @return array<string, array{id: string, kind: string, name: string, price: string|null, launch_price: string|null, price_label: string, price_note: string, summary: string, machines: int, hardware_ids: int}>
      */
     public static function options(string $product): array
     {
@@ -347,6 +347,7 @@ final class LicenceController extends Controller
                     'kind' => $kind,
                     'name' => (string) ($t['name'] ?? $t['title'] ?? $id),
                     'price' => isset($t['price']) && is_numeric($t['price']) ? (string) $t['price'] : null,
+                    'launch_price' => Content::launchPrice($t),
                     'price_label' => (string) ($t['price_label'] ?? ''),
                     'price_note' => (string) ($t['price_note'] ?? ''),
                     'summary' => (string) ($t['summary'] ?? $t['text'] ?? ''),

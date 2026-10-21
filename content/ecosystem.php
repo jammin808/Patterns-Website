@@ -94,7 +94,7 @@ return [
             ],
             [
                 'title' => 'Keys that stay secret',
-                'text' => 'Control needs a key or a pairing token. StageWatch uses named API keys that you can scope and revoke; Patterns, PlayMap and their Companion modules prove they know their token without ever sending it across the network. AGMessage shares only counts, the room\'s state and the titles of open action prompts, never message text, names, room codes or documents.',
+                'text' => 'Control needs a key or a pairing token. StageWatch uses named API keys that you can scope and revoke; Patterns\' and PlayMap\'s Companion modules prove they know the pairing token without ever sending it across the network, and every app can serve its pages over HTTPS. AGMessage shares only counts, the room\'s state and the titles of open action prompts, never message text, names, room codes or documents.',
                 'icon' => 'key',
             ],
         ],
@@ -388,8 +388,8 @@ return [
         'intro' => 'Everything in the ecosystem works without AI, and AI makes it faster. Where an app offers AI, it drafts, suggests and explains; a person decides what happens, and the app\'s own safety checks still apply after approval.',
         'principles' => [
             [
-                'title' => 'A person always decides',
-                'text' => 'AI features propose. Out of the box, nothing an AI suggests runs until a person says yes, and anything that would change what the audience sees is never pre-ticked. Letting an AI act directly is only ever a choice an operator makes, and PlayMap\'s high-risk actions wait for a person whatever the settings.',
+                'title' => 'People stay in charge',
+                'text' => 'AI features propose. Out of the box, Patterns, StageWatch and AGMessage run nothing an AI suggests until a person says yes, and anything that would change what the audience sees is never pre-ticked. In PlayMap, everyday steps run straight away through PlayMap\'s own checks, and anything high-risk waits for a person whatever the settings.',
             ],
             [
                 'title' => 'One place to decide',
@@ -464,7 +464,7 @@ return [
 
     'reliability' => [
         'title' => 'Built for show day',
-        'intro' => 'The apps are made for rooms where the show cannot stop: they run without the internet, come back by themselves, and keep a second machine ready.',
+        'intro' => 'The apps are made for rooms where the show cannot stop: they run without the internet and come back by themselves, and Patterns, StageWatch and PlayMap can keep a second machine ready.',
         'points' => [
             [
                 'title' => 'Nothing to install, nothing in the cloud',
@@ -592,7 +592,7 @@ return [
         ],
         [
             'q' => 'Will the AI change my show by itself?',
-            'a' => 'Not unless you choose to let it. Out of the box, AI features only propose and a person decides, and anything that would change what the audience sees is never pre-ticked. With StageWatch Pro or higher on the network, suggestions wait in one list for the show caller.',
+            'a' => 'In Patterns, StageWatch and AGMessage, not unless you choose to let it: out of the box, AI features only propose and a person decides, and anything that would change what the audience sees is never pre-ticked. In PlayMap, everyday steps run straight away through PlayMap\'s own checks, and high-risk actions always wait for a person. With StageWatch Pro or higher on the network, suggestions from Patterns\' assistant, AI tools connected to StageWatch and AGMessage\'s research team wait in one list for the show caller.',
         ],
         [
             'q' => 'Can I run everything from one Stream Deck?',

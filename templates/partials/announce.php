@@ -7,14 +7,15 @@ foreach (($lic['tiers'] ?? []) as $t) {
         $production = $t;
     }
 }
-if ($production === null || empty($production['price_note']) || !preg_match('/£\s?(\d+)/', (string) $production['price_note'], $m)) {
+$launch = $production !== null ? \Psc\Content\Content::launchPrice($production) : null;
+if ($launch === null) {
     return;
 }
 ?>
 <div class="c-announce" data-dismissible="launch-2026" role="region" aria-label="Announcement">
     <div class="l-wrap c-announce-bar">
         <p class="c-announce-text"><i class="c-lamp c-lamp--standby" aria-hidden="true"></i>
-            <span>StageWatch Production: <b>£<?= e($m[1]) ?></b> <s><span class="u-visually-hidden">was </span><?= e(price((string) $production['price'])) ?></s> launch price, one-off.</span>
+            <span>StageWatch Production: <b><?= e(price($launch)) ?></b> <s><span class="u-visually-hidden">was </span><?= e(price((string) $production['price'])) ?></s> launch price, one-off.</span>
             <a href="/stagewatch/licensing/">See pricing</a></p>
         <button class="c-announce-close" type="button" data-dismiss aria-label="Dismiss the announcement"><?= icon('close', 'c-icon--sm') ?></button>
     </div>

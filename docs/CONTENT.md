@@ -46,7 +46,8 @@ return [
     'summary' => '…1–2 sentences: cards, meta, llms.txt…',
     'pitch' => '…2–3 sentences: the overview hero…',
     'version' => '2.16',                       // only if stated by the product; else null
-    'os' => 'Windows 10 and 11 (64-bit)',
+    'os' => 'Windows 10 and 11 (64-bit)',      // the "Runs on" line; may be a sentence
+    'schema_os' => 'Windows 10, Windows 11 (64-bit)', // structured data's operatingSystem: operating systems only
     'distribution' => 'Installer',             // or 'Portable app (no install)'
     'schema_category' => 'MultimediaApplication',
     'status' => 'available',                   // available | early-access

@@ -21,6 +21,27 @@ final class SiteTest extends TestCase
         self::assertSame([], $r->cookies(), 'public pages set no cookies');
     }
 
+    /**
+     * The contact page is in the sitemap and its meta robots says index, but the route's nostore step replaced the
+     * page's own X-Robots-Tag with noindex, which search engines obey. The page's choice now stands; the portal's
+     * pages stay noindex.
+     */
+    public function testTheContactPageIsIndexableAndThePortalIsNot(): void
+    {
+        $contact = $this->request('GET', '/contact/');
+        self::assertSame(200, $contact->status);
+        self::assertStringNotContainsString('noindex', (string) $contact->getHeader('X-Robots-Tag'));
+        self::assertMatchesRegularExpression('#<meta name="robots" content="index, follow[^"]*">#', $contact->body);
+        self::assertSame('private, no-store', $contact->getHeader('Cache-Control'), 'still never cached: it holds a form token');
+        self::assertStringContainsString('<loc>https://patternsshowcontrol.test/contact/</loc>', $this->request('GET', '/sitemap.xml')->body);
+
+        foreach (['/portal/login/', '/portal/register/', '/portal/forgot/'] as $path) {
+            $r = $this->request('GET', $path);
+            self::assertSame('noindex, nofollow', $r->getHeader('X-Robots-Tag'), $path);
+            self::assertSame('private, no-store', $r->getHeader('Cache-Control'), $path);
+        }
+    }
+
     public function testUnknownPagesAre404AndNoindex(): void
     {
         $r = $this->request('GET', '/no-such-page/');
@@ -41,6 +62,35 @@ final class SiteTest extends TestCase
         }
         $r = $this->request('GET', '/StageWatch');
         self::assertSame(301, $r->status);
+    }
+
+    /**
+     * The lowercase redirect echoed the decoded path into Location, so /%5CEvil.com became "Location: /\evil.com",
+     * which browsers follow to another host. A path holding a backslash, a control character or a space is no page.
+     */
+    public function testEncodedBackslashesAndControlCharactersAreNeverRedirected(): void
+    {
+        foreach (['/%5CEvil.com', '/%09/Evil.com', '/%5C/Evil.com', '/%5C%5CAttacker.example/y', '/%0D%0A/Evil.com', '/Evil%20.com', '/patterns%5C'] as $uri) {
+            $r = $this->request('GET', $uri);
+            self::assertSame(404, $r->status, $uri);
+            self::assertNull($r->getHeader('Location'), $uri);
+        }
+    }
+
+    /** A mixed-case path is lowercased only when the lowercase path is a page; otherwise it is a plain 404. */
+    public function testTheLowercaseRedirectOnlyLeadsToPages(): void
+    {
+        $nope = $this->request('GET', '/Nope');
+        self::assertSame(404, $nope->status);
+        self::assertNull($nope->getHeader('Location'));
+
+        $patterns = $this->request('GET', '/Patterns');
+        self::assertSame(301, $patterns->status);
+        self::assertSame('/patterns/', $patterns->getHeader('Location'));
+
+        $deep = $this->request('GET', '/PATTERNS/Features/?utm_source=x');
+        self::assertSame(301, $deep->status);
+        self::assertSame('/patterns/features/?utm_source=x', $deep->getHeader('Location'));
     }
 
     public function testSitemapRobotsAndLlms(): void
@@ -66,11 +116,68 @@ final class SiteTest extends TestCase
         self::assertStringStartsWith('# Patterns Show Control', $llms->body);
     }
 
+    /** llms.txt said every licensing page had prices; only a product with prices on its page says so now. */
+    public function testLlmsTxtClaimsPricesOnlyWherePricesArePublished(): void
+    {
+        $llms = $this->request('GET', '/llms.txt')->body;
+        foreach (Content::PRODUCTS as $key) {
+            self::assertSame(1, preg_match('#^- \[[^\]]+ licensing\]\(https://patternsshowcontrol\.test/' . $key . '/licensing/\): (.+)$#m', $llms, $m), $key);
+            $live = (Content::licensing($key)['pricing_status'] ?? 'live') === 'live';
+            if ($live) {
+                self::assertStringContainsString('prices', $m[1], $key);
+            } else {
+                self::assertStringNotContainsString('prices', $m[1], $key . ': prices are not announced');
+            }
+        }
+        self::assertStringContainsString('priced on application', $llms, 'AGMessage is quoted per AGM');
+    }
+
     public function testSecurityTxtAndManifest(): void
     {
-        self::assertStringContainsString('Contact: mailto:', $this->request('GET', '/.well-known/security.txt')->body);
+        $txt = $this->request('GET', '/.well-known/security.txt')->body;
+        self::assertStringContainsString('Contact: mailto:', $txt);
+        // Policy is for a disclosure policy (RFC 9116), not the privacy notice; Expires rolls, so it never falls due
+        // within the file's cache life (on 31 December it used to be hours away).
+        self::assertStringNotContainsString('Policy:', $txt);
+        self::assertSame(1, preg_match('/^Expires: (\S+)$/m', $txt, $m));
+        $expires = (int) strtotime($m[1]);
+        self::assertGreaterThan(time() + 150 * 86400, $expires);
+        self::assertLessThan(time() + 365 * 86400, $expires);
         $m = json_decode($this->request('GET', '/manifest.webmanifest')->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('Patterns Show Control', $m['name']);
+    }
+
+    /**
+     * /health answered "ok" on a deploy without vendor/, so the assistant was offline on every page while the smoke
+     * test passed. Once the assistant is switched on with a key, its SDK is part of being healthy.
+     */
+    public function testHealthCountsTheAssistantsSdkOnceTheAssistantIsConfigured(): void
+    {
+        $r = $this->request('GET', '/health');
+        self::assertSame(200, $r->status);
+        $body = json_decode($r->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('ok', $body['status']);
+        self::assertSame(['storage' => true, 'vendor' => true, 'database' => true, 'config_shadowed' => false], $body['checks']);
+
+        $this->bootApp(['chat' => ['api_key' => 'sk-test']]);
+        self::assertSame(200, $this->request('GET', '/health')->status, 'the SDK is installed');
+
+        $working = ['storage' => true, 'vendor' => true, 'database' => true];
+        $noSdk = ['vendor' => false] + $working;
+        self::assertTrue(\Psc\Controllers\SeoController::healthy($working, true));
+        self::assertFalse(\Psc\Controllers\SeoController::healthy($noSdk, true), 'a configured assistant without its SDK is degraded');
+        self::assertTrue(\Psc\Controllers\SeoController::healthy($noSdk, false), 'an assistant left off needs no SDK');
+        self::assertFalse(\Psc\Controllers\SeoController::healthy(['database' => false] + $working, false));
+    }
+
+    /** A config/local.php uploaded after the server file outside the web root exists is reported, not read. */
+    public function testHealthReportsAShadowedLocalConfig(): void
+    {
+        $this->bootShadowed();
+        $r = $this->request('GET', '/health');
+        self::assertSame(200, $r->status, 'the site still runs on the file it read');
+        self::assertTrue(json_decode($r->body, true, 512, JSON_THROW_ON_ERROR)['checks']['config_shadowed']);
+        self::assertStringContainsString('max-age=300', (string) $this->request('GET', '/')->getHeader('Cache-Control'), 'the shadowed file changes nothing');
     }
 
     /** The manifest's colours are the dark theme's page colour, the same as the layout's theme-color meta. */
@@ -87,18 +194,22 @@ final class SiteTest extends TestCase
 
     /**
      * Every FAQPage node's @id is the page URL with one fragment, and that fragment is the id of the FAQ block it
-     * describes; FAQ blocks keep unique anchors when a page has two.
+     * describes; FAQ blocks keep unique anchors when a page has two. Pages that only repeat questions marked up
+     * elsewhere, and troubleshooting lists (statements, not questions), keep their accordions but add no node.
      */
     public function testFaqSchemaIdsAreOneFragmentNamingTheirBlock(): void
     {
         $expect = [
-            '/' => '#faq-home',
             '/ecosystem/' => '#faq-eco',
-            '/licensing/' => '#faq-licensing',
             '/stagewatch/' => '#faq-stagewatch',
             '/stagewatch/licensing/' => '#faq-stagewatch-licence',
-            '/support/stagewatch/' => '#faq-trouble',
+            '/workflows/conference-timing/' => '#faq-wf',
         ];
+        foreach (['/' => 'faq-home', '/licensing/' => 'faq-licensing', '/support/stagewatch/' => 'faq-trouble'] as $path => $block) {
+            $body = $this->request('GET', $path)->body;
+            self::assertSame([], array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'FAQPage')), $path . ' marks up no FAQ');
+            self::assertStringContainsString('<div class="c-faq" id="' . $block . '">', $body, $path . ' still shows its questions');
+        }
         foreach ($expect as $path => $fragment) {
             $body = $this->request('GET', $path)->body;
             $faqs = array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'FAQPage'));
@@ -117,6 +228,60 @@ final class SiteTest extends TestCase
         self::assertSame(['faq-trouble', 'faq-questions'], $two[1]);
     }
 
+    /**
+     * Google asks for each FAQ to be marked up on one page only: 25 questions were marked up on two or three pages.
+     * Across the whole site each question is now in one FAQPage, and every marked-up question is shown on its page.
+     */
+    public function testEachFaqQuestionIsMarkedUpOnOnePageOnly(): void
+    {
+        $where = [];
+        foreach (array_keys(Content::pages()) as $path) {
+            $body = $this->request('GET', $path)->body;
+            foreach (self::graph($body) as $node) {
+                if (($node['@type'] ?? '') !== 'FAQPage') {
+                    continue;
+                }
+                self::assertFalse(str_starts_with($path, '/support/') && $path !== '/support/faq/', $path . ': troubleshooting pages mark up no FAQ');
+                $text = strip_tags($body);
+                foreach ($node['mainEntity'] as $q) {
+                    $where[(string) $q['name']][] = $path;
+                    self::assertStringContainsString(htmlspecialchars((string) $q['name'], ENT_QUOTES), $text, $path . ': the marked-up question is shown on the page');
+                }
+            }
+        }
+        self::assertGreaterThan(50, count($where), 'the site still marks up its questions');
+        $twice = array_filter($where, static fn (array $paths): bool => count($paths) > 1);
+        self::assertSame([], $twice, 'no question is marked up on two pages');
+        self::assertSame('/stagewatch/', Content::faqOwner('Is there a free trial?'), 'a product question belongs to its product page');
+    }
+
+    /**
+     * The founder and the workflow guides' author were anonymous Person nodes; the About page's Person stood
+     * alone. One Person, in every page's graph, is now what both point at, and every reference resolves on its page.
+     */
+    public function testThePublisherIsOnePersonThatEveryReferenceReaches(): void
+    {
+        $person = 'https://patternsshowcontrol.test/about/#ben';
+        foreach (array_keys(Content::pages()) as $path) {
+            $graph = self::graph($this->request('GET', $path)->body);
+            $ids = array_values(array_filter(array_map(static fn (array $n): ?string => $n['@id'] ?? null, $graph)));
+            self::assertSame(array_unique($ids), $ids, $path . ': no @id twice');
+            $byType = [];
+            foreach ($graph as $n) {
+                $byType[(string) ($n['@type'] ?? '')][] = $n;
+            }
+            self::assertSame(['@id' => $person], $byType['Organization'][0]['founder'] ?? null, $path);
+            self::assertCount(1, array_filter($byType['Person'] ?? [], static fn (array $n): bool => ($n['@id'] ?? '') === $person), $path);
+            foreach ($byType['TechArticle'] ?? [] as $article) {
+                self::assertSame(['@id' => $person], $article['author'] ?? null, $path);
+                self::assertContains($article['mainEntityOfPage']['@id'] ?? '', $ids, $path . ': the article names its page');
+            }
+        }
+        $about = self::graph($this->request('GET', '/about/')->body);
+        $ben = array_values(array_filter($about, static fn (array $n): bool => ($n['@id'] ?? '') === $person))[0];
+        self::assertSame(['Person', 'Ben Rohleder', 'https://patternsshowcontrol.test/about/'], [$ben['@type'], $ben['name'], $ben['url']]);
+    }
+
     /** The FAQ page's one FAQPage covers every group, and its @id fragment is the element that holds them all. */
     public function testFaqPageSchemaIdNamesTheGroups(): void
     {
@@ -124,6 +289,11 @@ final class SiteTest extends TestCase
         $faqs = array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'FAQPage'));
         self::assertCount(1, $faqs);
         self::assertSame('https://patternsshowcontrol.test/support/faq/#faq', (string) $faqs[0]['@id']);
+        // It stands in for the page's WebPage node, so it names the page and the site it belongs to.
+        self::assertSame('https://patternsshowcontrol.test/support/faq/', $faqs[0]['url'] ?? null);
+        self::assertSame(Content::page('/support/faq/')['title'], $faqs[0]['name'] ?? null);
+        self::assertSame('en-GB', $faqs[0]['inLanguage'] ?? null);
+        self::assertSame(['@id' => 'https://patternsshowcontrol.test/#website'], $faqs[0]['isPartOf'] ?? null);
         self::assertMatchesRegularExpression('/<div class="support-faq-groups" id="faq">/', $body);
         preg_match_all('/\sid="([^"]+)"/', $body, $ids);
         self::assertSame(array_unique($ids[1]), $ids[1], 'ids are unique');
@@ -196,6 +366,27 @@ final class SiteTest extends TestCase
         self::assertStringContainsString('<a href="/stagewatch/licensing/" aria-current="page">Licensing</a>', $this->request('GET', '/stagewatch/licensing/')->body);
     }
 
+    /** The mega-menu's "Licensing" links went to four pages under one anchor text; each now names its product. */
+    public function testMegaMenuLinksNameTheirProduct(): void
+    {
+        $body = $this->request('GET', '/')->body;
+        foreach (['patterns' => 'Patterns', 'stagewatch' => 'StageWatch', 'agmessage' => 'AGMessage', 'playmap' => 'PlayMap'] as $key => $name) {
+            self::assertStringContainsString('<a href="/' . $key . '/licensing/"><span class="u-visually-hidden">' . $name . ' </span>Licensing</a>', $body, $key);
+            self::assertStringContainsString('<a href="/support/' . $key . '/"><span class="u-visually-hidden">' . $name . ' </span>Help</a>', $body, $key);
+        }
+    }
+
+    /** Every share card was described as "Patterns Show Control"; a card now says what it shows. */
+    public function testShareCardsAreDescribedByTheirPage(): void
+    {
+        $alt = static function (string $body): string {
+            self::assertSame(1, preg_match('#<meta property="og:image:alt" content="([^"]*)">#', $body, $m));
+            return html_entity_decode($m[1], ENT_QUOTES);
+        };
+        self::assertSame(Content::page('/patterns/')['title'], $alt($this->request('GET', '/patterns/')->body));
+        self::assertSame('StageWatch prices: Standard £9, Pro £29, Production £59 launch price (was £79)', $alt($this->request('GET', '/stagewatch/licensing/')->body));
+    }
+
     /** The Show Bus points use the icons their content names, and each is a symbol in the sprite. */
     public function testEcosystemShowBusUsesItsOwnIcons(): void
     {
@@ -206,6 +397,37 @@ final class SiteTest extends TestCase
             self::assertStringContainsString('id="i-' . $icon . '"', $sprite, $icon);
             self::assertStringContainsString('<use href="#i-' . $icon . '"/></svg><h3>' . htmlspecialchars((string) $pt['title'], ENT_QUOTES), $body, $icon);
         }
+    }
+
+    /**
+     * The StageWatch Production offer in the structured data said £79 while every page sold it at the £59 launch
+     * price, and the assistant's tier list said £79 too. One field, launch_price, now feeds them all.
+     */
+    public function testTheLaunchPriceIsThePriceEverywhere(): void
+    {
+        foreach (['/stagewatch/', '/stagewatch/licensing/'] as $path) {
+            $body = $this->request('GET', $path)->body;
+            $software = array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'SoftwareApplication'));
+            self::assertCount(1, $software, $path);
+            $offers = array_column($software[0]['offers'] ?? [], 'price', 'name');
+            self::assertSame('59', $offers['StageWatch Production'] ?? null, $path);
+            self::assertSame('29', $offers['StageWatch Pro'] ?? null, $path);
+        }
+        self::assertStringContainsString('<b>£59</b> <s><span class="u-visually-hidden">was </span>£79</s> launch price', $this->request('GET', '/stagewatch/licensing/')->body);
+        $knowledge = (new \Psc\Chat\Knowledge(PSC_ROOT, $this->storage . '/cache'))->compile();
+        self::assertStringContainsString('- Production — £59 launch price (list price £79), 2 machine(s)', $knowledge);
+        self::assertStringNotContainsString('- Production — £79', $knowledge);
+    }
+
+    /** The schema's operatingSystem names operating systems, while the page keeps its sentence. */
+    public function testOperatingSystemsInTheSchemaAreOperatingSystems(): void
+    {
+        $body = $this->request('GET', '/agmessage/')->body;
+        $software = array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'SoftwareApplication'));
+        self::assertSame('Windows (64-bit)', $software[0]['operatingSystem']);
+        self::assertStringContainsString('everyone joins from a web browser', $body, 'the page keeps its "Runs on" sentence');
+        $downloads = (string) json_encode(self::graph($this->request('GET', '/downloads/')->body));
+        self::assertStringNotContainsString('hosts the meeting', $downloads);
     }
 
     /** @return list<array<string, mixed>> the page's JSON-LD @graph */

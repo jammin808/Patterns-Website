@@ -11,7 +11,7 @@ namespace Psc;
 final class Config
 {
     /** @param array<string, mixed> $values */
-    private function __construct(private array $values, private ?string $source)
+    private function __construct(private array $values, private ?string $source, private bool $shadowed = false)
     {
     }
 
@@ -26,7 +26,8 @@ final class Config
             $loaded = require $source;
             $local = is_array($loaded) ? $loaded : [];
         }
-        return new self(self::merge(self::merge($defaults, $local), $overrides), $source);
+        $inside = $root . '/config/local.php';
+        return new self(self::merge(self::merge($defaults, $local), $overrides), $source, $source !== null && $source !== $inside && is_file($inside));
     }
 
     /** @param array<string, mixed> $values */
@@ -79,6 +80,16 @@ final class Config
         return $this->source;
     }
 
+    /**
+     * True when a config/local.php sits in the web root but another file is the one read (the server file outside
+     * it wins). Such a file is never merged or moved over the live one, because a partial upload would drop the
+     * settings it leaves out: the change belongs in the file that is read, and the stray copy should be deleted.
+     */
+    public function shadowed(): bool
+    {
+        return $this->shadowed;
+    }
+
     public function isProduction(): bool
     {
         return $this->string('app.env') === 'production';
@@ -86,7 +97,8 @@ final class Config
 
     /**
      * The server file: $PSC_CONFIG, then ../patterns-data/config.php, then config/local.php. A local.php found
-     * while the outside folder is creatable is moved there, so the secret file leaves the web root.
+     * while the outside folder is creatable and holds no server file yet is moved there, so the secret file leaves
+     * the web root; once the outside file exists, a later local.php is only reported (shadowed()).
      */
     private static function locate(string $root): ?string
     {

@@ -40,6 +40,9 @@ final class ContactController extends Controller
 
     public const EMAIL_ERROR = 'Enter an email address in the format name@example.co.uk';
 
+    /** Receipts one address can be sent in a day, however many messages name it. */
+    public const RECEIPTS_PER_DAY = 2;
+
     public function show(Request $request): Response
     {
         $page = Content::page('/contact/') ?? ['title' => 'Contact | Patterns Show Control', 'description' => 'Contact Patterns Show Control.', 'template' => 'pages/contact', 'crumb' => 'Contact', 'section' => 'contact', 'type' => 'contact'];
@@ -150,7 +153,13 @@ final class ContactController extends Controller
         foreach ($recipients as $r) {
             $this->app->mailer()->send($r, 'Website message: ' . self::TOPICS[$data['topic']], 'contact-admin', $data + ['id' => $id, 'topicLabel' => self::TOPICS[$data['topic']]], $data['email']);
         }
-        $this->app->mailer()->send($data['email'], 'We have your message', 'contact-receipt', ['name' => $data['name'], 'topicLabel' => self::TOPICS[$data['topic']]]);
+        // The receipt goes to an address nobody has proven, so it carries only the site's own words (the topic comes
+        // from the fixed list), never the name or message typed into the form, and each address gets at most
+        // RECEIPTS_PER_DAY a day: the form cannot be used to send someone mail from this site. The message itself is
+        // always stored and passed on to the administrator.
+        if ($this->app->limiter()->hit('contact-to:' . mb_strtolower($data['email']), self::RECEIPTS_PER_DAY, 86400)) {
+            $this->app->mailer()->send($data['email'], 'We have your message', 'contact-receipt', ['topicLabel' => self::TOPICS[$data['topic']]]);
+        }
         $session->set('contact_sent', true);
         return Response::redirect('/contact/#sent', 303);
     }
