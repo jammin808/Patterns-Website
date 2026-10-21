@@ -45,7 +45,7 @@ $seo->add(\Psc\View\Schema::faq($seo->canonical(), $all));
                 </button>
             </nav>
         </div>
-        <div class="support-faq-groups">
+        <div class="support-faq-groups" id="faq">
             <?php foreach ($groups as $g): $gid = (string) $g['id']; ?>
                 <section class="support-faq-group" id="<?= e($gid) ?>" aria-labelledby="<?= e($gid) ?>-title">
                     <h2 id="<?= e($gid) ?>-title"><?= e($g['title']) ?></h2>

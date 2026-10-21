@@ -117,6 +117,18 @@ final class SiteTest extends TestCase
         self::assertSame(['faq-trouble', 'faq-questions'], $two[1]);
     }
 
+    /** The FAQ page's one FAQPage covers every group, and its @id fragment is the element that holds them all. */
+    public function testFaqPageSchemaIdNamesTheGroups(): void
+    {
+        $body = $this->request('GET', '/support/faq/')->body;
+        $faqs = array_values(array_filter(self::graph($body), static fn (array $n): bool => ($n['@type'] ?? '') === 'FAQPage'));
+        self::assertCount(1, $faqs);
+        self::assertSame('https://patternsshowcontrol.test/support/faq/#faq', (string) $faqs[0]['@id']);
+        self::assertMatchesRegularExpression('/<div class="support-faq-groups" id="faq">/', $body);
+        preg_match_all('/\sid="([^"]+)"/', $body, $ids);
+        self::assertSame(array_unique($ids[1]), $ids[1], 'ids are unique');
+    }
+
     /** A hyphenated word in a question is kept on one line, as in the product headings. */
     public function testFaqQuestionsKeepHyphenatedWordsWhole(): void
     {

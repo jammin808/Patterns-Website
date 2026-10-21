@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 import os from 'node:os';
 import path from 'node:path';
 
-const storage = path.join(os.tmpdir(), `psc-e2e-${process.pid}`);
+// One storage folder per run, shared by the server and every test: each worker evaluates this file again with the
+// runner's environment, so it keeps the folder the runner chose (where the server writes its mail) instead of its own.
+const storage = process.env.PSC_E2E_STORAGE || path.join(os.tmpdir(), `psc-e2e-${process.pid}`);
 process.env.PSC_E2E_STORAGE = storage;
 
 export default defineConfig({

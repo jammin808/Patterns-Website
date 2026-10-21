@@ -37,7 +37,8 @@ test('register, verify, sign in, report a bug and see the ideas board', async ({
 
   await page.goto('/portal/tickets/new/?type=bug&product=stagewatch');
   await page.getByLabel(/title|summary/i).first().fill('Countdown freezes after resume');
-  for (const field of await page.locator('textarea').all()) {
+  // The ticket form's fields; the assistant's closed panel (outside <main>) holds a textarea of its own.
+  for (const field of await page.locator('main textarea').all()) {
     if (!(await field.inputValue())) await field.fill('Steps and details for the e2e test.');
   }
   await page.getByRole('button', { name: /submit|send|create|report/i }).click();

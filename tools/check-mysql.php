@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /*
  * Applies every MySQL migration to the database in $PSC_TEST_MYSQL_DSN (CI's MySQL service) and exercises the
- * statements the site uses that differ between MySQL and SQLite. Exits non-zero on any failure.
+ * statements the site uses that differ between MySQL and SQLite. Exits non-zero on any failure. It counts and removes
+ * only the rows it writes, so it can run again on a database that is kept (or that an earlier failed run left behind).
  *   PSC_TEST_MYSQL_DSN='mysql:host=127.0.0.1;port=3306;dbname=psc;charset=utf8mb4' PSC_TEST_MYSQL_USER=root php tools/check-mysql.php
  */
 
@@ -26,11 +27,13 @@ $applied = (new Psc\Db\Migrator($db, PSC_ROOT . '/database/migrations', $marker)
 echo 'applied: ' . implode(', ', $applied) . PHP_EOL;
 
 $now = time();
+$db->exec('DELETE FROM users WHERE email = ?', ['ci@example.test']);
 $uid = $db->insert('users', ['email' => 'ci@example.test', 'name' => 'CI', 'password_hash' => 'x', 'role' => 'client', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]);
 $tid = $db->insert('tickets', ['user_id' => $uid, 'type' => 'feature', 'product' => 'stagewatch', 'title' => 'T', 'body' => 'B', 'visibility' => 'public', 'last_activity_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
 $db->insert('ticket_votes', ['ticket_id' => $tid, 'user_id' => $uid, 'created_at' => $now]);
 $db->exec('UPDATE tickets SET votes = (SELECT COUNT(*) FROM ticket_votes WHERE ticket_id = ?) WHERE id = ?', [$tid, $tid]);
 $limiter = new Psc\Support\RateLimiter($db, str_repeat('a', 64));
+$limiter->clear('ci:x');
 $limiter->hits('ci:x', 60);
 $limiter->hits('ci:x', 60);
 if ($limiter->peek('ci:x') !== 2) {
@@ -41,19 +44,22 @@ $store = new Psc\Chat\ChatStore($db);
 $cid = Psc\Chat\ChatStore::newId();
 $store->create($cid, $uid, 'h', '/');
 $store->add($cid, 'user', 'hello');
+$usageBefore = $store->usageToday();
 $store->addUsage(10, 5);
 $store->addUsage(1, 1);
-$like = $db->value("SELECT COUNT(*) FROM tickets WHERE title LIKE ? ESCAPE '!'", [Psc\Db\Database::like('T')]);
+$like = $db->value("SELECT COUNT(*) FROM tickets WHERE user_id = ? AND title LIKE ? ESCAPE '!'", [$uid, Psc\Db\Database::like('T')]);
 $page = Psc\Support\Paginator::class;
-$count = (int) $db->value('SELECT COUNT(*) FROM (SELECT id FROM tickets) AS counted');
-if ((int) $like !== 1 || $count !== 1 || $store->usageToday() !== 17 || count($store->history($cid, 5)) !== 1) {
+$count = (int) $db->value('SELECT COUNT(*) FROM (SELECT id FROM tickets WHERE user_id = ?) AS counted', [$uid]);
+if ((int) $like !== 1 || $count !== 1 || $store->usageToday() - $usageBefore !== 17 || count($store->history($cid, 5)) !== 1) {
     fwrite(STDERR, "query checks failed\n");
     exit(1);
 }
 $db->exec('DELETE FROM users WHERE id = ?', [$uid]);
-if ((int) $db->value('SELECT COUNT(*) FROM tickets') !== 0) {
+if ((int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$uid]) !== 0) {
     fwrite(STDERR, "cascade failed\n");
     exit(1);
 }
+$db->exec('DELETE FROM chat_conversations WHERE id = ?', [$cid]);
+$limiter->clear('ci:x');
 echo "mysql ok\n";
 @unlink($marker);

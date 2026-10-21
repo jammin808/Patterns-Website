@@ -66,8 +66,8 @@ test('the dark/light toggle and the mobile menu work without errors', async ({ p
   if (await toggle.count()) {
     const before = await page.evaluate(() => document.documentElement.dataset.theme ?? '');
     await toggle.click();
-    const after = await page.evaluate(() => document.documentElement.dataset.theme ?? '');
-    expect(after).not.toBe(before);
+    // The theme lands inside a view transition (a frame after the click) when motion is allowed.
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme ?? '')).not.toBe(before);
   }
 });
 
