@@ -53,7 +53,8 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
    it to `public_html` with File Manager and extract it there. The data folder outside `public_html` is never
    touched by either route.
 9. **Cron.** hPanel → Advanced → Cron Jobs, daily (UTC):
-   `/opt/alt/php83/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php`
+   `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php` (`/usr/bin/php` is the
+   account's PHP CLI, 8.3 today)
 10. **Your admin account.** Register at `/portal/register/` with an address listed in `app.admin_emails` and
     confirm the email: that account is an administrator.
 

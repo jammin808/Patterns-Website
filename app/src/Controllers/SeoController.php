@@ -154,9 +154,10 @@ final class SeoController extends Controller
 
     /**
      * A health check for uptime monitors: booleans only, nothing sensitive. The site is healthy only when every
-     * part it is configured to use works: storage and the database always, the assistant's SDK once the assistant
-     * is switched on with a key. config_shadowed is true when a config/local.php sits in the web root unread,
-     * because the configuration outside it wins (a change uploaded there has no effect).
+     * part it is configured to use works: storage and the database always (reachable and holding every migration
+     * this release ships), the assistant's SDK once the assistant is switched on with a key. config_shadowed is
+     * true when a config/local.php sits in the web root unread, because the configuration outside it wins (a
+     * change uploaded there has no effect).
      */
     public function health(Request $request): Response
     {
@@ -173,6 +174,7 @@ final class SeoController extends Controller
             $checks['database'] = false;
         }
         $checks['config_shadowed'] = $cfg->shadowed();
+        $checks['schema'] = $checks['database'] && $this->app->migrator()->isCurrent();
         $ok = self::healthy($checks, $cfg->bool('chat.enabled', true) && $cfg->string('chat.api_key') !== '');
         return Response::json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks], $ok ? 200 : 503)
             ->header('X-Robots-Tag', 'noindex');
@@ -182,10 +184,11 @@ final class SeoController extends Controller
      * Whether the checks add up to a working site. A shadowed configuration file is reported, not failed: the site
      * runs on the configuration it found.
      *
-     * @param array{storage: bool, vendor: bool, database: bool} $checks
+     * @param array{storage: bool, vendor: bool, database: bool, schema?: bool} $checks
      */
     public static function healthy(array $checks, bool $assistantConfigured): bool
     {
-        return $checks['storage'] && $checks['database'] && (!$assistantConfigured || $checks['vendor']);
+        return $checks['storage'] && $checks['database'] && ($checks['schema'] ?? true)
+            && (!$assistantConfigured || $checks['vendor']);
     }
 }

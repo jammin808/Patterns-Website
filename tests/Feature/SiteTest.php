@@ -157,7 +157,7 @@ final class SiteTest extends TestCase
         self::assertSame(200, $r->status);
         $body = json_decode($r->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('ok', $body['status']);
-        self::assertSame(['storage' => true, 'vendor' => true, 'database' => true, 'config_shadowed' => false], $body['checks']);
+        self::assertSame(['storage' => true, 'vendor' => true, 'database' => true, 'config_shadowed' => false, 'schema' => true], $body['checks']);
 
         $this->bootApp(['chat' => ['api_key' => 'sk-test']]);
         self::assertSame(200, $this->request('GET', '/health')->status, 'the SDK is installed');
@@ -168,6 +168,7 @@ final class SiteTest extends TestCase
         self::assertFalse(\Psc\Controllers\SeoController::healthy($noSdk, true), 'a configured assistant without its SDK is degraded');
         self::assertTrue(\Psc\Controllers\SeoController::healthy($noSdk, false), 'an assistant left off needs no SDK');
         self::assertFalse(\Psc\Controllers\SeoController::healthy(['database' => false] + $working, false));
+        self::assertFalse(\Psc\Controllers\SeoController::healthy(['schema' => false] + $working, false), 'a database missing its tables is degraded');
     }
 
     /** A config/local.php uploaded after the server file outside the web root exists is reported, not read. */
