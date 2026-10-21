@@ -11,10 +11,17 @@ namespace Psc\Db;
  */
 final class Migrator
 {
+    /**
+     * @param string $database what identifies the database (its DSN and user): the marker records which database it
+     *                         speaks for, so a site moved to another database (a config uploaded after the first
+     *                         requests ran on the default SQLite file) migrates that one instead of trusting a marker
+     *                         written for the old one
+     */
     public function __construct(
         private readonly Database $db,
         private readonly string $migrationsRoot,
         private readonly string $markerFile,
+        private readonly string $database = '',
     ) {
     }
 
@@ -24,10 +31,24 @@ final class Migrator
         if ($latest === null) {
             return;
         }
-        if (is_file($this->markerFile) && trim((string) @file_get_contents($this->markerFile)) === $latest) {
+        if (is_file($this->markerFile) && trim((string) @file_get_contents($this->markerFile)) === $this->marker($latest)) {
             return;
         }
         $this->migrate();
+    }
+
+    /** Whether the database itself holds every migration this release ships (asks the database, not the marker). */
+    public function isCurrent(): bool
+    {
+        $latest = $this->latestAvailable();
+        if ($latest === null) {
+            return true;
+        }
+        try {
+            return (int) $this->db->value('SELECT COUNT(*) FROM schema_migrations WHERE version = ?', [$latest]) === 1;
+        } catch (\PDOException) {
+            return false;
+        }
     }
 
     /** @return list<string> versions applied by this call */
@@ -53,10 +74,16 @@ final class Migrator
         if ($latest !== null) {
             $dir = dirname($this->markerFile);
             if (is_dir($dir) || @mkdir($dir, 0770, true)) {
-                @file_put_contents($this->markerFile, $latest, LOCK_EX);
+                @file_put_contents($this->markerFile, $this->marker($latest), LOCK_EX);
             }
         }
         return $applied;
+    }
+
+    /** The marker's content: the latest version and a fingerprint of the database it was applied to. */
+    private function marker(string $latest): string
+    {
+        return $latest . ' ' . substr(hash('sha256', $this->database), 0, 16);
     }
 
     /** @return array<string, string> version => file, sorted */
