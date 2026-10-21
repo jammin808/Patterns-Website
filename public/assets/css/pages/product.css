@@ -228,6 +228,11 @@
   .c-pd-compare .c-compare-group td { background: var(--s2); vertical-align: bottom; }
   .c-pd-compare .c-compare-group td.is-rec { background: color-mix(in oklab, var(--accent) 10%, var(--s2)); }
   .c-pd-compare .c-tier-head .c-flag { white-space: normal; }
+  /* Where the columns are narrow enough for the flag to wrap, it is set small so two lines fit its row and every
+     column's name and price stay level. */
+  @container compare (width >= 50rem) and (width < 75rem) {
+    .c-pd-compare .c-tier-head .c-flag { font-size: 12px; line-height: 1.15; padding: 2px 5px; }
+  }
   /* Two lines kept for the line under each price, so every button in the row sits at the same height. */
   .c-pd-compare .c-tier-head-sub { display: block; min-height: 2.8em; }
   @container compare (width < 50rem) {

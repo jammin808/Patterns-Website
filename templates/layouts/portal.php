@@ -9,10 +9,12 @@
  */
 $user ??= null;
 $isAdmin = ($user['role'] ?? '') === 'admin';
-$links = $user === null ? [
+// Signed out, the switch offers sign-up only while accounts are open to everyone or by approval.
+$inviteOnly = $app->config->string('security.registration', 'open') === 'invite';
+$links = $user === null ? array_values(array_filter([
     ['/portal/login/', 'Sign in'],
-    ['/portal/register/', 'Create an account'],
-] : [
+    $inviteOnly ? null : ['/portal/register/', 'Create an account'],
+])) : [
     ['/portal/', 'Dashboard'],
     ['/portal/downloads/', 'Downloads'],
     ['/portal/licences/', 'Licences'],

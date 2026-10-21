@@ -208,6 +208,7 @@ final class AccountsTest extends TestCase
         $invite = $this->request('GET', '/portal/login/')->body;
         self::assertStringContainsString('New here? Accounts are by invitation. <a href="/contact/">Contact us</a> if you need one.', $invite);
         self::assertStringNotContainsString('New here? <a href="/portal/register/">', $invite);
+        self::assertStringNotContainsString('<a href="/portal/register/">Create an account</a>', $invite, 'the switch offers no sign-up either');
     }
 
     /** Every portal page carries the same description, of a length search engines and link previews show whole. */
@@ -340,6 +341,21 @@ final class AccountsTest extends TestCase
         }
         $sent = array_filter($this->mails(), static fn (array $m): bool => $m['to'] === 'pending@example.test');
         self::assertCount(3, $sent, 'three links an hour for one address');
+    }
+
+    public function testSignInReturnsToTheGuardedPageWithItsQuery(): void
+    {
+        $this->makeUser();
+        $page = '/portal/licences/request/?product=stagewatch&tier=pro';
+        self::assertRedirect($this->request('GET', $page), '/portal/login/?next=' . rawurlencode($page), 302);
+
+        $r = $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'next' => $page]);
+        self::assertRedirect($r, $page);
+
+        // Only scalar query values travel, and an oversized query falls back to the bare path.
+        $this->freshBrowser();
+        self::assertRedirect($this->request('GET', '/portal/tickets/new/?type=bug&x[]=1'), '/portal/login/?next=' . rawurlencode('/portal/tickets/new/?type=bug'), 302);
+        self::assertRedirect($this->request('GET', '/portal/tickets/new/?type=' . str_repeat('a', 600)), '/portal/login/?next=' . rawurlencode('/portal/tickets/new/'), 302);
     }
 
     public function testNextIsKeptForSameSitePathsAndNeutralisedOtherwise(): void

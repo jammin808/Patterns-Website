@@ -195,8 +195,8 @@ final class AdminTest extends TestCase
     public function testSignedOutVisitorsAreSentToSignIn(string $path): void
     {
         $r = $this->request('GET', $path);
-        // The sign-in page is told the path to come back to (the auth middleware keeps the path, not the query).
-        self::assertRedirect($r, '/portal/login/?next=' . rawurlencode((string) parse_url($path, PHP_URL_PATH)), 302);
+        // The sign-in page is told the page to come back to, query included.
+        self::assertRedirect($r, '/portal/login/?next=' . rawurlencode($path), 302);
     }
 
     #[DataProvider('adminPages')]

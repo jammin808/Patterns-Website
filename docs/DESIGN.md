@@ -45,7 +45,7 @@ the browser blocks the fonts and the module scripts.
 
 ```html
 <!doctype html>
-<html lang="en-GB" data-theme="dark">  <!-- data-theme only when the psc_theme cookie says light or dark -->
+<html lang="en-GB" data-theme="dark">  <!-- set by theme-init.js from localStorage, never by the server -->
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -69,15 +69,16 @@ the browser blocks the fonts and the module scripts.
 ```
 
 - **Theme before first paint, with no inline script.** `site.js` stores the visitor's choice in `localStorage`
-  (`psc-theme`) and in the cookie `psc_theme=light|dark`. Having no cookie means "follow the system". The layout
-  reads the cookie, checks it is exactly `light` or `dark`, and renders `<html data-theme="…">`. With no
-  attribute, the CSS follows `prefers-color-scheme` and falls back to dark. A page cached without the attribute
-  can show the system theme for one frame before `site.js` applies the stored choice; that is the only flash.
+  (`psc-theme`, exactly `light` or `dark`; none means "follow the system"). `theme-init.js`, a classic script in
+  `<head>`, copies it to `<html data-theme="…">` before the body is parsed. The server never renders the attribute:
+  public pages are the same for every visitor and are cached. With no attribute, the CSS follows
+  `prefers-color-scheme` and falls back to dark. When storage is blocked the page follows the system.
 - **Signed-in state on cached pages.** The portal sets a non-HttpOnly cookie `psc_li=1` while someone is signed in.
   It carries no identity; the session cookie stays HttpOnly. `site.js` then turns `[data-account-link]` ("Client
   login") into "My account".
-- **Dismissed announcements.** The ids are kept in the cookie `psc_dismissed` (a comma list). Leave a dismissed
-  strip out of the HTML so nothing shifts on load.
+- **Dismissed announcements.** The ids are kept in `localStorage` (`psc-dismissed`, a comma list); `theme-init.js`
+  copies them to `<html data-dismissed>` before first paint and the CSS hides those strips, so nothing shifts on
+  load.
 - **Product scope.** Put `data-product="patterns|stagewatch|agmessage|playmap"` on `<main>` (not `<body>`) on that
   product's pages. The header, footer and assistant stay neutral. Inside the scope, primary buttons, eyebrows,
   tabs, rules, recommended tiers and swatches take the product's colour. `ecosystem` and `companion` are grey.
@@ -363,7 +364,7 @@ One line, 40px tall, ellipsis when narrow, so put the key fact first.
   widening the window closes it. The button always says **Menu** or **Close**.
 - Mega-menu keys: Enter, Space or click toggles; ArrowDown opens it and enters the panel; ArrowUp, ArrowDown, Home
   and End move between links; Escape closes it and returns focus. Leaving the menu closes it.
-- Render `pressed` on the theme button the cookie names. A single `<button data-theme-toggle>` without
+- `site.js` sets `aria-pressed` on the theme button the stored choice names. A single `<button data-theme-toggle>` without
   `data-theme-set` children also works and toggles between light and dark.
 - Without JavaScript the drawer links sit open under the bar, the mega panel opens on hover or focus, and the theme
   control is hidden (`@media (scripting: none)`).
@@ -950,6 +951,9 @@ How the portal's markup is laid out (everything below is CSS; the templates keep
   </section>
 </div>
 ```
+- The status reads `c-lamp--go` "Online" while the assistant is configured and `c-lamp--off` "Offline" otherwise,
+  with the panel's unavailable text and contact links in place of the suggestions. It is a site-wide fact
+  (`ChatController::online()`), never a per-visitor one, so cached pages stay the same for everyone.
 - `chat.js` writes the messages: `.c-chat-msg` + `--user` / `--assistant` / `--error`, `.c-chat-msg-body`,
   `.c-chat-typing`, `.c-chat-handoff` (Contact us, Open a support ticket) and `.c-chat-feedback`. The visible
   "You" and "Assistant" labels come from CSS, with empty alternative text so they are not read twice. Source

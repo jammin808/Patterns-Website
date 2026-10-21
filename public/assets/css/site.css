@@ -1011,7 +1011,12 @@
       & tr { padding: 12px 14px; border-bottom: 1px solid var(--line); } & tbody tr:last-child { border-bottom: 0; }
       & td, & tbody th { padding: 3px 0; border: 0; background: none !important; text-align: left !important; }
       & td[data-label] { display: grid; grid-template-columns: minmax(6.5rem, 34%) minmax(0, 1fr); gap: 0 12px; justify-items: start; align-items: baseline; }
-      & td[data-label]::before { content: attr(data-label); grid-row: 1 / span 4; font-size: var(--fs-0); font-weight: 600; color: var(--text-3); }
+      & td[data-label]::before { content: attr(data-label); grid-row: 1 / span 4; font-size: var(--fs-0); font-weight: 600; color: var(--text-3);
+        font-family: var(--font-sans); font-variant-numeric: normal; }
+      /* A long unbroken value (an email address) wraps inside its cell instead of widening the card. */
+      & td[data-label] { overflow-wrap: anywhere; } & td[data-label] > * { min-width: 0; }
+      /* Stacked rows keep their own padding even where the wide-table compact rule applies. */
+      &:has(thead th:nth-child(9)) :is(td, tbody th) { padding: 3px 0; }
     }
   }
 

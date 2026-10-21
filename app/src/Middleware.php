@@ -43,8 +43,7 @@ final class Middleware
                     if ($request->wantsJson()) {
                         return Response::json(['error' => 'unauthenticated'], 401);
                     }
-                    $nextPath = $request->method === 'GET' ? $request->path : '/portal/';
-                    return Response::redirect('/portal/login/?next=' . rawurlencode($nextPath));
+                    return Response::redirect('/portal/login/?next=' . rawurlencode(self::comeBackTo($request)));
                 }
                 return $next($request);
 
@@ -74,5 +73,20 @@ final class Middleware
                 return $response;
         }
         throw new \LogicException('Unknown middleware ' . $name);
+    }
+
+    /**
+     * Where sign-in returns to: a GET's path with its query (so a link such as the licence request for one product
+     * and tier keeps its choice), anything else to the dashboard. The login controller still passes it through
+     * safeNext(), which allows only same-site relative paths.
+     */
+    private static function comeBackTo(Request $request): string
+    {
+        if ($request->method !== 'GET') {
+            return '/portal/';
+        }
+        $query = http_build_query(array_filter($request->query, 'is_scalar'), '', '&', PHP_QUERY_RFC3986);
+        $target = $request->path . ($query !== '' ? '?' . $query : '');
+        return strlen($target) <= 512 ? $target : $request->path;
     }
 }

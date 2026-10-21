@@ -36,7 +36,7 @@ Under UK data protection law you can ask for a copy of your data, ask us to corr
 
 ## Cookies
 
-See the [cookie notice](/legal/cookies/). Public pages set no cookies.
+See the [cookie notice](/legal/cookies/). The pages you read set no cookies; only the contact form, the client portal and the support assistant set essential ones.
 
 ## Changes
 
