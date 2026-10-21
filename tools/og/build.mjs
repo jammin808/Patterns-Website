@@ -114,7 +114,9 @@ const V = {
 // title: the page's H1 (docs: the SEO brief §2) or its title tag, in sentence case; sub: one line from content/.
 const cards = {
   default: { title: 'Show control software for live events', sub: 'Test patterns, stage timers, back-room messaging and projection mapping.', visual: V.apps() },
-  home: { title: 'Show control software for the people who run the room', sub: 'Four Windows apps, one show network. Made in the UK.', visual: V.multiview() },
+  // The home headline is long and sits beside the widest visual: four lines at a larger size read better than three
+  // squeezed to the floor.
+  home: { title: 'Show control software for the people who run the room', sub: 'Four Windows apps, one show network. Made in the UK.', visual: V.multiview(), lines: 4 },
   ecosystem: { eyebrow: 'Ecosystem', title: 'Four apps. One show network.', sub: 'Pictures, time, people and media, working together on the venue LAN.', visual: V.bus() },
   integrations: { eyebrow: 'Integrations', title: 'Companion, Stream Deck, NDI, OSC and MIDI', sub: 'The apps work with the kit already in your rack.', visual: V.chips() },
   ai: { eyebrow: 'AI with approval', title: 'AI in show control, with a person always approving', sub: '', visual: V.approval() },
@@ -183,19 +185,18 @@ for (const key of todo) {
     }
   }, { c, p: P });
   await page.evaluate(() => document.fonts.ready);
-  // The headline steps down (to 50 px at the least) until it fits beside the visual in three lines.
-  const fits = await page.evaluate((start) => {
+  // The headline steps down (to 50 px at the least) until it fits beside the visual in three lines (or the card's own).
+  const fits = await page.evaluate(([start, maxLines]) => {
     const title = document.querySelector('.og-title');
     const text = document.querySelector('.og-text');
-    const maxLines = 3;
     for (let size = start; size >= 50; size -= 2) {
       title.style.fontSize = `${size}px`;
       const lines = Math.round(title.getBoundingClientRect().height / (size * 1.02));
       if (lines <= maxLines && text.getBoundingClientRect().height <= 430) return true;
     }
     return false;
-  }, c.size ?? 66);
-  if (!fits) console.warn(`${key}: the headline needs more than three lines at 50 px; shorten it or its line.`);
+  }, [c.size ?? 66, c.lines ?? 3]);
+  if (!fits) console.warn(`${key}: the headline needs more than ${c.lines ?? 3} lines at 50 px; shorten it or its line.`);
   await page.waitForLoadState('networkidle');
   const file = path.join(outDir, `${key}.png`);
   await page.locator('[data-og]').screenshot({ path: file });

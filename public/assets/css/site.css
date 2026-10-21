@@ -1341,6 +1341,7 @@
     .c-seg :is(input:checked + span, button[aria-pressed="true"]), .c-theme button[aria-pressed="true"], .c-radio-card input:checked + span,
     .c-vote[aria-pressed="true"], .pt-vote[aria-pressed="true"], .c-tabs > [aria-current], .c-tabs > [aria-selected="true"], .pt-tabs > [aria-current], .c-pager [aria-current="page"], .pt-pager [aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
     .c-btn, .pt-btn, .c-chat-fab, .c-chat-send, .c-go, .c-take { border: 1px solid ButtonText; }
+    :is(.pt-actions > a.pt-btn--ghost, .pt-card-footer > a.pt-btn--ghost:only-child) { border-color: transparent; }
     .c-tier.is-rec, .c-compare-table .is-rec { outline: 2px solid Highlight; outline-offset: -2px; }
     input:is([type="checkbox"], [type="radio"]) { appearance: auto; }
     .c-cue[data-state="standby"], .c-flow-gate { outline: 2px dashed Highlight; }

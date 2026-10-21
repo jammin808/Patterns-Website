@@ -1016,7 +1016,8 @@ followspot in its colour; PlayMap's card says "Early access".
 | `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
 | `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
 
-Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines; hyphenated words never
+Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines (four for the home card's
+long headline, so it stays large beside the multiview); hyphenated words never
 break, and the build warns when a headline needs a fourth line (shorten it: Support's card uses its H1, "Support",
 with the page's description as the line, rather than its 55-character title). Text is sized to stay legible at a 400px thumbnail. Words and prices come from `content/`; the build fails if
 `content/pages.php` names an `og` image with no card. Cards are palette PNGs when that is visually identical, and stay
