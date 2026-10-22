@@ -744,13 +744,15 @@ final class NewsPagesTest extends TestCase
      */
     public function testTheSitemapListsTheHubsWithLiveArticlesAndNoArticle(): void
     {
-        $first = $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video'], 'published_at' => time() - 7200]);
-        $newest = time() - 300;
-        $this->db->update('news_articles', ['created_at' => time() - 7200, 'updated_at' => $newest], ['id' => $first]);
-        $later = $this->makeArticle(['slug' => 'also-in-the-map', 'categories' => ['audio', 'freelance'], 'published_at' => time() - 3600]);
-        $this->db->update('news_articles', ['created_at' => time() - 3600, 'updated_at' => time() - 3500], ['id' => $later]);
+        // One clock reading for the stored times and the expected ones, so a second ticking over mid-test changes nothing.
+        $now = time();
+        $first = $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video'], 'published_at' => $now - 7200]);
+        $newest = $now - 300;
+        $this->db->update('news_articles', ['created_at' => $now - 7200, 'updated_at' => $newest], ['id' => $first]);
+        $later = $this->makeArticle(['slug' => 'also-in-the-map', 'categories' => ['audio', 'freelance'], 'published_at' => $now - 3600]);
+        $this->db->update('news_articles', ['created_at' => $now - 3600, 'updated_at' => $now - 3500], ['id' => $later]);
         $this->makeArticle(['slug' => 'a-draft-not-in-the-map', 'categories' => ['lighting'], 'status' => 'draft']);
-        $this->makeArticle(['slug' => 'scheduled-not-in-the-map', 'categories' => ['legal'], 'published_at' => time() + 600]);
+        $this->makeArticle(['slug' => 'scheduled-not-in-the-map', 'categories' => ['legal'], 'published_at' => $now + 600]);
 
         $xml = simplexml_load_string($this->body('/sitemap.xml'));
         self::assertNotFalse($xml);
@@ -769,7 +771,7 @@ final class NewsPagesTest extends TestCase
             self::assertNull(Paths::parse((string) parse_url($loc, PHP_URL_PATH)), $loc . ': no article in the site\'s sitemap');
         }
         self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $newest), $map[self::BASE . '/news/video/'], 'its article was updated after it went live');
-        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', time() - 3600), $map[self::BASE . '/news/freelance/'], 'a change within minutes of going live is part of it');
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $now - 3600), $map[self::BASE . '/news/freelance/'], 'a change within minutes of going live is part of it');
         $since = (int) strtotime(\Psc\Content\Content::page('/news/')['updated'] . ' 00:00:00 UTC');
         self::assertSame(gmdate('Y-m-d\TH:i:s\Z', max($newest, $since)), $map[self::BASE . '/news/'], 'the hub changes with its newest article');
         $r = $this->request('GET', '/sitemap.xml');
