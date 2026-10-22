@@ -28,10 +28,14 @@ final class Analytics
     /** How long an answer stands before the banner asks again: a year, in milliseconds. */
     public const CONSENT_MS = 31536000000;
 
-    /** Google's own hosts for GA4, as its content-security-policy guide lists them. */
+    /**
+     * Google's own hosts for GA4, as its content-security-policy guide lists them, plus the bare analytics.google.com:
+     * the tag now sends its page views there, and a *. wildcard never matches the bare host. Google Signals' extra
+     * endpoints (stats.g.doubleclick.net, www.google.com) stay out: the cookie notice promises no advertising trackers.
+     */
     private const SCRIPT_HOSTS = 'https://*.googletagmanager.com';
-    private const IMG_HOSTS = 'https://*.google-analytics.com https://*.googletagmanager.com';
-    private const CONNECT_HOSTS = 'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
+    private const IMG_HOSTS = 'https://*.google-analytics.com https://analytics.google.com https://*.googletagmanager.com';
+    private const CONNECT_HOSTS = 'https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com';
 
     /** The measurement ID when it is well formed, else '' (analytics off). */
     public static function id(string $configured): string

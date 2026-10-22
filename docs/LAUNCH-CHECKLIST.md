@@ -51,6 +51,9 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       tested: set `'analytics' => ['consent' => true]` in the server config to switch it on, and restore the consent
       wording of the cookie notice and privacy policy (commit e6a3074). Either way, keep Google signals and data sharing
       off in Google Analytics unless the notice says otherwise.
+- [ ] **Turn Google signals off** in Google Analytics (Admin, then Data collection, then switch off Google signals data
+      collection). The property has it on: it sends extra hits to stats.g.doubleclick.net and www.google.com, which the
+      site's security policy blocks on purpose (no advertising trackers), so they only show as console errors.
 - [ ] Privacy policy items: name the payment provider if payment links are switched on; say that a signed-in
       visitor's assistant conversations are linked to their account and may be read to improve answers; confirm the
       Anthropic processing, training and retention wording against the commercial terms in force.
