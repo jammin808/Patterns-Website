@@ -8,6 +8,7 @@ use Psc\Auth\Auth;
 use Psc\Controllers\Controller;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\Paths;
 use Psc\Support\Audit;
 use Psc\Support\FormGuard;
 
@@ -52,9 +53,6 @@ final class AuthController extends Controller
 
     /** The session key holding where the person was going before signing in or creating an account. */
     public const RETURN_KEY = 'return_to';
-
-    /** First segments under /news/ that are not articles. */
-    private const NEWS_PAGES = ['category', 'go', 'media'];
 
     public function loginForm(Request $request): Response
     {
@@ -224,15 +222,18 @@ final class AuthController extends Controller
     }
 
     /**
-     * The article a return path belongs to, at its comments (/news/{slug}/#comments), or null when the path is not an
-     * article's: an article, its comment page, or either with a fragment.
+     * The article a return path belongs to, at its comments (/news/{category}/{slug}/#comments, or the lasting
+     * /news/{slug}/#comments for an address without its category, which leads there), or null when the path is not an
+     * article's: an article, its comment page, or either with a query or a fragment (Paths::parse()).
      */
     public static function articleOf(string $next): ?string
     {
-        if (!preg_match('#^/news/([a-z0-9-]+)/(?:comment/)?(?:[?\#].*)?$#', $next, $m) || in_array($m[1], self::NEWS_PAGES, true)) {
+        $parts = preg_split('/[?#]/', $next, 2);
+        $found = Paths::parse((string) ($parts[0] ?? ''));
+        if ($found === null) {
             return null;
         }
-        return '/news/' . $m[1] . '/#comments';
+        return Paths::article(['slug' => $found['slug'], 'category' => $found['category'] ?? '']) . '#comments';
     }
 
     /**

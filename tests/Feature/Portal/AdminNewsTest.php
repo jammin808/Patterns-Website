@@ -302,7 +302,7 @@ final class AdminNewsTest extends TestCase
         $id = $this->newest();
         self::assertRedirect($r, '/portal/admin/news/' . $id . '/');
         $row = $this->article($id);
-        self::assertSame(['draft', null, 'manual', $admin, 'a-headline-is-all-a-draft-needs'], [$row['status'], $row['published_at'], $row['origin'], (int) $row['author_id'], $row['slug']]);
+        self::assertSame(['draft', null, 'manual', $admin, 'headline-is-all-a-draft-needs'], [$row['status'], $row['published_at'], $row['origin'], (int) $row['author_id'], $row['slug']]);
         self::assertSame('success', self::lastFlash()['type']);
         self::assertSame('Saved as a draft. Only administrators can see it until you publish it.', self::lastFlash()['message']);
         $audit = $this->auditRows('news.created');
@@ -391,9 +391,11 @@ final class AdminNewsTest extends TestCase
         self::assertCount(1, $this->auditRows('news.created'));
         self::assertCount(1, $this->auditRows('news.published'));
         $flashes = self::flashes();
-        self::assertSame(['type' => 'success', 'message' => 'Published. The article is live at /news/' . $row['slug'] . '/.'], $flashes[count($flashes) - 2]);
+        self::assertSame(['type' => 'success', 'message' => 'Published. The article is live at /news/video/' . $row['slug'] . '/.'], $flashes[count($flashes) - 2]);
         self::assertSame(['type' => 'warning', 'message' => Validator::DASHES], end($flashes));
-        self::assertSame(200, $this->request('GET', '/news/' . $row['slug'] . '/')->status);
+        self::assertSame(200, $this->request('GET', '/news/video/' . $row['slug'] . '/')->status);
+        $edit = $this->request('GET', '/portal/admin/news/' . $id . '/')->body;
+        self::assertStringContainsString('<a class="pt-btn pt-btn--secondary" href="/news/video/' . $row['slug'] . '/">View it on the site</a>', $edit, 'at its own address');
         self::assertSame($admin, (int) $row['author_id']);
     }
 
@@ -493,7 +495,7 @@ final class AdminNewsTest extends TestCase
         self::assertSame(['draft', $first], [$row['status'], (int) $row['published_at']], 'it keeps its first time');
         self::assertStringEndsWith(AdminNewsCommentController::TAKEDOWN, self::lastFlash()['message']);
         self::assertSame(['was' => 'live'], json_decode((string) $this->auditRows('news.unpublished')[0]['meta'], true));
-        self::assertSame(404, $this->request('GET', '/news/coming-down/')->status);
+        self::assertSame(404, $this->request('GET', '/news/video/coming-down/')->status);
         self::assertSame('coming-down', $row['slug'], 'an address once public never changes');
 
         $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'publish', 'title' => 'Sample story number 1 from the test suite']));
@@ -529,7 +531,7 @@ final class AdminNewsTest extends TestCase
         self::assertSame([], $this->auditRows('news.updated'), 'the form was not saved');
         self::assertArrayHasKey('sources.0.url', $_SESSION['_errors'] ?? []);
         self::assertContains(['type' => 'success', 'message' => 'Unpublished. The article is a draft again, but your other changes were not saved. ' . AdminNewsCommentController::TAKEDOWN], self::flashes());
-        self::assertSame(404, $this->request('GET', '/news/banned-since/')->status);
+        self::assertSame(404, $this->request('GET', '/news/video/banned-since/')->status);
         self::assertSame(404, $this->request('GET', '/news/go/' . (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ? LIMIT 1', [$id]) . '/')->status);
 
         // The kept form is the article as it is after its own takedown, so it can be fixed and saved.
@@ -610,12 +612,57 @@ final class AdminNewsTest extends TestCase
         $this->signInAdmin();
         $this->post('/portal/admin/news/', ['action' => 'save', 'title' => 'A working title for now']);
         $id = $this->newest();
-        self::assertSame('a-working-title-for-now', $this->article($id)['slug']);
+        self::assertSame('working-title-for-now', $this->article($id)['slug'], 'no stop word at either end');
         $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'save', 'title' => 'The real headline at last']));
-        self::assertSame('the-real-headline-at-last', $this->article($id)['slug']);
-        $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'publish', 'title' => 'The real headline at last']));
+        self::assertSame('real-headline-at-last', $this->article($id)['slug']);
+        // Its own SEO title makes its address, as the store would make it.
+        $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'save', 'title' => 'The real headline at last', 'seo_title' => 'Frame sync for mixed LED walls']));
+        self::assertSame('frame-sync-for-mixed-led-walls', $this->article($id)['slug']);
+        $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'publish', 'title' => 'The real headline at last', 'seo_title' => 'Frame sync for mixed LED walls']));
         $this->post('/portal/admin/news/' . $id . '/', self::form(['action' => 'save', 'title' => 'A changed headline after publishing']));
-        self::assertSame('the-real-headline-at-last', $this->article($id)['slug']);
+        self::assertSame('frame-sync-for-mixed-led-walls', $this->article($id)['slug']);
+    }
+
+    /**
+     * The address is the administrator's to type until the article has been live: shown in the editor (empty while it
+     * is the one the words make), kept clear of the words the routes use, and from then on shown and never offered,
+     * through an unpublish, a new schedule and another unpublish.
+     */
+    public function testTheAddressIsTheAdministratorsToChooseUntilTheArticleHasBeenLive(): void
+    {
+        $this->signInAdmin();
+        $this->post('/portal/admin/news/', self::form(['action' => 'save', 'slug' => 'The Mixed-Wall Fix!']));
+        $id = $this->newest();
+        $path = '/portal/admin/news/' . $id . '/';
+        self::assertSame('mixed-wall-fix', $this->article($id)['slug'], 'typed, by the same rules');
+        $page = $this->request('GET', $path)->body;
+        self::assertMatchesRegularExpression('#id="f-slug" name="slug"[^>]* value="mixed-wall-fix">#', $page);
+        self::assertStringContainsString('Now /news/video/mixed-wall-fix/.', $page);
+
+        $this->post($path, self::form(['action' => 'save', 'slug' => 'video']));
+        self::assertSame('video-2', $this->article($id)['slug'], 'a category key is never a slug');
+        $this->post($path, self::form(['action' => 'save', 'slug' => '']));
+        self::assertSame('led-processors-gain-a-frame-sync-mode-for-mixed-walls', $this->article($id)['slug'], 'empty: the words make it');
+        self::assertMatchesRegularExpression('#id="f-slug" name="slug"[^>]* value="">#', $this->request('GET', $path)->body, 'and it goes on following them');
+
+        $this->post($path, self::form(['action' => 'publish', 'slug' => 'frame-sync-at-last']));
+        $live = $this->article($id);
+        self::assertSame('frame-sync-at-last', $live['slug'], 'the address it goes live at');
+        $page = $this->request('GET', $path)->body;
+        self::assertStringNotContainsString('name="slug"', $page, 'never offered once live');
+        self::assertStringContainsString('<p><strong>Address</strong> <span class="pt-mono">/news/video/frame-sync-at-last/</span></p>', $page);
+
+        $this->post($path, self::form(['action' => 'save', 'slug' => 'something-else', 'title' => 'A new headline for the live one']));
+        self::assertSame('frame-sync-at-last', $this->article($id)['slug'], 'a posted slug is ignored');
+        $store = new ArticleStore($this->app);
+        $store->unpublish($id);
+        $store->publish($id, time() + 86400);
+        $store->unpublish($id);
+        self::assertNull($this->article($id)['published_at'], 'the schedule it never reached is gone');
+        self::assertNotNull($this->article($id)['first_live_at'], 'but the time it was live is kept');
+        $this->post($path, self::form(['action' => 'save', 'slug' => 'something-else']));
+        self::assertSame('frame-sync-at-last', $this->article($id)['slug'], 'it has been live, so its address never changes');
+        self::assertStringNotContainsString('name="slug"', $this->request('GET', $path)->body);
     }
 
     public function testADraftWhoseHeadlineIsTakenKeepsItsNumberedAddress(): void
@@ -624,10 +671,10 @@ final class AdminNewsTest extends TestCase
         $this->post('/portal/admin/news/', ['action' => 'save', 'title' => 'The same working headline']);
         $this->post('/portal/admin/news/', ['action' => 'save', 'title' => 'The same working headline']);
         $second = $this->newest();
-        self::assertSame('the-same-working-headline-2', $this->article($second)['slug']);
+        self::assertSame('same-working-headline-2', $this->article($second)['slug']);
         $this->post('/portal/admin/news/' . $second . '/', ['action' => 'save', 'title' => 'The same working headline']);
         self::assertSame(['type' => 'info', 'message' => 'Nothing changed, so nothing was saved.'], self::lastFlash());
-        self::assertSame('the-same-working-headline-2', $this->article($second)['slug']);
+        self::assertSame('same-working-headline-2', $this->article($second)['slug']);
         self::assertSame([], $this->auditRows('news.updated'));
     }
 
@@ -740,7 +787,7 @@ final class AdminNewsTest extends TestCase
 
     public function testImagesAreAddedDescribedLedAndDeleted(): void
     {
-        $id = $this->makeArticle(['slug' => 'with-pictures']);
+        $id = $this->makeArticle(['slug' => 'pictures-included']);
         $admin = $this->signInAdmin();
         $path = '/portal/admin/news/' . $id . '/';
         $first = $this->addImage($id, 'The first picture');
@@ -772,7 +819,7 @@ final class AdminNewsTest extends TestCase
         self::assertSame('That image now leads the article. It can take a few minutes for every reader to see it.', self::lastFlash()['message']);
         self::assertSame([(int) $second['id'], (int) $first['id']], array_map(static fn (array $i): int => (int) $i['id'], (new ArticleStore($this->app))->images($id)));
         self::assertSame(['image' => (int) $second['id'], 'fields' => ['lead']], json_decode((string) $this->auditRows('news.image_updated')[1]['meta'], true));
-        self::assertStringContainsString('/news/media/' . $second['base'] . '-og.jpg', $this->request('GET', '/news/with-pictures/')->body, 'the lead is the share card');
+        self::assertStringContainsString('/news/media/' . $second['base'] . '-og.jpg', $this->request('GET', '/news/video/pictures-included/')->body, 'the lead is the share card');
 
         $this->post($path . 'images/', ['action' => 'delete', 'image' => (string) $second['id']]);
         self::assertSame('Image deleted. ' . AdminNewsCommentController::TAKEDOWN, self::lastFlash()['message']);

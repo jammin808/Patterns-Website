@@ -54,6 +54,9 @@ final class Comments
 
     public const STATUSES = ['visible', 'pending', 'hidden'];
 
+    /** The primary category of the article a, for Paths::article() on rows that join it. */
+    private const PRIMARY = '(SELECT ac.category FROM news_article_categories ac WHERE ac.article_id = a.id ORDER BY ac.position, ac.category LIMIT 1)';
+
     public const STAFF_BADGE = 'Patterns team';
     public const PENDING_NOTE = 'Only you can see this until it is approved.';
     public const HIDDEN_NOTE = 'Hidden by a moderator. Only you can see this, and you can delete it.';
@@ -482,6 +485,25 @@ final class Comments
         return array_map(self::shape(...), $rows);
     }
 
+    /**
+     * The person's newest comments on any article, in every status, for their account page: each with its article's
+     * slug, title, primary category and whether it is live (article_live), so the page links to each comment page and
+     * names an article only while it is live (a draft's headline is no one's to read).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function ofAccount(int $userId, int $limit): array
+    {
+        $rows = $this->db()->all(
+            'SELECT c.id, c.article_id, c.body, c.status, c.created_at, a.slug, a.title, a.status AS article_status, a.published_at,'
+            . ' ' . self::PRIMARY . ' AS category'
+            . ' FROM news_comments c JOIN news_articles a ON a.id = c.article_id WHERE c.user_id = ? ORDER BY c.created_at DESC, c.id DESC LIMIT ' . max(1, $limit),
+            [$userId]
+        );
+        $store = new ArticleStore($this->app);
+        return array_map(static fn (array $r): array => $r + ['article_live' => $store->isLive(['status' => $r['article_status'], 'published_at' => $r['published_at']])], $rows);
+    }
+
     /** @return list<int> the ids of the person's comments on the article, in every status (each is theirs to delete) */
     public function own(int $articleId, int $userId): array
     {
@@ -548,19 +570,19 @@ final class Comments
         $comments = array_map(static fn (array $c): array => [
             'id' => (int) $c['id'],
             'article' => (string) $c['title'],
-            'url' => $base . '/news/' . $c['slug'] . '/',
+            'url' => $base . Paths::article($c),
             'body' => (string) $c['body'],
             'status' => (string) $c['status'],
             'created_at' => $c['created_at'],
             'updated_at' => $c['updated_at'],
-        ], $db->all('SELECT c.id, c.body, c.status, c.created_at, c.updated_at, a.title, a.slug FROM news_comments c JOIN news_articles a ON a.id = c.article_id WHERE c.user_id = ? ORDER BY c.id', [$userId]));
+        ], $db->all('SELECT c.id, c.body, c.status, c.created_at, c.updated_at, a.title, a.slug, ' . self::PRIMARY . ' AS category FROM news_comments c JOIN news_articles a ON a.id = c.article_id WHERE c.user_id = ? ORDER BY c.id', [$userId]));
         $reports = array_map(static fn (array $r): array => [
             'comment_id' => (int) $r['comment_id'],
             'article' => (string) $r['title'],
-            'url' => $base . '/news/' . $r['slug'] . '/',
+            'url' => $base . Paths::article($r),
             'created_at' => $r['created_at'],
         ], $db->all(
-            'SELECT r.comment_id, r.created_at, a.title, a.slug FROM news_comment_reports r JOIN news_comments c ON c.id = r.comment_id'
+            'SELECT r.comment_id, r.created_at, a.title, a.slug, ' . self::PRIMARY . ' AS category FROM news_comment_reports r JOIN news_comments c ON c.id = r.comment_id'
             . ' JOIN news_articles a ON a.id = c.article_id WHERE r.user_id = ? ORDER BY r.created_at, r.comment_id',
             [$userId]
         ));
@@ -643,7 +665,7 @@ final class Comments
         }
         $this->app->auth()->notifyAdmins($hidden ? 'A reported comment was hidden' : 'A comment was reported', 'news-comment-admin', [
             'kind' => $hidden ? 'hidden' : 'reported',
-            'article' => ['title' => (string) $article['title'], 'url' => $this->app->baseUrl() . '/news/' . $article['slug'] . '/'],
+            'article' => ['title' => (string) $article['title'], 'url' => $this->app->baseUrl() . Paths::article($article)],
             'authorName' => (string) $comment['author_name'],
             'authorEmail' => (string) $comment['author_email'],
             'body' => (string) $comment['body'],
@@ -670,7 +692,7 @@ final class Comments
         }
         $this->app->auth()->notifyAdmins('A comment is waiting for approval', 'news-comment-admin', [
             'kind' => 'pending',
-            'article' => ['title' => (string) $article['title'], 'url' => $this->app->baseUrl() . '/news/' . $article['slug'] . '/'],
+            'article' => ['title' => (string) $article['title'], 'url' => $this->app->baseUrl() . Paths::article($article)],
             'authorName' => (string) ($user['name'] ?? ''),
             'authorEmail' => (string) ($user['email'] ?? ''),
             'body' => $body,

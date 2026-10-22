@@ -62,10 +62,12 @@ These are the owner's words, kept because the defaults and fences come from them
 
 ## 2. Decisions
 
-1. **Where it lives.**
-   - The index is `/news/`.
-   - Articles are at `/news/{slug}/`, and categories at `/news/category/{key}/`.
-   - The feed is `/news/feed.xml` (RSS 2.0).
+1. **Where it lives.** One silo under `/news/`, every address made by `Psc\News\Paths` (§4, §5):
+   - The hub is `/news/`, and its later pages `/news/page/2/` and on.
+   - Each category has a hub of its own at `/news/{key}/`, with its later pages at `/news/{key}/page/2/` and on.
+   - An article is at `/news/{its primary category}/{slug}/`, its comment page at `/news/{category}/{slug}/comment/`. Any other address of it answers 301 there, so a later change of primary category keeps old links working.
+   - The feeds are `/news/feed.xml` and each category's `/news/{key}/feed.xml` (RSS 2.0).
+   - The articles have sitemaps of their own (`/news/sitemap.xml`, §10); the site's `/sitemap.xml` lists only the hubs, so it stays small.
    - Public images are at `/news/media/{file}`, and admin preview images at `/portal/admin/news/media/{file}`.
    - The section's name, "Industry Updates", is a proper name. It is the h1, the page titles, the footer link, the admin nav label and the byline.
    - The header nav label is **"News"**. "Industry Updates" overflows the header bar at 1152 to 1440px (measured), and DESIGN.md §10 asks for a clean bar at those widths.
@@ -83,8 +85,8 @@ These are the owner's words, kept because the defaults and fences come from them
    - The HTML of an article is the same for every visitor.
    - News responses never start a session and never set a cookie. This is a fence: every `/news/*` GET, made with a signed-in admin's cookie jar, sets no cookies.
    - Comments are rendered into the page. `news.js` adds the comment box and the person's own recent or pending comments through `/api/news/{id}/state`.
-   - Without scripting, the box links to the comment page `/news/{slug}/comment/` (`session`, `auth`, `nostore`).
-   - News HTML sends `public, max-age=120, stale-while-revalidate=600`. Whether Hostinger's CDN honours `max-age` must be checked on the live site; until then, takedown actions in the admin say "Run Flush CDN to remove it now".
+   - Without scripting, the box links to the comment page `/news/{category}/{slug}/comment/` (`session`, `auth`, `nostore`).
+   - News HTML sends `public, max-age=120, stale-while-revalidate=60`, so even a copy served stale is about two minutes old at most. Whether Hostinger's CDN honours `max-age` must be checked on the live site; until then, takedown actions in the admin say "Run Flush CDN to remove both at once".
 5. **A session is three kinds of model call.** Structured output cannot be combined with web-search citations, and forcing a tool call is refused on these models, so the steps are kept apart:
    1. **Research.** Web tools on, free text. The model writes a brief between marker lines. The server builds numbered references from every search result, fetched page and citation.
    2. **Select.** No tools, JSON schema. The model returns every candidate it considered, each with a decision. The server enforces the count, the importance threshold, the window and dedup itself.
@@ -147,6 +149,7 @@ These are the owner's words, kept because the defaults and fences come from them
 **Publishing**
 - `status VARCHAR(16) NOT NULL DEFAULT 'draft'`: `draft|published`
 - `published_at INT NULL`: a future time means scheduled
+- `first_live_at INT NULL` (migration `0005_news_first_live`): the time the article first went live, kept when a publish or an unpublish would lose it (a reschedule moves `published_at` on; a takedown of a scheduled time clears it). An article has been live when this is set or `published_at` has passed, and from then on its slug never changes
 - `origin VARCHAR(16) NOT NULL DEFAULT 'manual'`: `manual|ai|import`
 - `ai_written TINYINT(1) NOT NULL DEFAULT 0`: 1 for `ai`; for `import`, the file's `ai_written` (default true); for `manual`, the editor's "Written with AI help" tick. It decides the AI note and the desk byline
 - `review_reason VARCHAR(300) NULL`: why an AI article was held as a draft
@@ -218,10 +221,24 @@ In `news_links`:
 - `countDashes()`.
 - `tells(string $text, list<string> $phrases): list<string>`: case-insensitive, whole words. It ignores text inside quotation marks and Markdown link text.
 - `words()`, `readMinutes()`.
-- `slug(string): string`: ASCII through intl `Transliterator` or iconv, lower case, `[a-z0-9-]`, at most 80 characters, cut on a hyphen.
+- `slug(string, int $max = 80): string`: ASCII through intl `Transliterator` or iconv, lower case, `[a-z0-9-]`, at most `$max` characters, cut on a hyphen. Story keys use it; article slugs use `Paths::slug()`.
 - `plain(string $md): string`.
 - `cut(string, int $max): string`: on a word boundary, with no trailing punctuation.
 - `emails(string): bool`: true if the text holds an email address or `mailto:`.
+
+**`Paths`** (every Industry Updates address, static and pure)
+- `index(int $page = 1)`: `/news/`, or `/news/page/{n}/` from page 2.
+- `category(string $key, int $page = 1)`: `/news/{key}/`, or `/news/{key}/page/{n}/`.
+- `article(array $row)`: `/news/{primary category}/{slug}/` (the row's `category`); an article without a category yet has only `permalink()`.
+- `permalink(array $row)`: `/news/{slug}/`, the lasting address that answers 301 to `article()`. The feeds use it as each item's guid.
+- `comment(array $row)`: `article()` + `comment/`.
+- `feed(?string $key)`: `/news/feed.xml` or `/news/{key}/feed.xml`.
+- `go()`, `media($file, $admin)`, `sitemap()`, `sitemapMonth('YYYY-MM')`, `sitemapNews()`.
+- `categoryPattern()`: the fourteen keys as the routes' `{category}` alternation.
+- `parse(string $path)`: the `{category, slug, comment}` an address on this site names, or null for a hub, a list page or a reserved word (the validator and the sign-in return path use it).
+- `slug(string $text)`: the slug rules. Lower case ASCII words joined by hyphens (through `Prose::slug()`), with no stop word at either end (`a an the and or of to in on for with at by is are from`), at most `SLUG_MAX` (60) characters cut at a word.
+- `numbered($base, $n)`: `base`, `base-2`, `base-3` ..., the base cut at a word (and its end's stop words trimmed again) so the number still fits within 60.
+- `RESERVED`: `page comment category go media feed sitemap`. No slug is one of these or a category key (`isReserved()`), and no category key is one of these.
 
 **`Urls`**
 - `canonical(string): ?string`:
@@ -266,12 +283,15 @@ In `news_links`:
 **`ArticleStore`**
 - The only writer of the article tables.
 - **Writing:**
-  - `create(Draft, ?int $userId, ?int $runId): int` and `update(int $id, Draft, ?int $userId): array $changed`. Both run in one transaction and retry a unique-slug clash.
-  - `publish(int $id, ?int $at)`, `unpublish(int $id)`.
+  - `create(Draft, ?int $userId, ?int $runId): int` and `update(int $id, Draft, ?int $userId, ?int $expectedUpdatedAt = null): ?array $changed`. Both run in one transaction and retry a unique-slug clash. With `$expectedUpdatedAt`, an article changed since answers null and nothing is written.
+  - `publish(int $id, ?int $at)`, `unpublish(int $id)`. Both move `updated_at` on like a save (`max(now, updated_at + 1)`), so a form opened before either is stale, and keep `first_live_at` before they replace or clear a time the article was live at.
   - `delete(int $id): ?array`. It removes the image files and returns the row for the audit.
 - **Reading:**
-  - `find(int)`, `findBySlug(string, bool $liveOnly = true)`.
+  - `find(int)`, `findBySlug(string, bool $liveOnly = true)`: an article is found by its slug alone, whatever category its address names.
   - `live(?string $category, ?string $q, int $page, int $perPage): array{items, total, page, pages}`.
+  - `moreIn(string $category, int $exceptId, int $limit)`: an article's "More in".
+  - `categoryTimes()`, `months()`, `liveInMonth('YYYY-MM')`, `liveSince(int)`: the sitemaps' reads (London months).
+  - `hasBeenLive(array $row)`, `updatedAfterLive(array $row)`, `lastChange(array $row)` (static): whether its slug is frozen, its "Updated" time, and the last change that counts (the page's `dateModified`, the sitemaps' `lastmod`).
   - `recent(int $days, int $limit): list`.
   - `categoryCounts(): array`.
   - `links(int)`, `related(int): {earlier, later}`, `images(int)`.
@@ -281,7 +301,7 @@ In `news_links`:
   - lower-cases the tags;
   - registers the links (the sources, plus every external link in the body, impact, confirmed and speculation);
   - computes `word_count`;
-  - makes the slug unique (`-2`, `-3` and so on).
+  - makes the slug unique (`-2`, `-3` and so on) and clear of the reserved words (`Paths::numbered()`, `Paths::isReserved()`). A new article's comes from `Draft::slugBase()` (its own SEO title, else its headline, by `Paths::slug()`), or a slug the draft names by the same rules; a stored one's changes only when a draft names one and never once the article has been live.
 - **"Live"** means `status = 'published' AND published_at <= now`.
 
 **`Images`**
@@ -381,7 +401,8 @@ In `news_links`:
 ### Elsewhere
 
 **Controllers**
-- `Psc\Controllers\NewsController`: index, category, show, feed and go.
+- `Psc\Controllers\NewsController`: index, category, oldCategory, show, feed, go and click; `elsewhere()` is the 301 to an article's own address.
+- `SeoController`: the site's sitemap, robots and llms, and the section's sitemaps (`newsSitemap`, `newsSitemapMonth`, `newsSitemapRecent`).
 - `NewsMediaController`: public media and admin media.
 - `NewsCommentController`: the API, the comment page and its forms.
 - `Admin\AdminNewsController`: the articles, images and preview.
@@ -402,15 +423,31 @@ In `news_links`:
 
 ## 5. Routes (declared before the registry loop, which skips `/news/`)
 
+The section is one silo. The router takes the first route that matches, so the specific ones come first: every word
+they use (`page`, `go`, `media`, `category`, `feed`, `sitemap`) is a reserved slug, `{category}` is only ever one of the
+fourteen keys (`Paths::categoryPattern()`), and `{page}` is 2 or more (`[1-9][0-9]{0,5}`). The comment pages carry
+`news-address` first: a live article's comment page asked for at another of its addresses answers 301 (308 for a POST,
+so a form drawn before a category change is sent again, not lost) before any session starts.
+
 ```
-GET  /news/                                   NewsController::index           ?q= ?page=
+GET  /news/                                   NewsController::index           ?q= ?page= (moved)
+GET  /news/page/{page}/                       NewsController::index
 GET  /news/feed.xml                           NewsController::feed
-GET  /news/category/{key:[a-z]+}/             NewsController::category        ?page=
+GET  /news/sitemap.xml                        SeoController::newsSitemap      (a sitemap index)
+GET  /news/sitemap-news.xml                   SeoController::newsSitemapRecent
+GET  /news/sitemap-{month:yyyy-mm}.xml        SeoController::newsSitemapMonth
+GET  /news/category/{key:[a-z]+}/             NewsController::oldCategory     301 to /news/{key}/ (?page=N to its page)
 GET  /news/go/{id:\d+}/                       NewsController::go              ['nostore']
 GET  /news/media/{file:[a-f0-9]{32}-[a-z0-9]+\.(?:webp|jpg)}   NewsMediaController::public
-GET  /news/{slug:[a-z0-9-]+}/comment/         NewsCommentController::page     ['session','auth','nostore']
-POST /news/{slug:[a-z0-9-]+}/comment/         NewsCommentController::submit   ['session','csrf','auth','nostore']   (action: post|delete|report)
-GET  /news/{slug:[a-z0-9-]+}/                 NewsController::show
+GET  /news/{category}/                        NewsController::category        ?page= (moved)
+GET  /news/{category}/page/{page}/            NewsController::category
+GET  /news/{category}/feed.xml                NewsController::feed
+GET  /news/{category}/{slug}/comment/         NewsCommentController::show     ['news-address','session','auth','nostore']
+POST /news/{category}/{slug}/comment/         NewsCommentController::submit   ['news-address','session','csrf','auth','nostore']   (action: post|delete|report)
+GET  /news/{category}/{slug}/                 NewsController::show
+GET  /news/{slug}/comment/                    NewsCommentController::show     (the same, at the lasting address)
+POST /news/{slug}/comment/                    NewsCommentController::submit
+GET  /news/{slug}/                            NewsController::show            301 to the article's own address
 GET  /api/news/{id:\d+}/state                 NewsCommentController::state    ['api','session','nostore']
 POST /api/news/{id:\d+}/comments              NewsCommentController::create   ['api','session','auth','nostore']
 POST /api/news/comments/{id:\d+}/delete       NewsCommentController::delete   ['api','session','auth','nostore']
@@ -438,12 +475,21 @@ POST /portal/admin/news/desk/prompt/          AdminNewsDeskController::savePromp
 GET  /portal/admin/news/desk/runs/{id:\d+}/   AdminNewsDeskController::run        $ad
 ```
 
+**The addresses' rules**
+- `/news/{category}/{slug}/` is an article's canonical address, the category its primary one. The slug is unique across the site and never changes once the article has been live (`first_live_at`, §3).
+- Any other category in the path, or the bare `/news/{slug}/`, answers 301 to the canonical address, keeping the query string; so does the comment page. An unknown slug, or one whose article is not live, is a 404 at every address, with no redirect.
+- `?page=N` on a list answers 301 to its path form (`/news/page/N/`, `/news/{key}/page/N/`), and `/news/page/1/` (or `/news/{key}/page/1/`) to the list itself; `?page=0`, `?page=02` and the like are 404s. A search pages by its query (`/news/?q=...&page=N`); `/news/page/N/?q=...` answers 301 there.
+- A path in capitals answers 301 to its lower-case form only when that form is a page with no route parameters (`/News/` goes to `/news/`); `/news/NOPE/` or `/news/Video/` is a 404 with no redirect (`App::dispatch`).
+- **Slugs**: from the SEO title when the article has its own, else the headline (`Draft::slugBase()`); lower case ASCII words joined by hyphens; at most 60 characters cut at a word; no stop word at either end; unique (`-2`, `-3` ...); never a reserved word or a category key (those get a number). An admin may type one, by the same rules, until the article has been live.
+
 **Indexing and discovery**
-- `robots.txt` adds `Disallow: /news/go/`. Articles use the real links; the go route serves the feed and no-JS readers.
-- The sitemap already lists `/news/` from the registry. It adds:
-  - each category page that has at least one live article;
-  - each live article, with `lastmod` = `updated_at`.
-- `llms.txt` adds an "Industry Updates" section listing the 10 newest articles.
+- `robots.txt` adds `Disallow: /news/go/`, and lists `Sitemap:` lines for `/sitemap.xml` and `/news/sitemap.xml`. Articles use the real links; the go route serves the feeds and no-JS readers.
+- The site's `/sitemap.xml` lists `/news/` (its `lastmod` the newest live article's last change) and each category hub with at least one live article (its newest live article's). It never lists an article.
+- `/news/sitemap.xml` is a sitemap index of `/news/sitemap-{yyyy}-{mm}.xml`, one per London month with live articles, the newest first (`lastmod` = the month's newest change), plus `/news/sitemap-news.xml`.
+- Each month's sitemap is a `urlset` of the live articles that went live that London month (`xmlns:image`), each with its `lastmod` (`ArticleStore::lastChange()`) and an `image:image` for a lead image (its widest copy). A month without any is a 404.
+- `/news/sitemap-news.xml` is a Google News sitemap (`xmlns:news`) of the live articles that went live in the last 48 hours: `news:publication` (name "Patterns Show Control", the site's name; language `en`), `news:publication_date` and `news:title`.
+- Every sitemap answers `private, no-store` when the articles cannot be read: the site's still lists its pages, with a 200; the section's answer 503 with `Retry-After`. Otherwise they are `public, max-age=3600`, the news sitemap as briefly as a news page.
+- `llms.txt` adds an "Industry Updates" section listing the 10 newest articles at their own addresses.
 
 **Admin**
 - The admin nav adds `['/portal/admin/news/', 'Industry Updates']`.
@@ -521,7 +567,7 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
    - **User turn:**
      - the brief;
      - the refs list;
-     - this candidate (headline, story key, refs, follow-ups with their slugs and titles);
+     - this candidate (headline, story key, refs, follow-ups with their addresses, `Paths::article()`, and titles);
      - the context.
    - **Failure:** a refusal, a `max_tokens` stop or invalid JSON drops that article and logs the step. The others carry on.
 5. **Validate** each article with origin `ai` (§7).
@@ -598,7 +644,7 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
   "seo_title": "Right to work checks now cover freelance crew",
   "dek": "One or two sentences that say what happened and why a crew chief should care (50 to 320 characters).",
   "summary": "The meta description, 50 to 155 characters.",
-  "body": "Markdown. The story, the context, what it means in practice. ## and ### headings. Links as [text](S3) or to /news/{slug}/.",
+  "body": "Markdown. The story, the context, what it means in practice. ## and ### headings. Links as [text](S3) or to /news/{category}/{slug}/.",
   "confirmed": [{"text": "A verified fact, one sentence.", "ref": "S1"}],
   "speculation": [{"text": "A claim not yet confirmed, and whose claim it is.", "ref": "S4"}],
   "impact": "Markdown. How it applies to freelance and corporate event delivery, or plainly that it does not.",
@@ -648,7 +694,8 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 | `banned_domain` | all | No source, link or `credit_url` on a banned domain. AI: dropped like an unknown ref | That site is on the banned list. |
 | `banned_topic` | ai, import | No banned topic as a whole-word, case-insensitive match in the title, dek, body, impact or tags. Manual: a warning flash only | |
 | `duplicate` | ai, import | Duplicate when either: the `story_key` equals one from the last 365 days; or any source URL key matches a source of an article from the last 120 days; or the Jaccard overlap of lower-case words across title + dek + tags is 0.5 or more against an article from the last 60 days. A match against an article in `follow_up_of` is allowed only if the new article brings at least one source URL none of them used. A match against an article that was not in the context, with new sources, becomes an automatic follow-up (logged). Otherwise rejected | |
-| `follow_up` | all | Every id or slug exists | |
+| `follow_up` | all | Every id or slug exists; for AI, every one the desk declared is live (an automatic follow-up of an article not live holds the article instead, §6.2) | |
+| `own_links` | all | A link on this site to an article (`Paths::parse()`) is rewritten to that article's own address while it is live. AI: a link to one that is not live, or not there, is unlinked, keeping its text, with a warning | |
 | `contact` | all | No email address and no `mailto:` in any text field | Remove the email address; link to a page instead. |
 | `dashes` | all | Not a rejection: `undash` runs on save. A manual save that replaced any shows a flash | Em dashes were replaced with commas. |
 | `tells` | ai | Phrases to avoid: repair, then hold (§6.2 step 5) | |
@@ -701,7 +748,7 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
   - At 3 reports a comment is hidden until an admin looks. Staff comments are never hidden automatically.
   - The first report emails the admins.
   - Admins can approve, hide, show, delete, or clear the reports.
-- **Deleting.** A person can delete their own comment.
+- **Deleting.** A person can delete their own comment, in any status, also on an article that is no longer live (its comment page then shows them only their own comments). Their account page lists their newest 50 comments, each linking to its comment page, and names an article only while it is live; the data copy has every one.
 - **Closed.** When an article's `comments_open` is off, or the setting is `closed`, the box says comments are closed and the existing comments stay.
 - **Only on live articles.** The API, the comment page and `state` all answer 404 for an article that is not live.
 - **The cached page.**
@@ -710,7 +757,7 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
   - `news.js` merges these in, shows delete on the person's own comments and report on everyone else's.
   - `signed_in: false` shows the sign-in link, so a stale `psc_li` hint does no harm.
 - **Without JavaScript.**
-  - The box links to `/news/{slug}/comment/`. That page has the form and the person's own comments, each with a delete form, plus report buttons on the others.
+  - The box links to `/news/{category}/{slug}/comment/`. That page has the form and the person's own comments, each with a delete form, plus report buttons on the others.
   - Posting returns 303 to that page, never to the cached article, with a link back.
   - The page says that sessions end after 2 hours without activity.
 - **Signing in.**
@@ -722,28 +769,33 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 
 ## 10. Public pages
 
-**Index `/news/`**
+**The hub `/news/`**
 - A hero with the h1 "Industry Updates" and a lede.
 - The category list:
-  - `<nav aria-label="Categories">` with a wrapping list (`news-cats`, 44px targets), showing "All" and each category that has live articles, with counts;
-  - below 40rem, a GET form with a `<select>` and a Show button instead.
+  - `<nav aria-label="Categories">` with a wrapping list (`news-cats`, 44px targets), showing "All" and each category that has live articles, with counts, each linking to its hub;
+  - below 40rem, a GET form with a `<select>` and a Show button instead (`?category=` answers 302 to the hub).
 - A search form (GET `?q=`, up to 100 characters).
-- The newest article as a wide card, then a grid of 12 per page, then a public pager (`c-pager`).
+- The newest article as a wide card, then a grid of 12 per page, then a public pager (`c-pager`) whose pages are paths (`/news/page/2/`).
+- At its foot, "Browse by category": a link to every category hub with live articles (`partials/news/silo.php`).
 - **Indexing:**
-  - pages 2 and up are `noindex, follow` (`Seo::noindexFollow()`);
+  - every page names itself as canonical (path-based) and is `index, follow`; page 2 and on say their number in the title ("..., page 2"), the description ("Page 2: ...") and the breadcrumbs ("Page 2");
   - `?q=` pages are `noindex, follow` and `private, no-store`;
-  - a page number past the end is a 404, and `?page=1` is a 301 to the clean URL.
+  - a page number past the end is a 404, and `?page=N` and `/news/page/1/` answer 301 to the clean address (§5).
+- **Head:** `CollectionPage` with `mainEntity` its `ItemList` of the page's articles at their own addresses, the BreadcrumbList, the news share card, and the RSS alternate for `/news/feed.xml`.
 
-**Category `/news/category/{key}/`**
-- The same layout, with the category's title, description and intro.
+**A category hub `/news/{key}/`**
+- The same layout, with the category's own title and description from `content/news.php` (each unique, the title 60 characters or fewer, the description 50 to 155) and its intro as the lede; its pages are `/news/{key}/page/2/` and on, with the same rules as the hub's.
+- **Head:** a self-referencing canonical, `CollectionPage` + `ItemList`, the breadcrumbs Home › Industry Updates › the category, its own share card (`/assets/img/og/news-{key}.png`, built by `tools/og/build.mjs` from its artwork and headline), and RSS alternates for `/news/{key}/feed.xml` and `/news/feed.xml`.
+- **Silo navigation:** at its foot, "More Industry Updates": a link back to `/news/` and to each other category with live articles.
 - A known category with no live articles: 200, the empty state, `noindex, follow`.
-- An unknown key: 404.
+- An unknown key is not a category: `/news/{word}/` is read as an article's lasting address, which is a 404 unless it is one.
+- The old `/news/category/{key}/` answers 301 to `/news/{key}/`.
 
-**Article `/news/{slug}/`**, in order:
-1. Breadcrumbs: Home › Industry Updates › the primary category › `seo_title`.
-2. The category tags, the h1 `title`, and the `dek`.
+**Article `/news/{category}/{slug}/`**, in order:
+1. Breadcrumbs: Home › Industry Updates › the primary category (its hub) › `seo_title`.
+2. The category tags (each linking to its hub), the h1 `title`, and the `dek`.
 3. A meta line: the date and time in London, the read time, "Updated" if changed, and the byline.
-4. A follow-up banner (a `c-callout`): "Follow-up to:", linking to the earlier articles.
+4. A follow-up banner (a `c-callout`): "Follow-up to:", linking to the earlier articles at their own addresses.
 5. The lead image (`<figure>` with `srcset`, width, height, alt, caption, credit), or the category artwork.
 6. The body.
 7. "What's confirmed": each item with a "Confirmed" done badge (green, with the word) and its source link.
@@ -752,33 +804,38 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 10. The verdict callout.
 11. The other images.
 12. "Sources": a numbered list of real links (`rel="nofollow noopener"`, `target="_blank"`, `data-news-link`), each with its publisher, host and kind.
-13. "Later updates": the articles that follow up this one.
+13. "Later updates": the articles that follow up this one, at their own addresses.
 14. The AI note, on AI articles.
-15. Comments.
+15. "More in {Category}": up to 4 of the newest live articles in its primary category, never itself, each with its date and read time, then "Every article in {Category}", the link to that hub.
+16. Comments.
 
 **Article head and structured data**
-- `<title>` from `seo_title`, the meta description from `summary`, and `og:title` from `title` (a new `Seo::$ogTitle`).
-- `ogType = 'article'`. `og:image` is the lead image's `-og.jpg`, with `og:image:alt` from its alt; otherwise the news share card.
-- `article:published_time`, `article:modified_time`, `article:section` and `article:tag` go in through `stack('head')`.
+- `<title>` from `seo_title`, with " | Industry Updates" added only when the whole stays within 60 characters; the meta description from `summary`; `og:title` from `title` (`Seo::$ogTitle`).
+- A self-referencing canonical, and `index, follow, max-image-preview:large, max-snippet:-1`.
+- `ogType = 'article'`, `og:description`, `og:url`, and `og:image` with its width (1200), height (630) and alt: the lead image's `-og.jpg` with its alt text; otherwise the primary category's share card, its alt "{the card's headline}, from Industry Updates". `twitter:card` is `summary_large_image`.
+- `article:published_time`, `article:modified_time`, `article:section` and `article:tag` go in through `stack('head')`, with RSS alternates for `/news/feed.xml` and the primary category's feed.
 - **JSON-LD**, on top of `baseGraph()`:
   - `NewsArticle`, `@id` = `url#article`, with:
     - `headline` = the title, cut to 110;
     - `description`;
-    - `datePublished`, `dateModified`;
+    - `datePublished`, `dateModified` (`ArticleStore::lastChange()`);
     - `articleSection` = the primary category's name;
     - `keywords`;
-    - `image`;
+    - `image`, a list: the share card, then the lead image at its widest;
+    - `wordCount`;
     - `author` = `{"@id": org}` (or the Person `@id`, §2.7);
     - `publisher` = `{"@id": org}`;
     - `isBasedOn` = the source URLs;
+    - `isAccessibleForFree` = true;
+    - `inLanguage` = `en-GB`;
     - `mainEntityOfPage` = `{"@id": url#webpage}`.
   - `Schema::webPage(... 'WebPage')`.
-  - The BreadcrumbList.
+  - The BreadcrumbList: Home › Industry Updates › the category › the article.
 
-**Feed**
-- RSS 2.0 with the 30 newest live articles.
-- Item links go to the article. The description is the summary plus the source links through `/news/go/{id}/`.
-- Every news page carries `<link rel="alternate" type="application/rss+xml">`.
+**Feeds**
+- RSS 2.0 with the 30 newest live articles: every category's at `/news/feed.xml`, one category's at `/news/{key}/feed.xml` (its channel titled "Industry Updates from Patterns Show Control: {Category}", linking to its hub, described by its description). An unknown category's feed is a 404.
+- Item links go to the article's own address; each guid is its lasting `/news/{slug}/` (`isPermaLink="true"`, a 301 to the article), so a change of category never shows a reader the article twice. The description is the summary plus the source links through `/news/go/{id}/`.
+- Every news page carries `<link rel="alternate" type="application/rss+xml">`: the section's feed, and on a hub or an article its category's too.
 
 **Click counting**
 - `news.js` sends `fetch('/api/news/links/{id}/click', {method: 'POST', keepalive: true, headers: {'X-Requested-With': 'fetch'}})` on click and on middle click.
@@ -818,7 +875,8 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 
 **Order of the page**
 1. The error summary.
-2. The headline, then the SEO title and the meta description (optional, with live counters).
+2. The headline, then the SEO title, the address and the meta description (optional, with live counters).
+   - **The address** is the slug after `/news/{category}/`. Until the article has been live it is a field: empty, it is made from the SEO title or the headline as the store makes it (`Draft::slugBase()`) and goes on following them; typed, it takes the same rules (`Paths::slug()`, numbered clear of other articles and the reserved words). Once the article has been live (`ArticleStore::hasBeenLive()`) it is shown, never offered, and a posted slug is ignored; a new primary category moves the article, and its old address answers 301 there.
 3. The standfirst, the body, and "What's confirmed" and "Still speculation" as rows of text and URL. Each row has an id (`confirmed-3-url`) so the error summary can link to it. The form renders 6 rows plus the existing ones; JS adds more.
 4. Impact, the verdict (radio buttons) and the verdict note.
 5. The categories (checkboxes, 1 to 3, the first ticked is primary) and the tags.
@@ -838,12 +896,13 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 - Note: "Only upload images you have the right to use: your own, a press kit that allows editorial use, or licensed."
 
 **Also on the edit page**
+- The address (`Paths::article()`), with "View it on the site" while it is live.
 - Link clicks, approximate: per link, in total and for the last 30 days.
 - For AI articles, the run that wrote it and the `review_reason`.
 - A preview link.
 - Delete, with a confirm box.
 
-**Takedown actions** (unpublish, delete, image delete) flash: "It can take up to 2 minutes to leave the CDN. Run Flush CDN to remove it at once."
+**Takedown actions** (unpublish, delete, image delete) flash: "Pages can take up to about 2 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once." (`AdminNewsCommentController::TAKEDOWN`; a page's `max-age` 120 and `stale-while-revalidate` 60 keep it true.)
 
 ### Preview
 - Renders the article template with a banner reading "Preview: not published".
@@ -893,7 +952,8 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
   - usage summing.
 
 **Feature: public**
-- The pages, the feed, the sitemap, `robots` and `llms`.
+- The pages, the feeds, the sitemaps, `robots` and `llms`.
+- The silo (`NewsSiloTest`): the canonical address and every 301 to it (another category, the lasting address, the comment page, the old category address, `?page=N`), no redirect for an unknown slug or one not live, reserved slugs, the hubs' heads and pages, "More in", the category feeds, the month and news sitemaps; `PathsTest` for the addresses and the slug rules.
 - `go` and `click`: the redirect, the count, bots, the rate limit, not-live articles.
 - `media`: live, draft and admin.
 - No cookies on any `/news/*` GET, even with an admin's cookie jar.
@@ -946,8 +1006,8 @@ The run takes the lease (`Settings::lease`) with a deadline of 40 minutes. Every
 - Every new admin GET route is in `adminPages()`.
 
 **e2e**
-- `config.e2e.php` sets `news.import_stagger = false`, and the webServer command runs `php tools/news.php import` first, so every launch article is live and `pages.spec` checks them all.
-- A `news.spec.mjs` covers the category filter, an article, and a comment round trip, signed in.
+- `config.e2e.php` sets `news.import_stagger = false`, and the webServer command runs `php tools/news.php import` first, so every launch article is live and `pages.spec` checks them all: it reads `/sitemap.xml` (the pages and the hubs), then `/news/sitemap.xml` and each sitemap it names, each page once.
+- A `news.spec.mjs` covers the category hubs and the way across them, an article under its category with its "More in", and the feed; `news-comments.spec.mjs` a comment round trip, signed in, on the first article the section's month sitemap lists.
 
 ## 13. What this does not do
 

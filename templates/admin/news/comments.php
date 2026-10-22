@@ -77,7 +77,7 @@ $modes = [
             [$badge, $badgeLabel] = $statusBadge[$status] ?? ['closed', $status];
             $reports = (int) $c['reports'];
             $mailto = AdminController::mailto((string) $c['author_email'], 'Your comment on ' . $c['article_title']);
-            $articleUrl = '/news/' . $c['article_slug'] . '/'; ?>
+            $articleUrl = \Psc\News\Paths::article(['slug' => $c['article_slug'], 'category' => $c['article_category']]); ?>
             <article class="pt-card" id="comment-<?= $id ?>" aria-labelledby="comment-<?= $id ?>-title">
                 <h3 class="pt-card-title" id="comment-<?= $id ?>-title"><bdi><?= e($c['author_name']) ?></bdi> on <a href="/portal/admin/news/<?= (int) $c['article_id'] ?>/"><?= e($c['article_title']) ?></a></h3>
                 <p class="pt-card-meta">

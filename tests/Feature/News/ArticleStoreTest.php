@@ -7,6 +7,7 @@ namespace Psc\Tests\Feature\News;
 use Psc\News\ArticleStore;
 use Psc\News\Draft;
 use Psc\News\Markdown;
+use Psc\News\Paths;
 use Psc\News\Prose;
 use Psc\News\Urls;
 use Psc\Tests\TestCase;
@@ -124,8 +125,84 @@ final class ArticleStoreTest extends TestCase
             ['wireless-mic-licences-change-for-the-spring-season', 'wireless-mic-licences-change-for-the-spring-season-2', 'wireless-mic-licences-change-for-the-spring-season-3', 'mic-licences'],
             array_map(static fn (int $id): string => (string) $store->find($id)['slug'], [$a, $b, $c, $d])
         );
-        self::assertSame(['slug'], $store->update($b, self::draft(['slug' => 'mic-licences']), null));
-        self::assertSame('mic-licences-2', $store->find($b)['slug'], 'an update never takes another article\'s slug');
+        // A draft that has never been live may change its address, never to another article's.
+        $e = $store->create(self::draft(['status' => 'draft', 'slug' => 'a-working-address']), null);
+        self::assertSame('working-address', $store->find($e)['slug'], 'a typed slug keeps the rules too');
+        self::assertSame(['slug'], $store->update($e, self::draft(['status' => 'draft', 'slug' => 'mic-licences']), null));
+        self::assertSame('mic-licences-2', $store->find($e)['slug'], 'an update never takes another article\'s slug');
+        // A live one keeps the address it went live at, whatever a draft names.
+        self::assertSame([], $store->update($b, self::draft(['slug' => 'mic-licences-new']), null));
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season-2', $store->find($b)['slug']);
+    }
+
+    /**
+     * No slug is a word the routes use or a category key (each gets a number), and a numbered slug still keeps within
+     * 60 characters, cut at a word with no stop word left at its end.
+     */
+    public function testSlugsKeepClearOfTheRoutesAndWithinTheirLength(): void
+    {
+        $store = $this->store();
+        foreach (['Video' => 'video-2', 'Page' => 'page-2', 'Comment' => 'comment-2', 'The Category' => 'category-2', 'Go!' => 'go-2', 'Media' => 'media-2', 'Feed' => 'feed-2', 'Sitemap' => 'sitemap-2', 'AI' => 'ai-2'] as $slug => $expected) {
+            $id = $store->create(self::draft(['slug' => $slug]), null);
+            self::assertSame($expected, $store->find($id)['slug'], $slug);
+        }
+        $title = 'Wireless microphone licences change for the spring season and the';
+        $first = $store->create(self::draft(['title' => $title]), null);
+        $second = $store->create(self::draft(['title' => $title]), null);
+        self::assertSame('wireless-microphone-licences-change-for-the-spring-season', $store->find($first)['slug'], 'cut at 60 with its stop words trimmed');
+        $numbered = (string) $store->find($second)['slug'];
+        self::assertSame('wireless-microphone-licences-change-for-the-spring-season-2', $numbered);
+        self::assertLessThanOrEqual(Paths::SLUG_MAX, strlen($numbered));
+        $long = $store->create(self::draft(['slug' => str_repeat('abcdefghi-', 6)]), null);
+        $again = $store->create(self::draft(['slug' => str_repeat('abcdefghi-', 6)]), null);
+        self::assertSame(rtrim(str_repeat('abcdefghi-', 6), '-'), $store->find($long)['slug']);
+        self::assertSame(rtrim(str_repeat('abcdefghi-', 5), '-') . '-2', $store->find($again)['slug'], 'its number fits: a word goes');
+    }
+
+    /**
+     * Publishing and unpublishing move updated_at on like a save (one second past where a save put it), so a form
+     * opened before either is stale; and the time an article first went live outlives a reschedule and a takedown,
+     * so its slug never changes after it has been live.
+     */
+    public function testPublishAndUnpublishMoveTheVersionAndKeepTheTimeItWentLive(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(['status' => 'draft']), null);
+        $ahead = time() + 50;
+        $this->db->update('news_articles', ['updated_at' => $ahead], ['id' => $id]);
+        self::assertTrue($store->publish($id));
+        self::assertSame($ahead + 1, (int) $store->find($id)['updated_at'], 'never back to now, under a save made this second');
+        self::assertNull($store->find($id)['first_live_at'], 'published_at says when it went live while it stands');
+        self::assertNull($store->update($id, self::draft(['title' => 'A stale form']), null, $ahead), 'a form from before the publish is stale');
+        self::assertTrue($store->unpublish($id));
+        self::assertSame($ahead + 2, (int) $store->find($id)['updated_at']);
+        self::assertNull($store->update($id, self::draft(['title' => 'A stale form']), null, $ahead + 1));
+        $this->db->update('news_articles', ['updated_at' => time() - 600], ['id' => $id]);
+        self::assertTrue($store->publish($id));
+        self::assertSame(time(), (int) $store->find($id)['updated_at'], 'now, when that is later');
+
+        $row = $store->find($id);
+        $wentLive = (int) $row['first_live_at'];
+        self::assertSame($wentLive, (int) $row['published_at'], 'the takedown kept the time it first went live, and publishing again went live then');
+        self::assertTrue(ArticleStore::hasBeenLive($row));
+        self::assertTrue($store->unpublish($id));
+        self::assertTrue($store->publish($id, time() + 86400), 'scheduled again');
+        $row = $store->find($id);
+        self::assertSame($wentLive, (int) $row['first_live_at'], 'kept before the new time replaced it');
+        self::assertTrue($store->unpublish($id));
+        $row = $store->find($id);
+        self::assertNull($row['published_at'], 'the schedule it never reached is dropped');
+        self::assertSame($wentLive, (int) $row['first_live_at']);
+        self::assertTrue(ArticleStore::hasBeenLive($row));
+        $slug = (string) $row['slug'];
+        self::assertSame([], $store->update($id, self::draft(['status' => 'draft', 'slug' => 'a-brand-new-address']), null));
+        self::assertSame($slug, $store->find($id)['slug'], 'it has been live: its address never changes');
+
+        $never = $store->create(self::draft(['status' => 'draft']), null);
+        self::assertFalse(ArticleStore::hasBeenLive((array) $store->find($never)));
+        self::assertTrue($store->publish($never, time() + 3600));
+        self::assertFalse(ArticleStore::hasBeenLive((array) $store->find($never)), 'scheduled is not live');
+        self::assertTrue(ArticleStore::hasBeenLive((array) $store->find($never), time() + 7200), 'once its time has passed it is');
     }
 
     public function testUpdateSaysWhatChangedAndKeepsTheClicksOfLinksThatStay(): void
@@ -387,12 +464,13 @@ final class ArticleStoreTest extends TestCase
         self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug']);
         $long = 'Wireless mic licences change for the spring season, and the booking deadline for shared channels is earlier';
         $plain = $store->create(self::draft(['title' => $long]), null);
-        self::assertSame(Prose::slug($long), $store->find($plain)['slug']);
-        self::assertGreaterThan(60, strlen(Prose::slug($long)), 'the headline, longer than its default SEO title');
-        self::assertLessThanOrEqual(Prose::SLUG_MAX, strlen(Prose::slug($long)));
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season-and-the', Prose::slug($long, 60), 'cut at 60 alone');
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season', $store->find($plain)['slug'], 'cut at 60 at a word, then no stop word at its end');
+        self::assertSame(Paths::slug($long), $store->find($plain)['slug']);
         $default = Draft::fromArray(['title' => $long, 'seo_title' => Prose::cut($long, 60)], 'manual');
-        self::assertSame(Prose::slug($long), $default->slugBase(), 'an SEO title that is only the headline cut short is not one of its own');
+        self::assertSame(Paths::slug($long), $default->slugBase(), 'an SEO title that is only the headline cut short is not one of its own');
         self::assertSame('article', Draft::fromArray(['title' => '!!!'], 'manual')->slugBase());
+        self::assertSame('article', Draft::fromArray(['title' => 'The and of'], 'manual')->slugBase(), 'nothing but stop words');
 
         self::assertSame(['seo_title'], $store->update($seo, self::draft(['title' => 'Wireless mic licences change for the spring season, and the booking deadline is earlier than last year', 'seo_title' => 'A new SEO title for the story']), null));
         self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug'], 'the address changes only when a draft names one');

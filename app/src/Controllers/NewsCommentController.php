@@ -8,7 +8,9 @@ use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\News\ArticleStore;
+use Psc\News\Categories;
 use Psc\News\Comments;
+use Psc\News\Paths;
 use Psc\News\Prose;
 
 /**
@@ -22,6 +24,10 @@ use Psc\News\Prose;
  * same-origin fetch only (the api middleware's X-Requested-With check is its CSRF defence) and its answers are JSON
  * with no-store. The comment page's forms answer with a 303 back to the comment page, never to the cached article,
  * where a flash could not show.
+ *
+ * The comment page lives at Paths::comment(): asked for at another address of its article (another category, or
+ * /news/{slug}/comment/), a live article's answers 301 before any session starts (the news-address middleware), and
+ * one that is not live answers so here, to the person it is served to.
  */
 final class NewsCommentController extends Controller
 {
@@ -29,8 +35,9 @@ final class NewsCommentController extends Controller
     private const STATE_IDS = Comments::PAGE_MAX;
 
     /**
-     * GET /news/{slug}/comment/: the box, the person's own comments with delete forms, report forms on the others. On
-     * an article that is not live, only the person's own comments with their delete forms, and never its title.
+     * GET /news/{category}/{slug}/comment/: the box, the person's own comments with delete forms, report forms on the
+     * others. On an article that is not live, only the person's own comments with their delete forms, and never its
+     * title.
      */
     public function show(Request $request): Response
     {
@@ -39,6 +46,9 @@ final class NewsCommentController extends Controller
         if ($article === null) {
             return $this->notFound();
         }
+        if ($request->path !== Paths::comment($article)) {
+            return Response::redirect(Paths::comment($article), 301);
+        }
         $uid = (int) $user['id'];
         $id = (int) $article['id'];
         $comments = new Comments($this->app);
@@ -46,14 +56,18 @@ final class NewsCommentController extends Controller
         $list = $live ? array_merge($comments->visible($id), $comments->authored($id, $uid, true)) : $comments->authored($id, $uid);
         usort($list, static fn (array $a, array $b): int => [(int) $a['created_at'], (int) $a['id']] <=> [(int) $b['created_at'], (int) $b['id']]);
 
-        $path = self::pagePath($article);
+        $path = Paths::comment($article);
         $title = (string) $article['title'];
         $seo = $live
             ? $this->app->seo('Comments: ' . Prose::cut($title, 40) . ' | Industry Updates', 'Comments on ' . Prose::cut($title, 120) . ', an Industry Updates article.', $path)->noindex()
             : $this->app->seo('Your comments | Industry Updates', 'Your comments on an Industry Updates article that is not published at the moment.', $path)->noindex();
-        $seo->breadcrumbs = Content::trail('/news/');
+        $seo->breadcrumbs = Content::trail(Paths::index());
         if ($live) {
-            $seo->crumb((string) ($article['seo_title'] ?: $title), self::articlePath($article));
+            $category = Categories::get((string) $article['category']);
+            if ($category !== null) {
+                $seo->crumb($category['name'], Paths::category((string) $article['category']));
+            }
+            $seo->crumb((string) ($article['seo_title'] ?: $title), Paths::article($article));
         }
         $seo->crumb($live ? 'Comments' : 'Your comments', $path);
         $idle = $this->app->config->int('security.session_idle_seconds', 7200);
@@ -73,9 +87,9 @@ final class NewsCommentController extends Controller
     }
 
     /**
-     * POST /news/{slug}/comment/ (action: post, delete or report), then a 303 back to the comment page. On an article
-     * that is not live only delete is taken; the last of the person's comments there deleted, the answer goes to
-     * their account page, since the comment page is theirs only while they have comments on it.
+     * POST /news/{category}/{slug}/comment/ (action: post, delete or report), then a 303 back to the comment page. On
+     * an article that is not live only delete is taken; the last of the person's comments there deleted, the answer
+     * goes to their account page, since the comment page is theirs only while they have comments on it.
      */
     public function submit(Request $request): Response
     {
@@ -85,7 +99,7 @@ final class NewsCommentController extends Controller
         if ($article === null || (!$live && $action !== 'delete')) {
             return $this->notFound();
         }
-        $path = self::pagePath($article);
+        $path = Paths::comment($article);
         $comments = new Comments($this->app);
         switch ($action) {
             case 'post':
@@ -214,26 +228,6 @@ final class NewsCommentController extends Controller
         }
         $codes = ['own' => 422, 'staff' => 403, 'limited' => 429, 'missing' => 404];
         return Response::json(['error' => $outcome, 'message' => $message], $codes[$outcome] ?? 400);
-    }
-
-    /**
-     * The comment page: /news/{slug}/comment/.
-     *
-     * @param array<string, mixed> $article
-     */
-    public static function pagePath(array $article): string
-    {
-        return self::articlePath($article) . 'comment/';
-    }
-
-    /**
-     * The article: /news/{slug}/.
-     *
-     * @param array<string, mixed> $article
-     */
-    public static function articlePath(array $article): string
-    {
-        return '/news/' . $article['slug'] . '/';
     }
 
     /**

@@ -304,12 +304,15 @@ final class App
         }
         $lower = strtolower($request->path);
         if ($lower !== $request->path && !str_starts_with($request->path, '/portal/') && !str_starts_with($request->path, '/api/')) {
-            // Only a path that exists in lower case is redirected: anything else is a 404, never a permanent hop.
-            $again = $this->router->match('GET', $lower);
-            if ($again === null) {
+            // Only a page that exists in lower case, with nothing in its path a route reads as a value, is redirected:
+            // anything else (an unknown address, an article's slug or a category key typed in capitals) is a 404,
+            // never a permanent hop to a guess. Slugs and keys are only ever written in lower case.
+            $target = self::localTarget($this->router->match('GET', $lower)['redirect'] ?? $lower);
+            $again = $this->router->match('GET', $target);
+            if ($again === null || !isset($again['route']) || $again['params'] !== []) {
                 return $this->errorResponse($request, 404);
             }
-            return Response::redirect(self::localTarget($again['redirect'] ?? $lower) . $this->queryString($request), 301);
+            return Response::redirect($target . $this->queryString($request), 301);
         }
         $match = $this->router->match($request->method, $request->path);
         if ($match === null) {

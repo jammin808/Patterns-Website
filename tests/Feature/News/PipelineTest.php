@@ -442,7 +442,9 @@ final class PipelineTest extends TestCase
         $a = $this->articles()[0];
         self::assertSame('published', $a['status']);
         self::assertSame([['article_id' => (int) $a['id'], 'related_id' => $earlier]], array_map(static fn (array $r): array => array_map('intval', $r), $this->db->all('SELECT article_id, related_id FROM news_related')));
-        self::assertStringContainsString('Follows up: ' . $earlier . ' (/news/', self::turn($model->callsOf('compose')[0]));
+        $slug = (string) $this->db->value('SELECT slug FROM news_articles WHERE id = ?', [$earlier]);
+        self::assertStringContainsString('Follows up: ' . $earlier . ' (/news/video/' . $slug . '/): The genlock firmware was announced', self::turn($model->callsOf('compose')[0]), 'the address it links to, as the page has it');
+        self::assertStringContainsString('[words](/news/its-category/its-slug/), exactly as given', (string) $model->callsOf('compose')[0]['system'], 'and the rules say how to link to it');
     }
 
     public function testOnlyALiveArticleIsFollowedUpOrLinked(): void

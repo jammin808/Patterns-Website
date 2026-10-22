@@ -16,7 +16,7 @@ $minutes = \Psc\News\Prose::readMinutes((int) $a['word_count']);
 $picture = $a['picture'] ?? null;
 ?>
 <article class="c-card news-card<?= $lead ? ' news-card--lead' : '' ?>">
-    <h3 class="c-card-title"><a href="/news/<?= e($a['slug']) ?>/"><?= e($a['title']) ?></a></h3>
+    <h3 class="c-card-title"><a href="<?= e(\Psc\News\Paths::article($a)) ?>"><?= e($a['title']) ?></a></h3>
     <?php if ($names !== []): ?><p class="news-card-cats"><?= e(implode(', ', $names)) ?></p><?php endif; ?>
     <p class="c-card-body"><?= e($a['dek']) ?></p>
     <p class="c-card-footer news-card-meta"><time datetime="<?= e(date(DATE_ATOM, $ts)) ?>"><?= e(date_short($ts)) ?></time><span><?= e(strtr((string) ($copy['meta']['read'] ?? ':n min read'), [':n' => (string) $minutes])) ?></span></p>

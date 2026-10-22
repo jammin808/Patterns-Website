@@ -8,7 +8,8 @@ use Psc\Content\Content;
 
 /**
  * The fixed Industry Updates categories, with their words from content/news.php. The keys are stored on articles
- * and are part of each category page's address, so they never change; only their words do.
+ * and are part of each category hub's address and of every article's (Paths), so they never change, and none is a
+ * word the routes use (Paths::RESERVED); only their words do.
  */
 final class Categories
 {
@@ -49,6 +50,19 @@ final class Categories
     public static function name(string $key): string
     {
         return self::has($key) ? self::all()[$key]['name'] : '';
+    }
+
+    /** A category's share card, which tools/og/build.mjs draws from its artwork and its words (news-{key}). */
+    public static function shareCard(string $key): string
+    {
+        return '/assets/img/og/news-' . $key . '.png';
+    }
+
+    /** What a category's share card says: its title tag without the section's name ("Video news: switching ..."). */
+    public static function headline(string $key): string
+    {
+        $c = self::get($key);
+        return $c !== null ? trim((string) preg_replace('/\s*\|[^|]*$/u', '', $c['title'])) : '';
     }
 
     /**

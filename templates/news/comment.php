@@ -1,6 +1,6 @@
 <?php
 /**
- * /news/{slug}/comment/: one article's comments for a signed-in reader without scripting, and where signing in from
+ * /news/{category}/{slug}/comment/ (Paths::comment()): one article's comments for a signed-in reader without scripting, and where signing in from
  * an article leads. The comment form, the visible comments with the person's own pending and hidden ones (each of
  * theirs with a delete form, everyone else's with a report form), and a link back to the article. On an article that
  * is not live only the person's own comments, each with its delete form, without the article's title or a link to it.
@@ -20,12 +20,12 @@
  * @var int $idleSeconds security.session_idle_seconds
  * @var list<array{type: string, message: string}> $flashes
  */
-use Psc\Controllers\NewsCommentController;
 use Psc\News\Comments;
+use Psc\News\Paths;
 
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/news-comments.css')) . '">');
-$articlePath = NewsCommentController::articlePath($article);
-$pagePath = NewsCommentController::pagePath($article);
+$articlePath = Paths::article($article);
+$pagePath = Paths::comment($article);
 $uid = (int) $viewer['id'];
 $hours = intdiv($idleSeconds, 3600);
 $idle = $hours >= 1 && $idleSeconds % 3600 === 0
@@ -137,7 +137,7 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
         <?php if ($live): ?>
             <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="<?= e($articlePath) ?>#comments">Back to the article</a></p>
         <?php else: ?>
-            <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="/news/">Back to Industry Updates</a></p>
+            <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="<?= e(Paths::index()) ?>">Back to Industry Updates</a></p>
         <?php endif; ?>
     </div>
 </div>

@@ -75,6 +75,15 @@ return [
         'title' => 'Industry Updates from Patterns Show Control',
         'description' => 'AV and live event industry news for freelance crew and corporate event teams, with verified facts kept apart from speculation.',
         'label' => 'Industry Updates RSS feed',
+        // A category's own feed (:title is the title above, :category the category's name).
+        'category_title' => ':title: :category',
+        'category_label' => ':category: Industry Updates RSS feed',
+    ],
+    // The way across the section, at the foot of the hub and of each category's hub.
+    'silo' => [
+        'index' => 'Browse by category',
+        'category' => 'More Industry Updates',
+        'all' => 'Every article',
     ],
 
     // The verdict callout on an article: its label, its callout variant (empty for the plain callout) and its icon.
@@ -92,6 +101,9 @@ return [
         'sources' => 'Sources',
         'later' => 'Later updates',
         'follow_up' => 'Follow-up to',
+        // The end of every article: the newest of its primary category, and the way to the rest.
+        'more' => 'More in :category',
+        'more_all' => 'Every article in :category',
     ],
     'badges' => [
         'confirmed' => 'Confirmed',

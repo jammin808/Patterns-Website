@@ -1,9 +1,10 @@
 <?php
 /**
- * /news/ and /news/category/{key}/: the Industry Updates lists (docs/NEWS.md §10). The hero (the section's name, or
- * the category's name and intro), the category bar and search, then one page of live articles: on a list's first
- * page the newest is drawn wide, the rest as a grid, then the pager. A search lists its results under a heading of
- * their own. The page reads the same for every visitor (no session, no form token).
+ * /news/ and /news/{key}/, and their pages: the Industry Updates hubs (docs/NEWS.md §10). The hero (the section's
+ * name, or the category's name and intro), the category bar and search, then one page of live articles: on a list's
+ * first page the newest is drawn wide, the rest as a grid, then the pager, then the way across the silo (the hub and
+ * every category with articles). A search lists its results under a heading of their own. The page reads the same
+ * for every visitor (no session, no form token).
  *
  * @var array<string, mixed> $copy  content/news.php
  * @var array<string, array{name: string, title: string, description: string, intro: string, icon: string}> $categories
@@ -16,11 +17,16 @@
  * @var int $pageNo
  * @var int $pages
  * @var int $total
- * @var string $path
+ * @var callable(int): string $pageLink  the address of a page of this list
  * @var bool $unavailable  the articles could not be read
+ * @var list<array{0: string, 1: string}> $feeds  the RSS feeds the page names: address, title
  */
+use Psc\News\Paths;
+
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/news.css')) . '">');
-$this->push('head', '<link rel="alternate" type="application/rss+xml" title="' . e($copy['feed']['label'] ?? 'Industry Updates RSS feed') . '" href="/news/feed.xml">');
+foreach ($feeds as [$feedHref, $feedTitle]) {
+    $this->push('head', '<link rel="alternate" type="application/rss+xml" title="' . e($feedTitle) . '" href="' . e($feedHref) . '">');
+}
 
 $index = is_array($copy['index'] ?? null) ? $copy['index'] : [];
 $list = is_array($copy['list'] ?? null) ? $copy['list'] : [];
@@ -72,7 +78,7 @@ $message = match (true) {
                 <span class="c-empty-mark" aria-hidden="true"></span>
                 <p><?= e($message) ?></p>
                 <?php if (!$unavailable && ($q !== '' || $c !== null)): ?>
-                    <a class="c-btn c-btn--secondary" href="/news/"><?= e($copy['all_link'] ?? 'See every article') ?></a>
+                    <a class="c-btn c-btn--secondary" href="<?= e(Paths::index()) ?>"><?= e($copy['all_link'] ?? 'See every article') ?></a>
                 <?php endif; ?>
             </div>
         <?php else: ?>
@@ -81,7 +87,10 @@ $message = match (true) {
                     <?= $this->partial('news/card', ['a' => $a, 'categories' => $categories, 'copy' => $copy, 'lead' => $lead && $i === 0]) ?>
                 <?php endforeach; ?>
             </div>
-            <?= $this->partial('news/pager', ['path' => $path, 'query' => $q !== '' ? ['q' => $q] : [], 'page' => $pageNo, 'pages' => $pages, 'total' => $total, 'perPage' => \Psc\Controllers\NewsController::PER_PAGE]) ?>
+            <?= $this->partial('news/pager', ['link' => $pageLink, 'page' => $pageNo, 'pages' => $pages, 'total' => $total, 'perPage' => \Psc\Controllers\NewsController::PER_PAGE]) ?>
+        <?php endif; ?>
+        <?php if ($q === '' && !$unavailable): ?>
+            <?= $this->partial('news/silo', ['copy' => $copy, 'categories' => $categories, 'counts' => $counts, 'category' => $category]) ?>
         <?php endif; ?>
     </div>
 </section>

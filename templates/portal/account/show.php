@@ -1,6 +1,8 @@
 <?php
 /**
- * The signed-in person's account: details, password, a copy of their data, and deleting the account.
+ * The signed-in person's account: details, password, their comments on Industry Updates articles (each linking to its
+ * comment page, the one place a comment on an article no longer live can be found and deleted), a copy of their data,
+ * and deleting the account.
  *
  * @var array<string, mixed> $account
  * @var array<string, string> $old
@@ -8,12 +10,16 @@
  * @var int $minLength
  * @var array{licences: int, tickets: int} $kept
  * @var int $newsComments the account's comments on Industry Updates articles, in every status
+ * @var list<array<string, mixed>> $newsList the newest of them (Comments::ofAccount()), each with its article's slug, title,
+ *   category and article_live
  * @var string $deleteWord
  * @var bool $soleAdmin the only active administrator (the account cannot be deleted until there is another)
  * @var list<array{type: string, message: string}> $flashes
  */
 $soleAdmin ??= false;
 $newsComments ??= 0;
+$newsList ??= [];
+$commentStates = ['visible' => ['public', 'Showing'], 'pending' => ['pending', 'Waiting for approval'], 'hidden' => ['private', 'Hidden by a moderator']];
 // Which of the three forms was sent last (its hidden "form" field comes back with the kept input), so a refusal no
 // field explains is said in that form's error summary and nowhere else.
 $posted = (string) ($old['form'] ?? '');
@@ -136,6 +142,28 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
         </div>
     </form>
 </section>
+
+<?php if ($newsList !== []): ?>
+<section class="pt-section" id="comments" aria-labelledby="comments-title">
+    <h2 class="pt-h2" id="comments-title">Your comments on Industry Updates</h2>
+    <p>Each comment's page shows it with its article and lets you delete it, including comments on articles that are no longer published.<?php if ($newsComments > count($newsList)): ?> These are your newest <?= count($newsList) ?> of <?= e($newsCount) ?>; your data copy has every one.<?php endif; ?></p>
+    <div class="pt-table-wrap"><table class="pt-table pt-table--stack">
+        <caption class="u-visually-hidden">Your comments on Industry Updates articles, the newest first</caption>
+        <thead><tr><th scope="col">Comment</th><th scope="col">Article</th><th scope="col">Status</th><th scope="col">Posted</th></tr></thead>
+        <tbody>
+            <?php foreach ($newsList as $c):
+                [$badge, $label] = $commentStates[(string) $c['status']] ?? ['private', ucfirst((string) $c['status'])]; ?>
+                <tr>
+                    <th scope="row"><a href="<?= e(\Psc\News\Paths::comment($c)) ?>#comment-<?= (int) $c['id'] ?>"><?= e(\Psc\News\Prose::cut((string) preg_replace('/\s+/u', ' ', (string) $c['body']), 80)) ?></a></th>
+                    <td data-label="Article"><?= $c['article_live'] ? e($c['title']) : '<span class="pt-muted">An article that is not published at the moment</span>' ?></td>
+                    <td data-label="Status"><span class="pt-badge pt-badge--<?= e($badge) ?>"><?= e($label) ?></span></td>
+                    <td data-label="Posted"><time datetime="<?= e(date('c', (int) $c['created_at'])) ?>"><?= e(date_short($c['created_at'])) ?></time></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table></div>
+</section>
+<?php endif; ?>
 
 <section class="pt-section" id="data" aria-labelledby="data-title">
     <h2 class="pt-h2" id="data-title">Your data</h2>

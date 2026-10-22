@@ -1109,7 +1109,7 @@ final class AccountsTest extends TestCase
         $data = json_decode($this->request('GET', '/portal/account/export/')->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(['My visible comment', 'My waiting comment', 'My hidden comment'], array_column($data['news_comments'], 'body'));
         self::assertSame(['visible', 'pending', 'hidden'], array_column($data['news_comments'], 'status'));
-        self::assertSame('https://patternsshowcontrol.test/news/export-me/', $data['news_comments'][0]['url']);
+        self::assertSame('https://patternsshowcontrol.test/news/video/export-me/', $data['news_comments'][0]['url'], 'the article\'s own address');
         self::assertSame('An article to comment on for the copy', $data['news_comments'][0]['article']);
         self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', (string) $data['news_comments'][0]['created_at']);
         self::assertSame([$theirs], array_column($data['news_comment_reports'], 'comment_id'));
@@ -1117,6 +1117,55 @@ final class AccountsTest extends TestCase
         self::assertStringNotContainsString('Their words, which I reported', $copy, 'a report names the comment, never the other person\'s words');
         self::assertStringNotContainsString('Their other words', $copy);
         self::assertStringNotContainsString('other@example.test', $copy);
+    }
+
+    /**
+     * The account page lists the person's news comments, the newest first, each linking to its comment page (where it
+     * can be deleted) and naming its article only while that is live: the one way to find a comment on an article
+     * taken down since.
+     */
+    public function testTheAccountPageListsTheNewsCommentsWithTheWayToEach(): void
+    {
+        $me = $this->makeUser();
+        $other = $this->makeUser('other@example.test');
+        $live = $this->makeArticle(['slug' => 'still-live', 'title' => 'An article still on the site', 'categories' => ['audio', 'video']]);
+        $gone = $this->makeArticle(['slug' => 'taken-down-since', 'title' => 'A headline nobody may read now', 'categories' => ['legal']]);
+        $visible = $this->newsComment($live, $me, "My visible comment\nover two lines");
+        $hidden = $this->newsComment($live, $me, 'My hidden comment', 'hidden');
+        $orphan = $this->newsComment($gone, $me, 'My comment on the article taken down');
+        $this->newsComment($live, $other, 'Their comment, never on my page');
+        $this->db->update('news_comments', ['created_at' => time() - 3600], ['id' => $visible]);
+        (new \Psc\News\ArticleStore($this->app))->unpublish($gone);
+
+        $this->signIn();
+        $page = $this->request('GET', '/portal/account/');
+        self::assertSame(200, $page->status);
+        self::assertSame(1, preg_match('#<section class="pt-section" id="comments"[^>]*>(.*?)</section>#s', $page->body, $section));
+        preg_match_all('#<th scope="row"><a href="([^"]+)">([^<]*)</a></th>#', $section[1], $rows, PREG_SET_ORDER);
+        self::assertSame([
+            ['/news/legal/taken-down-since/comment/#comment-' . $orphan, 'My comment on the article taken down'],
+            ['/news/audio/still-live/comment/#comment-' . $hidden, 'My hidden comment'],
+            ['/news/audio/still-live/comment/#comment-' . $visible, 'My visible comment over two lines'],
+        ], array_map(static fn (array $r): array => [html_entity_decode($r[1]), $r[2]], $rows), 'the newest first, each to its comment page');
+        self::assertStringContainsString('An article still on the site', $section[1]);
+        self::assertStringNotContainsString('A headline nobody may read now', $section[1], 'an article not live is not named');
+        self::assertStringContainsString('An article that is not published at the moment', $section[1]);
+        self::assertStringContainsString('Hidden by a moderator', $section[1]);
+        self::assertStringNotContainsString('Their comment', $page->body);
+        self::assertStringContainsString('<table class="pt-table pt-table--stack">', $section[1]);
+        foreach (['Article', 'Status', 'Posted'] as $label) {
+            self::assertStringContainsString('data-label="' . $label . '"', $section[1]);
+        }
+
+        // That page is the person's, and its delete takes the comment.
+        $there = $this->request('GET', '/news/legal/taken-down-since/comment/');
+        self::assertSame(200, $there->status);
+        self::assertStringContainsString('name="comment" value="' . $orphan . '"', $there->body);
+
+        $this->freshBrowser();
+        $this->makeUser('quiet@example.test');
+        $this->signIn('quiet@example.test');
+        self::assertStringNotContainsString('id="comments"', $this->request('GET', '/portal/account/')->body, 'no section without comments');
     }
 
     public function testDeletingAnAccountDeletesItsNewsCommentsAndReportsAndCountsAgain(): void
@@ -1164,8 +1213,8 @@ final class AccountsTest extends TestCase
 
     public function testRegistrationCarriesWhereThePersonWasGoingToTheConfirmationPage(): void
     {
-        $this->makeArticle(['slug' => 'a-good-read']);
-        $form = $this->request('GET', '/portal/register/?next=' . rawurlencode('/news/a-good-read/#comments'));
+        $this->makeArticle(['slug' => 'good-read']);
+        $form = $this->request('GET', '/portal/register/?next=' . rawurlencode('/news/video/good-read/#comments'));
         self::assertSame(200, $form->status);
         $this->register('nina@example.test');
         $check = $this->request('GET', '/portal/register/');
@@ -1175,12 +1224,12 @@ final class AccountsTest extends TestCase
         $url = $this->mailUrl('nina@example.test', 'verify-email');
         $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
         self::assertStringContainsString('Email address confirmed', $verify->body);
-        self::assertStringContainsString('<a class="pt-btn pt-btn--primary" href="/portal/login/?next=' . e(rawurlencode('/news/a-good-read/#comments')) . '">Sign in</a>', $verify->body);
-        self::assertStringContainsString('<a class="pt-btn pt-btn--ghost" href="/news/a-good-read/#comments">Continue to the article</a>', $verify->body);
+        self::assertStringContainsString('<a class="pt-btn pt-btn--primary" href="/portal/login/?next=' . e(rawurlencode('/news/video/good-read/#comments')) . '">Sign in</a>', $verify->body);
+        self::assertStringContainsString('<a class="pt-btn pt-btn--ghost" href="/news/video/good-read/#comments">Continue to the article</a>', $verify->body);
         self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION, 'offered once');
 
-        $login = $this->post('/portal/login/', ['email' => 'nina@example.test', 'password' => self::PASSWORD, 'next' => '/news/a-good-read/#comments']);
-        self::assertRedirect($login, '/news/a-good-read/#comments');
+        $login = $this->post('/portal/login/', ['email' => 'nina@example.test', 'password' => self::PASSWORD, 'next' => '/news/video/good-read/#comments']);
+        self::assertRedirect($login, '/news/video/good-read/#comments');
     }
 
     public function testThePortalSwitchFromSignInKeepsTheWayBack(): void
@@ -1212,10 +1261,13 @@ final class AccountsTest extends TestCase
         self::assertStringNotContainsString('Continue to the article', $verify->body);
 
         $articleOf = [\Psc\Controllers\Portal\AuthController::class, 'articleOf'];
-        self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/'));
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/'));
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/comment/'));
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/comment/?utm_source=mail#form'));
+        self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/'), 'the lasting address, which leads to the article');
         self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/comment/'));
         self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/#comments'));
-        foreach (['/news/', '/news/category/video/', '/news/category/', '/news/go/3/', '/news/x/y/z/', '/portal/news/x/', '/news/X/'] as $path) {
+        foreach (['/news/', '/news/category/video/', '/news/category/', '/news/go/3/', '/news/x/y/z/', '/portal/news/x/', '/news/X/', '/news/video/', '/news/video/page/2/', '/news/page/2/', '/news/rumours/x-y/'] as $path) {
             self::assertNull($articleOf($path), $path);
         }
 

@@ -1,8 +1,8 @@
-// Industry Updates in a browser (docs/NEWS.md §10, §12): the index lists the launch articles, a category narrows
-// the list and the phone's category form reaches the same page, an article has its parts in order and reports a
-// click on a source with a keepalive fetch while the source opens in a new tab, and the feed lists the articles
-// with tracked links that go to the stored address. pages.spec checks every article and category page the
-// sitemap names (status, SEO basics, axe, no sideways scroll).
+// Industry Updates in a browser (docs/NEWS.md §10, §12): the hub lists the launch articles, a category's hub narrows
+// the list and the phone's category form reaches the same page, an article lives under its category, has its parts
+// in order, ends with the newest of its category and reports a click on a source with a keepalive fetch while the
+// source opens in a new tab, and the feed lists the articles with tracked links that go to the stored address.
+// pages.spec checks every hub and article the sitemaps name (status, SEO basics, axe, no sideways scroll).
 import { test, expect } from '@playwright/test';
 
 /** A category chip's own name, without its count. */
@@ -16,10 +16,11 @@ test('the index lists the articles and a category narrows them', async ({ page }
   await expect(page.locator('article.news-card--lead')).toHaveCount(1);
   await expect(page.locator('.news-cats a[href="/news/"]')).toHaveAttribute('aria-current', 'page');
 
-  const chip = page.locator('.news-cats a[href^="/news/category/"]').first();
+  const chip = page.locator('.news-cats a:not([href="/news/"])').first();
   const href = await chip.getAttribute('href');
   const name = await chipName(chip);
   await chip.click();
+  expect(href).toMatch(/^\/news\/[a-z]+\/$/);
   await expect(page).toHaveURL(new RegExp(`${href}$`));
   await expect(page.locator('h1')).toHaveText(name);
   await expect(page.locator(`.news-cats a[href="${href}"]`)).toHaveAttribute('aria-current', 'page');
@@ -27,6 +28,9 @@ test('the index lists the articles and a category narrows them', async ({ page }
   expect(cats.length).toBeGreaterThan(0);
   for (const line of cats) expect(line.split(', ')).toContain(name);
   expect(cats.length).toBeLessThanOrEqual(all);
+  // The way back across the silo: the hub, and the other categories.
+  await expect(page.locator('.news-silo a[href="/news/"]')).toHaveCount(1);
+  await expect(page.locator(`.news-silo a[href="${href}"]`)).toHaveCount(0);
 });
 
 test('the phone shows a category form that reaches the same page', async ({ page }) => {
@@ -38,7 +42,7 @@ test('the phone shows a category form that reaches the same page', async ({ page
   const value = await select.locator('option[value]:not([value=""])').first().getAttribute('value');
   await select.selectOption(value);
   await page.getByRole('button', { name: 'Show' }).click();
-  await expect(page).toHaveURL(new RegExp(`/news/category/${value}/$`));
+  await expect(page).toHaveURL(new RegExp(`/news/${value}/$`));
   await expect(select).toHaveValue(value);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
@@ -46,9 +50,13 @@ test('the phone shows a category form that reaches the same page', async ({ page
 test('an article has its parts in order and counts a click on a source', async ({ page, context }) => {
   await page.goto('/news/');
   await page.locator('article.news-card h3 a').first().click();
-  await expect(page).toHaveURL(/\/news\/[a-z0-9-]+\/$/);
+  await expect(page).toHaveURL(/\/news\/[a-z]+\/[a-z0-9-]+\/$/);
   await expect(page.locator('h1')).toHaveCount(1);
   await expect(page.locator('nav.c-crumbs li')).toHaveCount(4);
+  const primary = new URL(page.url()).pathname.split('/')[2];
+  await expect(page.locator('nav.c-crumbs li').nth(2).locator('a')).toHaveAttribute('href', `/news/${primary}/`);
+  await expect(page.locator('#news-more')).toContainText('More in');
+  await expect(page.locator(`.news-more-all a[href="/news/${primary}/"]`)).toHaveCount(1);
 
   const order = await page.evaluate(() => ['.news-tags', 'h1', '.news-meta', '.news-body', '#news-confirmed', '#news-sources']
     .map((sel) => document.querySelector(sel)).map((el) => (el ? [...document.querySelectorAll('*')].indexOf(el) : -1)));

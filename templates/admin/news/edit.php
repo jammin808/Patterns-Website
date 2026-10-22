@@ -25,6 +25,8 @@
  * @var int $spare
  */
 use Psc\Controllers\Admin\AdminNewsController;
+use Psc\News\ArticleStore;
+use Psc\News\Paths;
 use Psc\News\Prose;
 
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/admin-news.css')) . '">');
@@ -32,7 +34,7 @@ $this->push('scripts', '<script type="module" src="' . e(asset('/assets/js/admin
 $id = (int) $article['id'];
 [$badge, $stateLabel] = AdminNewsController::STATES[$state];
 $origin = (string) $article['origin'];
-$address = '/news/' . $article['slug'] . '/';
+$address = Paths::article($article);
 $time = static fn (mixed $ts): string => '<time datetime="' . e(date(DATE_ATOM, (int) $ts)) . '">' . e(AdminNewsController::london((int) $ts)) . '</time>';
 $reason = trim((string) ($article['review_reason'] ?? ''));
 $field = fn (array $p): string => $this->render('admin/news/_field', $p);
@@ -62,7 +64,7 @@ $sourceNo = 0;
         <dt>Address</dt>
         <dd>
             <?php if ($state === 'live'): ?><a href="<?= e($address) ?>"><?= e($address) ?></a><?php else: ?><span class="pt-mono"><?= e($address) ?></span><?php endif; ?>
-            <?php if ($article['published_at'] === null): ?><span class="pt-small pt-muted">It follows the headline until the article is first published, then never changes.</span><?php endif; ?>
+            <?php if (!ArticleStore::hasBeenLive($article)): ?><span class="pt-small pt-muted">You can change it below until the article has been live; after that it never changes.</span><?php else: ?><span class="pt-small pt-muted">It never changes now: the article has been live there. A new main category moves it, and the old address leads to the new one.</span><?php endif; ?>
         </dd>
         <dt><?= $state === 'scheduled' ? 'Goes live' : 'Published' ?></dt>
         <dd><?= $article['published_at'] !== null && $state !== 'draft' && $state !== 'held' ? $time($article['published_at']) . ' <span class="pt-muted">(London time)</span>' : '<span class="pt-muted">Not yet</span>' ?></dd>

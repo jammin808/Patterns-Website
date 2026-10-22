@@ -14,7 +14,7 @@ use Psc\News\ArticleStore;
 use Psc\News\Categories;
 use Psc\News\Draft;
 use Psc\News\Images;
-use Psc\News\Prose;
+use Psc\News\Paths;
 use Psc\News\Result;
 use Psc\News\Settings;
 use Psc\News\Validator;
@@ -31,9 +31,11 @@ use Psc\Support\Uploads;
  *
  * A refused save comes back to the editor with everything that was typed, from a copy of its own in the session
  * (news_draft.new or news_draft.<id>: keepOld() keeps neither lists nor long text), and each error names its row
- * (the error sources.2.url belongs to the control sources-2-url). Until an article has first been published its
- * address follows its headline; after that it never changes. A takedown (unpublish, delete, an image deleted from a
- * live article) says how long the CDN may go on showing it.
+ * (the error sources.2.url belongs to the control sources-2-url). Until an article has been live its address is the
+ * administrator's to choose: the slug typed in the editor, or with none the one its SEO title or headline makes
+ * (Draft::slugBase(), as the store makes it), which it then follows; once it has been live it never changes
+ * (ArticleStore::hasBeenLive()). A takedown (unpublish, delete, an image deleted from a live article) says how long
+ * the CDN may go on showing it.
  *
  * The editor posts the updated_at of the article it was opened on (loaded_at), and a save over a later change is
  * refused with the form kept, so a stale tab never overwrites someone else's work. Unpublishing is a takedown: it
@@ -168,7 +170,7 @@ final class AdminNewsController extends Controller
             Audit::log($this->app, (int) $admin['id'], 'news.scheduled', (string) $id, ['at' => date(DATE_ATOM, (int) $at)]);
         }
         $message = match ($action) {
-            'publish' => 'Published. The article is live at /news/' . $row['slug'] . '/.',
+            'publish' => 'Published. The article is live at ' . Paths::article($row) . '.',
             'schedule' => 'Scheduled. The article goes live on ' . self::london((int) $at) . ' (London time).',
             default => 'Saved as a draft. Only administrators can see it until you publish it.',
         };
@@ -257,11 +259,13 @@ final class AdminNewsController extends Controller
             return $response;
         }
         $clean = $result->draft;
-        // Never published or scheduled, the address still follows the headline (an address it already has, or the
-        // same one numbered to be unique, is kept as it is).
-        $slug = Prose::slug($clean->title);
-        if ($article['published_at'] === null && $slug !== '' && preg_match('/^' . preg_quote($slug, '/') . '(?:-\d+)?$/', (string) $article['slug']) !== 1) {
-            $clean->slug = $slug;
+        // Until it has been live the address is the one typed, or with none the one its words make, as the store
+        // makes it (an address it already has, or the same one numbered to be unique, is kept as it is); after that
+        // it is the address it went live at, whatever was posted.
+        if (ArticleStore::hasBeenLive($article)) {
+            $clean->slug = null;
+        } elseif ($clean->slug === null && !Paths::isNumberedFrom((string) $article['slug'], $clean->slugBase())) {
+            $clean->slug = $clean->slugBase();
         }
         $changed = $store->update($id, $clean, (int) $admin['id'], $loaded);
         if ($changed === null) {
@@ -288,7 +292,7 @@ final class AdminNewsController extends Controller
                 $store->publish($id);
                 $row = (array) $store->find($id);
                 Audit::log($this->app, (int) $admin['id'], 'news.published', (string) $id, ['at' => date(DATE_ATOM, (int) $row['published_at'])]);
-                $session->flash('success', $saved . 'Published. The article is live at /news/' . $row['slug'] . '/.');
+                $session->flash('success', $saved . 'Published. The article is live at ' . Paths::article($row) . '.');
             }
         } elseif ($action === 'schedule') {
             $store->publish($id, (int) $at);
@@ -470,7 +474,7 @@ final class AdminNewsController extends Controller
         };
         $strings = static fn (mixed $list): array => array_values(array_filter(is_array($list) ? $list : [], 'is_string'));
         $values = [];
-        foreach (['title', 'seo_title', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time'] as $k) {
+        foreach (['title', 'seo_title', 'slug', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time'] as $k) {
             $values[$k] = $text($k);
         }
         $values['confirmed'] = $rows($request->post['confirmed'] ?? null, ['text', 'url']);
@@ -492,7 +496,7 @@ final class AdminNewsController extends Controller
      */
     private static function withDefaults(array $values): array
     {
-        $defaults = array_fill_keys(['title', 'seo_title', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time', 'loaded_at'], '')
+        $defaults = array_fill_keys(['title', 'seo_title', 'slug', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time', 'loaded_at'], '')
             + array_fill_keys(['confirmed', 'speculation', 'sources', 'categories', 'follow_up_of'], [])
             + ['comments_open' => true, 'ai_written' => false];
         $out = [];
@@ -508,8 +512,8 @@ final class AdminNewsController extends Controller
     }
 
     /**
-     * A stored article as the editor's values. An SEO title or meta description that is only what an empty field
-     * becomes shows as empty, so it goes on following the headline and the standfirst.
+     * A stored article as the editor's values. An SEO title, meta description or address that is only what an empty
+     * field becomes shows as empty, so it goes on following the headline, the standfirst and the words.
      *
      * @return array<string, mixed>
      */
@@ -524,6 +528,7 @@ final class AdminNewsController extends Controller
         return self::withDefaults([
             'title' => $d->title,
             'seo_title' => $d->seoTitle === $empty->seoTitleOrDefault() ? '' : $d->seoTitle,
+            'slug' => $d->slug === null || Paths::isNumberedFrom($d->slug, $d->slugBase()) ? '' : $d->slug,
             'summary' => $d->summary === $empty->summaryOrDefault() ? '' : $d->summary,
             'dek' => $d->dek,
             'body' => $d->body,
@@ -558,6 +563,7 @@ final class AdminNewsController extends Controller
         $draft = Draft::fromArray([
             'title' => $values['title'],
             'seo_title' => $values['seo_title'],
+            'slug' => $values['slug'],
             'summary' => $values['summary'],
             'dek' => $values['dek'],
             'body' => $values['body'],

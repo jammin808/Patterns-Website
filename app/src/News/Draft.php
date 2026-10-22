@@ -65,7 +65,7 @@ final class Draft
     public bool $commentsOpen = true;
     /** Carries the AI note and the desk's byline: every ai article, imports unless the file says not, manual when ticked. */
     public bool $aiWritten = false;
-    /** The address slug to use; null: made from the headline (create) or kept (update). */
+    /** The address slug to use (Paths::slug() rules); null: made by slugBase() (create) or kept (update). */
     public ?string $slug = null;
     /** An import file's key (news_imports.import_key). */
     public string $importKey = '';
@@ -115,7 +115,7 @@ final class Draft
         $d->tags = self::tags($data['tags'] ?? []);
         $d->storyKey = Prose::slug(self::line($data['story_key'] ?? ''), 190);
         $d->commentsOpen = self::flag($data['comments_open'] ?? true, true);
-        $slug = Prose::slug(self::line($data['slug'] ?? ''));
+        $slug = Paths::slug(self::line($data['slug'] ?? ''));
         $d->slug = $slug !== '' ? $slug : null;
         $reason = self::line($data['review_reason'] ?? '');
         $d->reviewReason = $reason !== '' ? Prose::cut($reason, 300) : null;
@@ -231,16 +231,17 @@ final class Draft
     }
 
     /**
-     * The address a new article is given when the draft names none: the SEO title when it is one of its own (not
-     * the headline cut short), which makes a shorter address, else the headline; at most Prose::SLUG_MAX characters
-     * before ArticleStore numbers it to be unique, and 'article' when nothing is left.
+     * The address an article is given when the draft names none: the SEO title when it is one of its own (not the
+     * headline cut short), which makes a shorter address, else the headline, by the rules of Paths::slug() (at most
+     * Paths::SLUG_MAX characters, no stop word at either end); 'article' when nothing is left. ArticleStore numbers it
+     * to be unique and to keep clear of the words the routes use.
      */
     public function slugBase(): string
     {
         $own = $this->seoTitle !== '' && $this->seoTitle !== Prose::cut($this->title, 60);
-        $slug = Prose::slug($own ? $this->seoTitle : $this->title);
+        $slug = Paths::slug($own ? $this->seoTitle : $this->title);
         if ($slug === '' && $own) {
-            $slug = Prose::slug($this->title);
+            $slug = Paths::slug($this->title);
         }
         return $slug !== '' ? $slug : 'article';
     }

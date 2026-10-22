@@ -105,7 +105,7 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 
 ## After launch
 
-- [ ] Verify the domain in Google Search Console and Bing Webmaster Tools and submit `/sitemap.xml`.
+- [ ] Verify the domain in Google Search Console and Bing Webmaster Tools and submit `/sitemap.xml` and `/news/sitemap.xml` (Industry Updates' articles, by month, with its news sitemap); `robots.txt` names both too.
 - [ ] Check whether `REMOTE_ADDR` is the visitor's own address behind Hostinger's CDN, and set
       `app.trusted_proxy_header` and `app.trusted_proxies` only if it is not (docs/DEPLOY.md §4).
 - [ ] `curl -I https://patternsshowcontrol.co.uk/.well-known/security.txt` answers 200 on LiteSpeed. security.txt

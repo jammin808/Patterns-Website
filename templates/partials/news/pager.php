@@ -1,11 +1,10 @@
 <?php
 /**
  * The public pager (docs/DESIGN.md 8.26): Previous, the first and last page numbers with those beside this one,
- * the articles shown and Next. Page 1 is always the clean address (?page=1 redirects there), and nothing is drawn
- * when everything fits on one page.
+ * the articles shown and Next. Each page's address is the list's own (Paths: /news/page/2/, a search's ?page=2), page
+ * 1 the list's clean address, and nothing is drawn when everything fits on one page.
  *
- * @var string $path  the list's address
- * @var array<string, string> $query  the list's other parameters (a search's q)
+ * @var callable(int): string $link  the address of page n
  * @var int $page
  * @var int $pages
  * @var int $total
@@ -14,10 +13,7 @@
 if ($pages <= 1) {
     return;
 }
-$url = static function (int $n) use ($path, $query): string {
-    $qs = http_build_query($query + ($n > 1 ? ['page' => (string) $n] : []));
-    return $path . ($qs !== '' ? '?' . $qs : '');
-};
+$url = static fn (int $n): string => (string) $link($n);
 $shown = array_values(array_unique(array_filter([1, $page - 1, $page, $page + 1, $pages], static fn (int $n): bool => $n >= 1 && $n <= $pages)));
 sort($shown);
 $first = ($page - 1) * $perPage + 1;

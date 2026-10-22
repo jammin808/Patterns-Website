@@ -1089,14 +1089,15 @@ followspot in its colour; PlayMap's card says "Early access".
 | `patterns`, `stagewatch`, `agmessage`, `playmap` | each product's overview, features and licensing | the product's drawn screen on a monitor with its UMD |
 | `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
 | `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
-| `news` | Industry Updates: the index, the category pages, and every article without a picture of its own | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
+| `news` | Industry Updates: the hub and its pages | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
+| `news-{key}` (one per category) | each category's hub and its pages, and every article of that primary category without a picture of its own | the category's headline (its title tag without " \| Industry Updates") beside its artwork from `news-art.svg`, drawn with doubled hairlines so it reads at a thumbnail, over its name |
 
 Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines (four for the home card's
 long headline, so it stays large beside the multiview); hyphenated words never
 break, and the build warns when a headline needs a fourth line (shorten it: Support's card uses its H1, "Support",
 with the page's description as the line, rather than its 55-character title). Text is sized to stay legible at a 400px thumbnail. Words and prices come from `content/`; the build fails if
 `content/pages.php` names an `og` image with no card. Cards are palette PNGs when that is visually identical, and stay
-under 150 KB (25–90 KB today).
+under 150 KB (20 to 95 KB today).
 
 ### 8.35 Cookie choice (`templates/partials/consent.php`, `site.js` initConsent)
 
@@ -1135,24 +1136,34 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 ```html
 <div class="news-bar">                                         <!-- above a list -->
   <nav class="news-cats-nav u-hide-sm" aria-label="Categories"><ul class="news-cats" role="list">
-    <li><a href="/news/" aria-current="page">All <span class="news-cats-count"><span class="u-visually-hidden">, </span>16<span class="u-visually-hidden"> articles</span></span></a></li>…</ul></nav>
+    <li><a href="/news/" aria-current="page">All <span class="news-cats-count"><span class="u-visually-hidden">, </span>16<span class="u-visually-hidden"> articles</span></span></a></li>
+    <li><a href="/news/video/">Video …</a></li>…</ul></nav>                <!-- each category's hub -->
   <form class="c-search news-pick u-show-sm" method="get" action="/news/">…label, select name="category", Show…</form>
   <form class="c-search news-search" role="search" method="get" action="/news/">…c-search-field, Search, c-help…</form>
 </div>
 <div class="news-grid">
   <article class="c-card news-card news-card--lead">            <!-- the newest, on a list's first page -->
-    <h3 class="c-card-title"><a href="/news/{slug}/">…</a></h3>   <!-- the link covers the card -->
+    <h3 class="c-card-title"><a href="/news/{category}/{slug}/">…</a></h3>   <!-- the link covers the card -->
     <p class="news-card-cats">Legal, Freelance</p><p class="c-card-body">…standfirst…</p>
     <p class="c-card-footer news-card-meta"><time>22 Oct 2026</time><span>4 min read</span></p>
     <div class="news-card-media">…img alt="" or the artwork…</div>   <!-- shown first, read last -->
   </article>…
 </div>
-<nav class="c-pager news-pager" aria-label="Pages">…</nav>
+<nav class="c-pager news-pager" aria-label="Pages">…</nav>          <!-- pages by path: /news/page/2/ -->
+<nav class="news-silo" aria-labelledby="news-silo-title">             <!-- at a list's foot -->
+  <h2 class="news-silo-title" id="news-silo-title">More Industry Updates</h2>
+  <ul class="news-silo-list" role="list"><li><a href="/news/">Every article</a></li><li><a href="/news/audio/">Audio</a></li>…</ul>
+</nav>
 ```
 
 - **The category bar.** Links, never script: a wrapping list of 44px targets with their counts (the current one
-  filled, as the pager's current page is, with its words kept); below 40rem the same choice is a GET form with a
-  select and a **Show** button. Only categories with live articles are listed.
+  filled, as the pager's current page is, with its words kept), each to its category's hub (`/news/{key}/`); below
+  40rem the same choice is a GET form with a select and a **Show** button. Only categories with live articles are
+  listed.
+- **The way across (`news-silo`).** At the foot of every list, the section's hubs as 44px links: on the hub, each
+  category with live articles ("Browse by category"); on a category's hub, the hub and the other categories ("More
+  Industry Updates"). The section reads as one silo: every hub is a step from every other, on a phone too, where the
+  bar above is a form.
 - **Cards** follow the workflow cards (`support-wfcard` in `pages/support.css`): the title's link covers the card, and the picture
   and the categories are shown above the title but read after it. From 64rem the newest article on a first page
   spans two columns and two rows. A card's picture has empty alt text: its title says what it is.
@@ -1162,7 +1173,9 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   a status badge holding its word: `c-badge--done` "Confirmed", `c-badge--progress` "Unconfirmed" (8.7), and its
   source. The verdict is a callout in its own variant (`c-callout--success` worth adopting, `--info` worth testing
   and good to know, `--warning` one to watch, plain safe to skip); the follow-up banner is `c-callout--info`, the
-  AI note a plain `c-callout`. Sources are a numbered `news-sources` list with the publisher, host and kind.
+  AI note a plain `c-callout`. Sources are a numbered `news-sources` list with the publisher, host and kind. The
+  article ends with `news-more`: "More in {Category}", up to four of that category's newest articles as a hairline
+  list (each a link with its date and read time), and a secondary button to the category's hub.
 - **Links out** are real (`rel="nofollow noopener" target="_blank"`, a hidden "opens in a new tab") and carry
   `data-news-link`, which `news.js` reports with a keepalive fetch; the browser follows the link as it would anyway.
 - **Pictures.** An article's images are uploaded by an administrator with the right to use them, re-encoded and
@@ -1242,7 +1255,7 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 | Support hub and four product help pages | `c-hero--page`, inline assistant (`c-chat--inline`), `c-support-links`, `c-faq`, `c-prose` |
 | FAQ | `c-hero--page`, `c-tabs` (groups) or section heads, `c-faq` |
 | Contact | `c-hero--page`, `c-callout--info` (show in 48 hours), `c-form--panel`, `c-kv` |
-| Industry Updates: index, categories, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources` (8.36) |
+| Industry Updates: the hub, the category hubs, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-more` (8.36) |
 | About, legal | `c-hero--page`, `c-prose` |
 | Portal: dashboard, downloads, licences, tickets, ideas board, account | `pt-shell`, `pt-header`, `pt-stats`, `pt-grid` + `pt-card--link`, `pt-table`, `pt-badge`, `pt-vote`, `pt-thread`, `pt-files`, `pt-kv`, `pt-alert`, `pt-empty`, `pt-pager` |
 | Admin tables | `pt-table` (+ `c-table--zebra c-table--compact`, `aria-sort` + `c-sort`), `pt-search`, `pt-tabs`, `pt-badge`, `c-table--stack` with `data-label` for phones |

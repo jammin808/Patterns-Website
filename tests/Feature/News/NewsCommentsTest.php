@@ -465,7 +465,7 @@ final class NewsCommentsTest extends TestCase
         self::assertSame(1, $this->visibleCount($article));
 
         // The comment page: the person's hidden comments, marked, each with its delete form; never someone else's.
-        $page = $this->request('GET', '/news/hidden-but-mine/comment/');
+        $page = $this->request('GET', '/news/video/hidden-but-mine/comment/');
         self::assertSame(200, $page->status);
         foreach ([$hidden, $alsoHidden] as $id) {
             self::assertStringContainsString('name="action" value="delete"', self::item($page->body, $id));
@@ -488,9 +488,9 @@ final class NewsCommentsTest extends TestCase
         self::assertStringContainsString('data-comment-hidden hidden', $this->partial($article), 'the cached page carries the note, inert');
 
         // Deleted from the comment page and through the API alike; the visible count is unchanged.
-        $r = $this->post('/news/hidden-but-mine/comment/', ['action' => 'delete', 'comment' => (string) $hidden]);
+        $r = $this->post('/news/video/hidden-but-mine/comment/', ['action' => 'delete', 'comment' => (string) $hidden]);
         self::assertSame(303, $r->status);
-        self::assertSame('/news/hidden-but-mine/comment/#comments', $r->getHeader('Location'));
+        self::assertSame('/news/video/hidden-but-mine/comment/#comments', $r->getHeader('Location'));
         self::assertSame('Your comment is deleted.', end($_SESSION['_flash'])['message']);
         self::assertNull($this->commentStatus($hidden));
         $api = $this->api('POST', '/api/news/comments/' . $alsoHidden . '/delete');
@@ -511,7 +511,7 @@ final class NewsCommentsTest extends TestCase
         $second = $this->comment($article, $uid, 'And a second, waiting', 'pending', time() - 800);
         $theirs = $this->comment($article, $other, 'Someone else said this', 'visible', time() - 700);
         $this->db->update('news_articles', ['status' => 'draft'], ['id' => $article]);
-        $page = '/news/taken-down-later/comment/';
+        $page = '/news/video/taken-down-later/comment/';
 
         // The comment page shows the person their own comments with delete forms, and nothing else of the article.
         $r = $this->request('GET', $page);
@@ -522,7 +522,7 @@ final class NewsCommentsTest extends TestCase
         self::assertSame('', self::item($r->body, $theirs));
         self::assertStringNotContainsString('Someone else said this', $r->body);
         self::assertStringNotContainsString('A headline that was taken down', $r->body, 'not the title of an article that is not published');
-        self::assertStringNotContainsString('href="/news/taken-down-later/"', $r->body);
+        self::assertStringNotContainsString('href="/news/video/taken-down-later/"', $r->body);
         self::assertStringContainsString(e(Comments::NOT_LIVE_OWN), $r->body);
         self::assertStringNotContainsString('value="post"', $r->body);
         self::assertStringNotContainsString('value="report"', $r->body);
@@ -670,8 +670,12 @@ final class NewsCommentsTest extends TestCase
             self::assertSame(404, $this->api('GET', '/api/news/' . $article . '/state')->status);
             self::assertSame(404, $this->postComment($article, 'Hello there')->status);
             self::assertSame(404, $this->api('POST', '/api/news/comments/' . $c . '/report')->status);
-            self::assertSame(404, $this->request('GET', '/news/' . $slug . '/comment/')->status);
-            self::assertSame(404, $this->post('/news/' . $slug . '/comment/', ['action' => 'post', 'body' => 'Hello there'])->status);
+            foreach (['/news/video/' . $slug . '/comment/', '/news/' . $slug . '/comment/', '/news/legal/' . $slug . '/comment/'] as $page) {
+                $r = $this->request('GET', $page);
+                self::assertSame(404, $r->status, $page);
+                self::assertNull($r->getHeader('Location'), $page . ': no hop says an article is there');
+                self::assertSame(404, $this->post($page, ['action' => 'post', 'body' => 'Hello there'])->status, $page);
+            }
         }
         self::assertSame(404, $this->api('GET', '/api/news/999/state')->status);
         self::assertSame(2, (int) $this->db->value('SELECT COUNT(*) FROM news_comments'));
@@ -723,7 +727,7 @@ final class NewsCommentsTest extends TestCase
         self::assertStringNotContainsString('@example.test', $html);
 
         // Open registration: sign in (the comment page, behind sign-in) or create an account, coming back after.
-        self::assertStringContainsString('<a href="/news/radio-mic-changes/comment/" data-comment-signin>Sign in</a> or <a href="/portal/register/?next=%2Fnews%2Fradio-mic-changes%2Fcomment%2F" data-comment-register>create an account</a> to comment.', $html);
+        self::assertStringContainsString('<a href="/news/video/radio-mic-changes/comment/" data-comment-signin>Sign in</a> or <a href="/portal/register/?next=%2Fnews%2Fvideo%2Fradio-mic-changes%2Fcomment%2F" data-comment-register>create an account</a> to comment.', $html);
         self::assertStringContainsString('<template data-comment-form>', $html);
         self::assertStringContainsString('role="status" data-comment-status', $html);
         self::assertStringNotContainsString('_csrf', $html);
@@ -733,8 +737,8 @@ final class NewsCommentsTest extends TestCase
         self::assertStringContainsString('/assets/js/news-comments.js', $this->app->view()->stack('scripts'));
 
         $this->bootApp(['security' => ['registration' => 'invite']]);
-        $article = $this->makeArticle(['slug' => 'by-invitation']);
-        self::assertStringContainsString('<a href="/news/by-invitation/comment/" data-comment-signin>Sign in to comment</a>.', $this->partial($article));
+        $article = $this->makeArticle(['slug' => 'invitation-only']);
+        self::assertStringContainsString('<a href="/news/video/invitation-only/comment/" data-comment-signin>Sign in to comment</a>.', $this->partial($article));
         self::assertStringNotContainsString('create an account', $this->partial($article));
         self::assertStringContainsString('No comments yet.', $this->partial($article));
     }
@@ -745,7 +749,7 @@ final class NewsCommentsTest extends TestCase
         $this->comment($article, $this->makeUser('other@example.test'), 'A comment everyone sees');
         $this->signInClient();
         $_SESSION = [];
-        $r = $this->request('GET', '/news/cached-for-everyone/');
+        $r = $this->request('GET', '/news/video/cached-for-everyone/');
         self::assertSame(200, $r->status);
         self::assertStringStartsWith('public', (string) $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies(), 'no cookie, even with a signed-in cookie jar');
@@ -758,12 +762,12 @@ final class NewsCommentsTest extends TestCase
     public function testTheCommentPageNeedsSignInAndBringsThePersonBack(): void
     {
         $this->makeArticle(['slug' => 'come-back-here']);
-        $r = $this->request('GET', '/news/come-back-here/comment/');
+        $r = $this->request('GET', '/news/video/come-back-here/comment/');
         self::assertSame(302, $r->status);
-        self::assertSame('/portal/login/?next=' . rawurlencode('/news/come-back-here/comment/'), $r->getHeader('Location'));
+        self::assertSame('/portal/login/?next=' . rawurlencode('/news/video/come-back-here/comment/'), $r->getHeader('Location'));
         $this->makeUser();
-        $login = $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => 'correct horse battery', 'next' => '/news/come-back-here/comment/']);
-        self::assertSame('/news/come-back-here/comment/', $login->getHeader('Location'));
+        $login = $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => 'correct horse battery', 'next' => '/news/video/come-back-here/comment/']);
+        self::assertSame('/news/video/come-back-here/comment/', $login->getHeader('Location'));
     }
 
     public function testTheCommentPageListsCommentsWithTheirForms(): void
@@ -776,17 +780,17 @@ final class NewsCommentsTest extends TestCase
         $mine = $this->comment($article, $uid, 'I said this', 'visible', time() - 800);
         $waiting = $this->comment($article, $uid, 'Mine is waiting', 'pending', time() - 700);
 
-        $r = $this->request('GET', '/news/no-script-reader/comment/');
+        $r = $this->request('GET', '/news/video/no-script-reader/comment/');
         self::assertSame(200, $r->status);
         self::assertStringContainsString('no-store', (string) $r->getHeader('Cache-Control'));
         self::assertStringContainsString('noindex', (string) $r->getHeader('X-Robots-Tag'));
         self::assertStringContainsString('<meta name="robots" content="noindex', $r->body);
         self::assertSame(1, substr_count($r->body, '<h1'));
-        self::assertStringContainsString('action="/news/no-script-reader/comment/"', $r->body);
+        self::assertStringContainsString('action="/news/video/no-script-reader/comment/"', $r->body);
         self::assertStringContainsString('name="_csrf"', $r->body);
         self::assertStringContainsString('Sessions end after 2 hours without activity.', $r->body);
         self::assertStringContainsString('shown as <strong><bdi>Test C.</bdi></strong>', $r->body);
-        self::assertStringContainsString('href="/news/no-script-reader/#comments"', $r->body, 'a link back to the article');
+        self::assertStringContainsString('href="/news/video/no-script-reader/#comments"', $r->body, 'a link back to the article');
         $main = (string) strstr($r->body, '<main');
         self::assertStringNotContainsString('style="', $main);
         self::assertStringNotContainsString('<script', $main);
@@ -808,7 +812,7 @@ final class NewsCommentsTest extends TestCase
         $article = $this->makeArticle(['slug' => 'forms-without-script']);
         $other = $this->makeUser('other@example.test');
         $theirs = $this->comment($article, $other, 'A comment to report');
-        $page = '/news/forms-without-script/comment/';
+        $page = '/news/video/forms-without-script/comment/';
         $this->signInClient();
 
         self::assertSame(419, $this->post($page, ['action' => 'post', 'body' => 'No token'], false)->status);
@@ -859,10 +863,10 @@ final class NewsCommentsTest extends TestCase
         $article = $this->makeArticle(['slug' => 'closed-for-comment']);
         $this->db->update('news_articles', ['comments_open' => 0], ['id' => $article]);
         $this->signInClient();
-        $page = $this->request('GET', '/news/closed-for-comment/comment/')->body;
+        $page = $this->request('GET', '/news/video/closed-for-comment/comment/')->body;
         self::assertStringContainsString(Comments::CLOSED_ARTICLE, $page);
         self::assertStringNotContainsString('value="post"', $page);
-        $r = $this->post('/news/closed-for-comment/comment/', ['action' => 'post', 'body' => 'Still trying']);
+        $r = $this->post('/news/video/closed-for-comment/comment/', ['action' => 'post', 'body' => 'Still trying']);
         self::assertSame(303, $r->status);
         self::assertSame(Comments::CLOSED_ARTICLE, end($_SESSION['_flash'])['message']);
         self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_comments'));

@@ -114,7 +114,7 @@ $empty = [
                     <tr>
                         <th scope="row">
                             <a href="/portal/admin/news/<?= (int) $a['id'] ?>/"><?= e($a['title']) ?></a>
-                            <span class="pt-small pt-muted"><?= $category !== '' ? e($categories[$category]['name'] ?? $category) . ' · ' : '' ?>/news/<?= e($a['slug']) ?>/</span>
+                            <span class="pt-small pt-muted"><?= $category !== '' ? e($categories[$category]['name'] ?? $category) . ' · ' : '' ?><?= e(\Psc\News\Paths::article($a)) ?></span>
                             <?php if ($state === 'held' && $reason !== ''): ?><span class="pt-small">Held because: <?= e($reason) ?></span><?php endif; ?>
                         </th>
                         <td data-label="Status"><span class="pt-badge pt-badge--<?= e($badge) ?>"><?= e($label) ?></span></td>

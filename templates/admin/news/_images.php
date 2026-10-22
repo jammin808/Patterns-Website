@@ -64,7 +64,7 @@ $summaryFields = static fn (string $form): array => [
                 $h = max(1, (int) round((int) $image['height'] * $w / max(1, (int) $image['width'])));
                 $name = (string) $image['original_name']; ?>
                 <li class="pt-news-image" id="<?= e($form) ?>">
-                    <img class="pt-news-thumb" src="/portal/admin/news/media/<?= e($image['base']) ?>-480.webp" width="<?= $w ?>" height="<?= $h ?>" alt="<?= e($image['alt']) ?>" decoding="async">
+                    <img class="pt-news-thumb" src="<?= e(\Psc\News\Paths::media($image['base'] . '-480.webp', true)) ?>" width="<?= $w ?>" height="<?= $h ?>" alt="<?= e($image['alt']) ?>" decoding="async">
                     <div class="pt-news-image-body">
                         <p class="pt-small">
                             <?php if ($n === 0): ?><span class="pt-badge pt-badge--active">Lead image</span><?php endif; ?>

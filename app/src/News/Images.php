@@ -281,7 +281,7 @@ final class Images
         }
         $listed = array_map('intval', explode(',', (string) ($image['widths'] ?? '')));
         $largest = (int) ($image['width'] ?? 0);
-        $file = ($admin ? '/portal/admin/news/media/' : '/news/media/') . $base;
+        $file = Paths::media($base, $admin);
         $out = [];
         foreach (ArticleStore::IMAGE_WIDTHS as $w) {
             if (in_array($w, $listed, true)) {

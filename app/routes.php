@@ -31,6 +31,7 @@ use Psc\Controllers\Admin\AdminReleaseController;
 use Psc\Controllers\Admin\AdminTicketController;
 use Psc\Controllers\Admin\AdminUserController;
 use Psc\Http\Router;
+use Psc\News\Paths;
 
 return static function (Router $r, App $app): void {
     // Machine-readable files.
@@ -53,18 +54,34 @@ return static function (Router $r, App $app): void {
     $ad = ['session', 'auth', 'admin', 'nostore'];
     $adPost = ['session', 'csrf', 'auth', 'admin', 'nostore'];
 
-    // Industry Updates (docs/NEWS.md §5). Its pages are the same for every visitor: no session, no cookie, except
-    // the comment page and the API, which carry their own. /news/ is in the registry for its words and the sitemap.
+    // Industry Updates (docs/NEWS.md §5), one silo under /news/: the hub and its pages, the section's feed and
+    // sitemaps, the old category address, the tracked links and the media first, then each category's hub, pages and
+    // feed, then the articles under their category and the lasting /news/{slug}/ (which answers 301 to where its
+    // category puts it). The first match wins, so every word these use is a reserved slug (Paths::RESERVED), and
+    // {category} is only ever one of the fourteen keys. Its pages are the same for every visitor: no session, no
+    // cookie, except the comment page and the API, which carry their own; news-address sends a comment page asked
+    // for at an old address to its own before any session starts. /news/ is in the registry for its words.
     $slug = '{slug:[a-z0-9-]+}';
+    $category = '{category:' . Paths::categoryPattern() . '}';
+    $page = '{page:[1-9][0-9]{0,5}}';
     $media = '{file:[a-f0-9]{32}-[a-z0-9]+\.(?:webp|jpg)}';
     $r->get('/news/', [NewsController::class, 'index']);
+    $r->get('/news/page/' . $page . '/', [NewsController::class, 'index']);
     $r->get('/news/feed.xml', [NewsController::class, 'feed']);
-    $r->get('/news/category/{key:[a-z]+}/', [NewsController::class, 'category']);
+    $r->get('/news/sitemap.xml', [SeoController::class, 'newsSitemap']);
+    $r->get('/news/sitemap-news.xml', [SeoController::class, 'newsSitemapRecent']);
+    $r->get('/news/sitemap-{month:[0-9]{4}-(?:0[1-9]|1[0-2])}.xml', [SeoController::class, 'newsSitemapMonth']);
+    $r->get('/news/category/{key:[a-z]+}/', [NewsController::class, 'oldCategory']);
     $r->get('/news/go/{id:\d+}/', [NewsController::class, 'go'], ['nostore']);
     $r->get('/news/media/' . $media, [NewsMediaController::class, 'public']);
-    $r->get('/news/' . $slug . '/comment/', [NewsCommentController::class, 'show'], ['session', 'auth', 'nostore']);
-    $r->post('/news/' . $slug . '/comment/', [NewsCommentController::class, 'submit'], ['session', 'csrf', 'auth', 'nostore']);
-    $r->get('/news/' . $slug . '/', [NewsController::class, 'show']);
+    $r->get('/news/' . $category . '/', [NewsController::class, 'category']);
+    $r->get('/news/' . $category . '/page/' . $page . '/', [NewsController::class, 'category']);
+    $r->get('/news/' . $category . '/feed.xml', [NewsController::class, 'feed']);
+    foreach (['/news/' . $category . '/' . $slug . '/', '/news/' . $slug . '/'] as $article) {
+        $r->get($article . 'comment/', [NewsCommentController::class, 'show'], ['news-address', 'session', 'auth', 'nostore']);
+        $r->post($article . 'comment/', [NewsCommentController::class, 'submit'], ['news-address', 'session', 'csrf', 'auth', 'nostore']);
+        $r->get($article, [NewsController::class, 'show']);
+    }
     $r->get('/api/news/{id:\d+}/state', [NewsCommentController::class, 'state'], ['api', 'session', 'nostore']);
     $r->post('/api/news/{id:\d+}/comments', [NewsCommentController::class, 'create'], ['api', 'session', 'auth', 'nostore']);
     $r->post('/api/news/comments/{id:\d+}/delete', [NewsCommentController::class, 'delete'], ['api', 'session', 'auth', 'nostore']);

@@ -12,6 +12,7 @@ use Psc\Controllers\Admin\AdminNewsDeskController;
 use Psc\Controllers\NewsCommentController;
 use Psc\Controllers\NewsController;
 use Psc\Controllers\NewsMediaController;
+use Psc\Controllers\SeoController;
 use Psc\News\Urls;
 use Psc\Tests\TestCase;
 
@@ -26,12 +27,22 @@ final class FoundationTest extends TestCase
         $file = str_repeat('a1', 16) . '-960.webp';
         return [
             ['GET', '/news/', NewsController::class, 'index', []],
+            ['GET', '/news/page/2/', NewsController::class, 'index', []],
             ['GET', '/news/feed.xml', NewsController::class, 'feed', []],
-            ['GET', '/news/category/video/', NewsController::class, 'category', []],
+            ['GET', '/news/sitemap.xml', SeoController::class, 'newsSitemap', []],
+            ['GET', '/news/sitemap-news.xml', SeoController::class, 'newsSitemapRecent', []],
+            ['GET', '/news/sitemap-2026-10.xml', SeoController::class, 'newsSitemapMonth', []],
+            ['GET', '/news/category/video/', NewsController::class, 'oldCategory', []],
             ['GET', '/news/go/12/', NewsController::class, 'go', ['nostore']],
             ['GET', '/news/media/' . $file, NewsMediaController::class, 'public', []],
-            ['GET', '/news/a-story/comment/', NewsCommentController::class, 'show', ['session', 'auth', 'nostore']],
-            ['POST', '/news/a-story/comment/', NewsCommentController::class, 'submit', ['session', 'csrf', 'auth', 'nostore']],
+            ['GET', '/news/video/', NewsController::class, 'category', []],
+            ['GET', '/news/video/page/2/', NewsController::class, 'category', []],
+            ['GET', '/news/video/feed.xml', NewsController::class, 'feed', []],
+            ['GET', '/news/video/a-story/comment/', NewsCommentController::class, 'show', ['news-address', 'session', 'auth', 'nostore']],
+            ['POST', '/news/video/a-story/comment/', NewsCommentController::class, 'submit', ['news-address', 'session', 'csrf', 'auth', 'nostore']],
+            ['GET', '/news/video/a-story/', NewsController::class, 'show', []],
+            ['GET', '/news/a-story/comment/', NewsCommentController::class, 'show', ['news-address', 'session', 'auth', 'nostore']],
+            ['POST', '/news/a-story/comment/', NewsCommentController::class, 'submit', ['news-address', 'session', 'csrf', 'auth', 'nostore']],
             ['GET', '/news/a-story/', NewsController::class, 'show', []],
             ['GET', '/api/news/12/state', NewsCommentController::class, 'state', ['api', 'session', 'nostore']],
             ['POST', '/api/news/12/comments', NewsCommentController::class, 'create', ['api', 'session', 'auth', 'nostore']],
@@ -73,13 +84,23 @@ final class FoundationTest extends TestCase
         self::assertNull($this->app->router->match('GET', '/news/category/Video/'), 'category keys are lower case');
         self::assertNull($this->app->router->match('GET', '/news/media/' . str_repeat('a', 32) . '-960.png'));
         self::assertSame(['redirect' => '/news/a-story/'], $this->app->router->match('GET', '/news/a-story'));
+        self::assertSame(['redirect' => '/news/video/a-story/'], $this->app->router->match('GET', '/news/video/a-story'));
+        // The placeholders take only what they name: a category key, a page from 2 (1 and the rest are a slug's or
+        // nothing's), a real month; everything else falls through to an article's slug, never to a hub.
+        self::assertSame(['category' => 'video'], $this->app->router->match('GET', '/news/video/')['params'] ?? null);
+        self::assertSame(['slug' => 'rumours'], $this->app->router->match('GET', '/news/rumours/')['params'] ?? null);
+        self::assertSame(['category' => 'ai', 'page' => '12'], $this->app->router->match('GET', '/news/ai/page/12/')['params'] ?? null);
+        self::assertSame(['category' => 'video', 'slug' => 'page'], $this->app->router->match('GET', '/news/video/page/')['params'] ?? null, 'a reserved word, which no slug is');
+        self::assertNull($this->app->router->match('GET', '/news/page/02/'));
+        self::assertNull($this->app->router->match('GET', '/news/sitemap-2026-13.xml'));
+        self::assertNull($this->app->router->match('GET', '/news/rumours/feed.xml'));
     }
 
     public function testTheIndexIsTheSameForEveryVisitor(): void
     {
         $r = $this->request('GET', '/news/');
         self::assertSame(200, $r->status);
-        self::assertSame('public, max-age=120, stale-while-revalidate=600', $r->getHeader('Cache-Control'));
+        self::assertSame('public, max-age=120, stale-while-revalidate=60', $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies());
         self::assertStringContainsString('<h1 class="c-hero-title" id="page-title">Industry Updates</h1>', $r->body);
         self::assertStringContainsString('<title>Industry Updates: AV and live event news</title>', $r->body);
@@ -92,7 +113,7 @@ final class FoundationTest extends TestCase
         $this->signInAdmin();
         $signedIn = $this->request('GET', '/news/');
         self::assertSame([], $signedIn->cookies(), 'no cookie, even with an administrator\'s session');
-        self::assertSame('public, max-age=120, stale-while-revalidate=600', $signedIn->getHeader('Cache-Control'));
+        self::assertSame('public, max-age=120, stale-while-revalidate=60', $signedIn->getHeader('Cache-Control'));
         self::assertSame(self::withoutFormTimes($r->body), self::withoutFormTimes($signedIn->body));
     }
 
@@ -102,7 +123,7 @@ final class FoundationTest extends TestCase
         $this->makeArticle(['title' => 'A draft about a secret product', 'status' => 'draft']);
         $this->makeArticle(['title' => 'A scheduled story for tomorrow', 'published_at' => time() + 86400]);
         $body = $this->request('GET', '/news/')->body;
-        self::assertStringContainsString('<a href="/news/live-story/">A live story about consoles</a>', $body);
+        self::assertStringContainsString('<a href="/news/video/live-story/">A live story about consoles</a>', $body);
         self::assertStringNotContainsString('secret product', $body);
         self::assertStringNotContainsString('scheduled story', $body);
         self::assertStringNotContainsString('Nothing published yet.', $body);

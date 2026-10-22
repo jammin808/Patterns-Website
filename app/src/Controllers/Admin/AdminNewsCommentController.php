@@ -70,7 +70,8 @@ final class AdminNewsCommentController extends Controller
             $db,
             'SELECT c.id, c.article_id, c.user_id, c.body, c.status, c.reports, c.created_at, c.updated_at,'
             . ' u.name AS author_name, u.email AS author_email, u.role AS author_role,'
-            . ' a.title AS article_title, a.slug AS article_slug, a.status AS article_status, a.published_at AS article_published_at'
+            . ' a.title AS article_title, a.slug AS article_slug, a.status AS article_status, a.published_at AS article_published_at,'
+            . ' (SELECT ac.category FROM news_article_categories ac WHERE ac.article_id = a.id ORDER BY ac.position, ac.category LIMIT 1) AS article_category'
             . ' FROM news_comments c JOIN users u ON u.id = c.user_id JOIN news_articles a ON a.id = c.article_id'
             . ' WHERE ' . $where . ' ORDER BY ' . $order,
             $params,

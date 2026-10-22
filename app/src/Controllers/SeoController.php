@@ -10,56 +10,167 @@ use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\News\ArticleStore;
-use Psc\News\Categories;
 use Psc\News\Images;
+use Psc\News\Paths;
+use Psc\News\Runs;
 use Psc\News\Settings;
 
 /**
  * sitemap.xml, robots.txt, llms.txt, the web manifest, security.txt and a health check, built from content/ and,
  * for Industry Updates, from the live articles (read in a try, so each file still answers when the database cannot,
  * then never stored, so the copy without the articles does not outlive the outage in a cache).
+ *
+ * The site's sitemap lists its pages, the news hub and each category hub that has a live article, never an article,
+ * so it stays small however many there are. The articles have the section's own (Paths::sitemap()): an index of
+ * one sitemap per London month with live articles, each listing that month's articles with their lead images, and
+ * a news sitemap of the articles that went live in the last NEWS_SITEMAP_HOURS. Those answer 503 with Retry-After,
+ * never stored, while the articles cannot be read.
  */
 final class SeoController extends Controller
 {
     /** The desk's last tick older than this, with the desk on and a key set, means its cron has stopped (docs/NEWS.md §6.1). */
-    public const NEWS_STALE_SECONDS = 35 * 60;
+    public const NEWS_STALE_SECONDS = Settings::TICK_STALE;
 
     /** The newest articles llms.txt lists. */
     public const LLMS_ARTICLES = 10;
 
-    /** Live articles read per query while the sitemap is built. */
-    private const SITEMAP_BATCH = 500;
+    /** The site's sitemap, the section's index and its monthly sitemaps: an hour in any cache. */
+    public const SITEMAP_CACHE = 'public, max-age=3600';
+
+    /** The news sitemap changes with every article that goes live, so it is kept no longer than a news page. */
+    public const NEWS_SITEMAP_CACHE = NewsController::CACHE;
+
+    /** How far back the news sitemap reaches: the two days a news search engine reads it for. */
+    public const NEWS_SITEMAP_HOURS = 48;
+
+    public const SITEMAP_NS = 'http://www.sitemaps.org/schemas/sitemap/0.9';
+    public const IMAGE_NS = 'http://www.google.com/schemas/sitemap-image/1.1';
+    public const NEWS_NS = 'http://www.google.com/schemas/sitemap-news/0.9';
 
     public function sitemap(Request $request): Response
     {
         $base = $this->app->baseUrl();
-        $news = self::newsUrls($this->app);
-        $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'];
+        $hubs = self::newsHubs($this->app);
+        $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="' . self::SITEMAP_NS . '">'];
         foreach (Content::pages() as $path => $page) {
             if (!empty($page['noindex'])) {
                 continue;
             }
             $xml[] = '  <url>';
-            $xml[] = '    <loc>' . htmlspecialchars($base . $path, ENT_XML1) . '</loc>';
-            // The news index changes with every article that goes live, so its time is the newest live article's.
-            if ($path === '/news/' && $news !== null && $news !== []) {
+            $xml[] = '    <loc>' . self::x($base . $path) . '</loc>';
+            // The news hub changes with every article that goes live, so its time is the newest live article's.
+            if ($path === Paths::index() && $hubs !== null && $hubs !== []) {
                 $since = !empty($page['updated']) ? (int) strtotime($page['updated'] . ' 00:00:00 UTC') : 0;
-                $xml[] = '    <lastmod>' . gmdate('Y-m-d\TH:i:s\Z', max(max($news), $since)) . '</lastmod>';
+                $xml[] = '    <lastmod>' . self::time(max(max($hubs), $since)) . '</lastmod>';
             } elseif (!empty($page['updated'])) {
-                $xml[] = '    <lastmod>' . htmlspecialchars((string) $page['updated'], ENT_XML1) . '</lastmod>';
+                $xml[] = '    <lastmod>' . self::x((string) $page['updated']) . '</lastmod>';
             }
             $xml[] = '  </url>';
         }
-        foreach ($news ?? [] as $path => $modified) {
+        foreach ($hubs ?? [] as $key => $modified) {
             $xml[] = '  <url>';
-            $xml[] = '    <loc>' . htmlspecialchars($base . $path, ENT_XML1) . '</loc>';
-            $xml[] = '    <lastmod>' . gmdate('Y-m-d\TH:i:s\Z', $modified) . '</lastmod>';
+            $xml[] = '    <loc>' . self::x($base . Paths::category($key)) . '</loc>';
+            $xml[] = '    <lastmod>' . self::time($modified) . '</lastmod>';
             $xml[] = '  </url>';
         }
         $xml[] = '</urlset>';
-        // Without the articles the map is incomplete, so it is not stored anywhere to outlive the outage.
+        // Without the hubs the map is incomplete, so it is not stored anywhere to outlive the outage.
         return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')
-            ->header('Cache-Control', $news !== null ? 'public, max-age=3600' : 'private, no-store');
+            ->header('Cache-Control', $hubs !== null ? self::SITEMAP_CACHE : 'private, no-store');
+    }
+
+    /**
+     * /news/sitemap.xml: a sitemap index of the month sitemaps with live articles, the newest month first, each with
+     * the newest change among its articles, and the news sitemap.
+     */
+    public function newsSitemap(Request $request): Response
+    {
+        $base = $this->app->baseUrl();
+        try {
+            $store = new ArticleStore($this->app);
+            $months = $store->months();
+            $recent = $store->liveSince(time() - self::NEWS_SITEMAP_HOURS * 3600);
+        } catch (\Throwable $e) {
+            return $this->sitemapUnavailable($e);
+        }
+        $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<sitemapindex xmlns="' . self::SITEMAP_NS . '">'];
+        foreach ($months as $month => $modified) {
+            $xml[] = '  <sitemap>';
+            $xml[] = '    <loc>' . self::x($base . Paths::sitemapMonth($month)) . '</loc>';
+            $xml[] = '    <lastmod>' . self::time($modified) . '</lastmod>';
+            $xml[] = '  </sitemap>';
+        }
+        $xml[] = '  <sitemap>';
+        $xml[] = '    <loc>' . self::x($base . Paths::sitemapNews()) . '</loc>';
+        if ($recent !== []) {
+            $xml[] = '    <lastmod>' . self::time(max(array_map([ArticleStore::class, 'lastChange'], $recent))) . '</lastmod>';
+        }
+        $xml[] = '  </sitemap>';
+        $xml[] = '</sitemapindex>';
+        return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')->header('Cache-Control', self::SITEMAP_CACHE);
+    }
+
+    /**
+     * /news/sitemap-{yyyy}-{mm}.xml: the live articles that went live in that London month, the newest first, each with
+     * its last change and its lead image at its widest (the image sitemap's entry). A month without any is a 404.
+     */
+    public function newsSitemapMonth(Request $request): Response
+    {
+        $base = $this->app->baseUrl();
+        try {
+            $articles = (new ArticleStore($this->app))->liveInMonth($request->attr('month'));
+        } catch (\Throwable $e) {
+            return $this->sitemapUnavailable($e);
+        }
+        if ($articles === []) {
+            return $this->notFound();
+        }
+        $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="' . self::SITEMAP_NS . '" xmlns:image="' . self::IMAGE_NS . '">'];
+        foreach ($articles as $a) {
+            $xml[] = '  <url>';
+            $xml[] = '    <loc>' . self::x($base . Paths::article($a)) . '</loc>';
+            $xml[] = '    <lastmod>' . self::time(ArticleStore::lastChange($a)) . '</lastmod>';
+            $picture = is_array($a['image'] ?? null) ? (new NewsController($this->app))->picture($a['image']) : null;
+            if ($picture !== null) {
+                $xml[] = '    <image:image>';
+                $xml[] = '      <image:loc>' . self::x($base . $picture['largest']) . '</image:loc>';
+                $xml[] = '    </image:image>';
+            }
+            $xml[] = '  </url>';
+        }
+        $xml[] = '</urlset>';
+        return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')->header('Cache-Control', self::SITEMAP_CACHE);
+    }
+
+    /**
+     * /news/sitemap-news.xml: a news sitemap of the live articles that went live in the last NEWS_SITEMAP_HOURS, the
+     * newest first: each with the publication (the site's name, as its Organization has it), its language, the time it
+     * went live and its headline.
+     */
+    public function newsSitemapRecent(Request $request): Response
+    {
+        $base = $this->app->baseUrl();
+        try {
+            $articles = (new ArticleStore($this->app))->liveSince(time() - self::NEWS_SITEMAP_HOURS * 3600);
+        } catch (\Throwable $e) {
+            return $this->sitemapUnavailable($e);
+        }
+        $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="' . self::SITEMAP_NS . '" xmlns:news="' . self::NEWS_NS . '">'];
+        foreach ($articles as $a) {
+            $xml[] = '  <url>';
+            $xml[] = '    <loc>' . self::x($base . Paths::article($a)) . '</loc>';
+            $xml[] = '    <news:news>';
+            $xml[] = '      <news:publication>';
+            $xml[] = '        <news:name>' . self::x($this->app->name()) . '</news:name>';
+            $xml[] = '        <news:language>en</news:language>';
+            $xml[] = '      </news:publication>';
+            $xml[] = '      <news:publication_date>' . self::time((int) $a['published_at']) . '</news:publication_date>';
+            $xml[] = '      <news:title>' . self::x((string) $a['title']) . '</news:title>';
+            $xml[] = '    </news:news>';
+            $xml[] = '  </url>';
+        }
+        $xml[] = '</urlset>';
+        return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')->header('Cache-Control', self::NEWS_SITEMAP_CACHE);
     }
 
     public function robots(Request $request): Response
@@ -83,6 +194,7 @@ final class SeoController extends Controller
             $lines[] = '';
         }
         $lines[] = 'Sitemap: ' . $base . '/sitemap.xml';
+        $lines[] = 'Sitemap: ' . $base . Paths::sitemap();
         return Response::text(implode("\n", $lines) . "\n")->header('Cache-Control', 'public, max-age=3600');
     }
 
@@ -125,14 +237,14 @@ final class SeoController extends Controller
             }
         }
         $complete = true;
-        $news = Content::page('/news/');
+        $news = Content::page(Paths::index());
         if ($news !== null) {
             $out[] = '## ' . (string) (Content::get('news')['name'] ?? 'Industry Updates');
             $out[] = '';
-            $out[] = '- [' . ($news['crumb'] ?? $news['title']) . '](' . $base . '/news/): ' . $news['description'];
+            $out[] = '- [' . ($news['crumb'] ?? $news['title']) . '](' . $base . Paths::index() . '): ' . $news['description'];
             try {
                 foreach ((new ArticleStore($this->app))->live(null, null, 1, self::LLMS_ARTICLES)['items'] as $a) {
-                    $out[] = '- [' . self::oneLine((string) $a['title']) . '](' . $base . '/news/' . $a['slug'] . '/): ' . self::oneLine((string) ($a['summary'] ?: $a['dek']));
+                    $out[] = '- [' . self::oneLine((string) $a['title']) . '](' . $base . Paths::article($a) . '): ' . self::oneLine((string) ($a['summary'] ?: $a['dek']));
                 }
             } catch (\Throwable $e) {
                 $this->app->log->exception($e, 'llms news');
@@ -237,8 +349,9 @@ final class SeoController extends Controller
     }
 
     /**
-     * The AI desk as an uptime monitor sees it: off while it has no key or is paused, ok while the cron's last tick
-     * is under NEWS_STALE_SECONDS old, and stale otherwise (the cron line has stopped, or the database cannot say).
+     * The AI desk as an uptime monitor sees it: off while it has no key or is paused, ok while the cron is ticking as
+     * the desk page judges it (Settings::cronState(): the last tick under NEWS_STALE_SECONDS old, or a session still
+     * inside its time), and stale otherwise (the cron line has stopped, or the database cannot say).
      */
     public static function newsState(App $app, bool $database): string
     {
@@ -253,12 +366,11 @@ final class SeoController extends Controller
             if ($settings->get('enabled') !== true) {
                 return 'off';
             }
-            $tick = $settings->lastTick();
+            return $settings->cronState((new Runs($app))->running()) === 'ok' ? 'ok' : 'stale';
         } catch (\Throwable $e) {
             $app->log->exception($e, 'health news');
             return 'stale';
         }
-        return $tick !== null && (int) ($tick['t'] ?? 0) >= time() - self::NEWS_STALE_SECONDS ? 'ok' : 'stale';
     }
 
     /**
@@ -275,42 +387,41 @@ final class SeoController extends Controller
     }
 
     /**
-     * The news addresses the sitemap adds, each with the time it last changed: every live article (its own last
-     * change, or the time it went live if that is later), then each category that has one (its newest such time).
-     * Null when the database cannot be read, which is not the same as no live articles ([]).
+     * The category hubs the site's sitemap adds: each category with a live article, with the newest last change among
+     * them (ArticleStore::lastChange()). Null when the database cannot be read, which is not the same as no live
+     * articles ([]).
      *
-     * @return array<string, int>|null path => Unix time
+     * @return array<string, int>|null key => Unix time
      */
-    public static function newsUrls(App $app): ?array
+    public static function newsHubs(App $app): ?array
     {
-        $articles = [];
-        $categories = [];
         try {
-            $store = new ArticleStore($app);
-            for ($page = 1; ; $page++) {
-                $batch = $store->live(null, null, $page, self::SITEMAP_BATCH);
-                foreach ($batch['items'] as $a) {
-                    $modified = max((int) $a['published_at'], (int) $a['updated_at']);
-                    $articles['/news/' . $a['slug'] . '/'] = $modified;
-                    foreach ($a['categories'] as $key) {
-                        $categories[(string) $key] = max($categories[(string) $key] ?? 0, $modified);
-                    }
-                }
-                if ($page >= $batch['pages']) {
-                    break;
-                }
-            }
+            return (new ArticleStore($app))->categoryTimes();
         } catch (\Throwable $e) {
             $app->log->exception($e, 'sitemap news');
             return null;
         }
-        $out = $articles;
-        foreach (Categories::KEYS as $key) {
-            if (isset($categories[$key])) {
-                $out['/news/category/' . $key . '/'] = $categories[$key];
-            }
-        }
-        return $out;
+    }
+
+    /** A news sitemap while the articles cannot be read: 503, to be asked again, never stored and never indexed. */
+    private function sitemapUnavailable(\Throwable $e): Response
+    {
+        $this->app->log->exception($e, 'news sitemap');
+        return Response::text("The articles cannot be read just now.\n", 503)
+            ->header('Retry-After', (string) NewsController::RETRY_AFTER)
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    /** Text for an XML element or attribute. */
+    private static function x(string $s): string
+    {
+        return htmlspecialchars($s, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /** A W3C date and time in UTC, as sitemaps give them. */
+    private static function time(int $ts): string
+    {
+        return gmdate('Y-m-d\TH:i:s\Z', $ts);
     }
 
     /** Text on one line, for a list item in llms.txt. */

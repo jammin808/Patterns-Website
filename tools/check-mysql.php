@@ -60,6 +60,21 @@ if ((int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$uid]) !
     fwrite(STDERR, "cascade failed\n");
     exit(1);
 }
+// An UPDATE that reads a column it also sets (ArticleStore::publish()): first_live_at is assigned before published_at,
+// because MySQL reads a column assigned earlier in the same SET as its new value and SQLite never does.
+$db->exec('DELETE FROM news_articles WHERE slug = ?', ['ci-check-article']);
+$aid = $db->insert('news_articles', ['slug' => 'ci-check-article', 'title' => 'CI', 'body' => 'B', 'status' => 'published', 'published_at' => $now - 60, 'created_at' => $now, 'updated_at' => $now + 5]);
+$db->exec(
+    "UPDATE news_articles SET first_live_at = COALESCE(first_live_at, CASE WHEN published_at <= ? THEN published_at ELSE NULL END),"
+    . " status = 'published', published_at = ?, updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END WHERE id = ?",
+    [$now, $now + 3600, $now, $now, $aid]
+);
+$article = $db->one('SELECT first_live_at, published_at, updated_at FROM news_articles WHERE id = ?', [$aid]);
+$db->exec('DELETE FROM news_articles WHERE id = ?', [$aid]);
+if ($article === null || (int) $article['first_live_at'] !== $now - 60 || (int) $article['published_at'] !== $now + 3600 || (int) $article['updated_at'] !== $now + 6) {
+    fwrite(STDERR, "article publish update failed\n");
+    exit(1);
+}
 $db->exec('DELETE FROM chat_conversations WHERE id = ?', [$cid]);
 $limiter->clear('ci:x');
 echo "mysql ok\n";

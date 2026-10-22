@@ -16,11 +16,14 @@ function latestMailLink(pattern) {
   throw new Error('no mail link found');
 }
 
-/* The first live article the sitemap lists (category pages and the index are not articles). */
+/* The first live article the section's sitemaps list: its index names a month's sitemap, which lists articles. */
 async function firstArticle(request) {
-  const xml = await (await request.get('/sitemap.xml')).text();
-  const paths = [...xml.matchAll(/<loc>[^<]*?(\/news\/[a-z0-9-]+\/)<\/loc>/g)].map((m) => m[1]).filter((p) => !p.startsWith('/news/category/'));
-  expect(paths.length, 'the sitemap lists at least one article').toBeGreaterThan(0);
+  const index = await (await request.get('/news/sitemap.xml')).text();
+  const month = /<loc>[^<]*?(\/news\/sitemap-\d{4}-\d{2}\.xml)<\/loc>/.exec(index);
+  expect(month, 'the index names a month with articles').not.toBeNull();
+  const xml = await (await request.get(month[1])).text();
+  const paths = [...xml.matchAll(/<loc>[^<]*?(\/news\/[a-z]+\/[a-z0-9-]+\/)<\/loc>/g)].map((m) => m[1]);
+  expect(paths.length, 'the month lists at least one article').toBeGreaterThan(0);
   return paths[0];
 }
 

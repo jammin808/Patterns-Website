@@ -1,18 +1,20 @@
 <?php
 /**
- * /news/{slug}/: one article, in the order docs/NEWS.md §10 sets. The hero holds the breadcrumbs (put there by the
- * layout), the category tags, the headline, the standfirst and the meta line; then the follow-up banner, the lead
- * image or the category's artwork, the body, what is confirmed and what is still speculation (each fact with its
- * badge and its source), what it means, the verdict, the other images, the numbered sources, the later updates,
- * the note on AI-written articles and the comments. Every source link is real (rel nofollow, a new tab) and carries
- * data-news-link, which news.js counts. The page is the same for every visitor; the administrators' preview adds
- * a banner and leaves out the counting and the comments.
+ * /news/{category}/{slug}/: one article, in the order docs/NEWS.md §10 sets. The hero holds the breadcrumbs (put
+ * there by the layout), the category tags (each its hub's link), the headline, the standfirst and the meta line; then
+ * the follow-up banner, the lead image or the category's artwork, the body, what is confirmed and what is still
+ * speculation (each fact with its badge and its source), what it means, the verdict, the other images, the numbered
+ * sources, the later updates, the note on AI-written articles, the newest of its category (More in) and the
+ * comments. Every source link is real (rel nofollow, a new tab) and carries data-news-link, which news.js counts.
+ * Every link to another article is that article's own address. The page is the same for every visitor; the
+ * administrators' preview adds a banner and leaves out the counting and the comments.
  *
  * @var array<string, mixed> $copy  content/news.php
  * @var array<string, mixed> $article  ArticleStore::findBySlug() or find()
  * @var bool $preview
  * @var bool $live
  * @var array{name: string}|null $primary  the primary category
+ * @var string $primaryKey  its key ('' when it has none)
  * @var array<string, array{name: string}> $categories
  * @var string $byline
  * @var int|null $published
@@ -25,14 +27,20 @@
  * @var list<array{html: string, url: string, link: int|null, label: string}> $speculation
  * @var list<array<string, mixed>> $sources  news_links rows
  * @var array{earlier: list<array<string, mixed>>, later: list<array<string, mixed>>} $related
+ * @var list<array<string, mixed>> $more  the newest other live articles of its primary category
  * @var array<string, mixed>|null $lead  NewsController::picture()
  * @var list<array<string, mixed>> $images  the other pictures
  * @var string $aiNote
  * @var list<array<string, mixed>> $comments
+ * @var list<array{0: string, 1: string}> $feeds  the RSS feeds the page names: address, title
  * @var \Psc\View\Seo $seo
  */
+use Psc\News\Paths;
+
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/news.css')) . '">');
-$this->push('head', '<link rel="alternate" type="application/rss+xml" title="' . e($copy['feed']['label'] ?? 'Industry Updates RSS feed') . '" href="/news/feed.xml">');
+foreach ($feeds as [$feedHref, $feedTitle]) {
+    $this->push('head', '<link rel="alternate" type="application/rss+xml" title="' . e($feedTitle) . '" href="' . e($feedHref) . '">');
+}
 if ($published !== null) {
     $this->push('head', '<meta property="article:published_time" content="' . e(date(DATE_ATOM, $published)) . '">');
     $this->push('head', '<meta property="article:modified_time" content="' . e(date(DATE_ATOM, $modified)) . '">');
@@ -54,7 +62,6 @@ $kinds = is_array($copy['kinds'] ?? null) ? $copy['kinds'] : [];
 $newTab = '<span class="u-visually-hidden"> (' . e($copy['new_tab'] ?? 'opens in a new tab') . ')</span>';
 $when = static fn (int $ts): string => '<time datetime="' . e(date(DATE_ATOM, $ts)) . '">' . e(date('j F Y, H:i', $ts)) . '</time>';
 $verdict = $copy['verdicts'][(string) ($article['verdict'] ?? '')] ?? null;
-$primaryKey = (string) $article['category'];
 // A source link names its source; the source list's links name their pages.
 $out = static fn (string $url, ?int $id, string $label): string => '<a href="' . e($url) . '" rel="nofollow noopener" target="_blank"' . ($id !== null ? ' data-news-link="' . $id . '"' : '') . '>' . e($label) . $newTab . '</a>';
 // Tell us (in the editable note) is the way to the contact page.
@@ -77,7 +84,7 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
             <?php if ($article['categories'] !== []): ?>
                 <ul class="news-tags" role="list" aria-label="<?= e($copy['categories_label'] ?? 'Categories') ?>">
                     <?php foreach ($article['categories'] as $key): ?>
-                        <li><a class="c-tag" href="/news/category/<?= e($key) ?>/"><?= e($categories[$key]['name'] ?? $key) ?></a></li>
+                        <li><a class="c-tag" href="<?= e(Paths::category($key)) ?>"><?= e($categories[$key]['name'] ?? $key) ?></a></li>
                     <?php endforeach; ?>
                 </ul>
             <?php endif; ?>
@@ -101,7 +108,7 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
                 <strong class="c-callout-title"><?= e($sections['follow_up'] ?? 'Follow-up to') ?>:</strong>
                 <ul>
                     <?php foreach ($related['earlier'] as $r): ?>
-                        <li><a href="/news/<?= e($r['slug']) ?>/"><?= e($r['title']) ?></a></li>
+                        <li><a href="<?= e(Paths::article($r)) ?>"><?= e($r['title']) ?></a></li>
                     <?php endforeach; ?>
                 </ul>
             </div>
@@ -191,7 +198,7 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
                 <h2 id="news-later"><?= e($sections['later'] ?? 'Later updates') ?></h2>
                 <ul class="news-later" role="list">
                     <?php foreach ($related['later'] as $r): ?>
-                        <li><a href="/news/<?= e($r['slug']) ?>/"><?= e($r['title']) ?></a><?php if ($r['published_at'] !== null): ?> <time datetime="<?= e(date(DATE_ATOM, (int) $r['published_at'])) ?>"><?= e(date_short((int) $r['published_at'])) ?></time><?php endif; ?></li>
+                        <li><a href="<?= e(Paths::article($r)) ?>"><?= e($r['title']) ?></a><?php if ($r['published_at'] !== null): ?> <time datetime="<?= e(date(DATE_ATOM, (int) $r['published_at'])) ?>"><?= e(date_short((int) $r['published_at'])) ?></time><?php endif; ?></li>
                     <?php endforeach; ?>
                 </ul>
             </section>
@@ -202,6 +209,23 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
                 <?= icon('sparkles') ?>
                 <p><?= $note ?></p>
             </div>
+        <?php endif; ?>
+
+        <?php if ($primary !== null): ?>
+            <section class="news-part news-more" aria-labelledby="news-more">
+                <h2 id="news-more"><?= e(strtr((string) ($sections['more'] ?? 'More in :category'), [':category' => $primary['name']])) ?></h2>
+                <?php if ($more !== []): ?>
+                    <ul class="news-more-list" role="list">
+                        <?php foreach ($more as $m): ?>
+                            <li>
+                                <a href="<?= e(Paths::article($m)) ?>"><?= e($m['title']) ?></a>
+                                <span class="news-more-meta"><time datetime="<?= e(date(DATE_ATOM, (int) $m['published_at'])) ?>"><?= e(date_short((int) $m['published_at'])) ?></time><span><?= e(strtr((string) ($meta['read'] ?? ':n min read'), [':n' => (string) \Psc\News\Prose::readMinutes((int) $m['word_count'])])) ?></span></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+                <p class="news-more-all"><a class="c-btn c-btn--secondary" href="<?= e(Paths::category($primaryKey)) ?>"><?= e(strtr((string) ($sections['more_all'] ?? 'All :category news'), [':category' => $primary['name']])) ?></a></p>
+            </section>
         <?php endif; ?>
 
         <?php if ($preview): ?>

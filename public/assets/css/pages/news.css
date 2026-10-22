@@ -116,4 +116,22 @@
   .news-later { list-style: none; padding: 0; display: grid; gap: 10px;
     & a { font-weight: 600; } & time { margin-left: 8px; font-size: var(--fs-0); color: var(--text-2); } }
   .news-preview-comments { font-size: var(--fs-1); color: var(--text-2); }
+
+  /* ===== An article's end: the newest of its category (More in), each a link with its date, and the way to the
+     category's hub ===== */
+  .news-more-list { list-style: none; padding: 0; border-top: 1px solid var(--line);
+    & li { display: grid; gap: 4px; padding-block: 14px; border-bottom: 1px solid var(--line); }
+    & a { font-size: var(--fs-3); font-weight: 650; line-height: 1.3; text-decoration-color: var(--line-2); }
+    & a:hover { text-decoration-color: currentColor; } }
+  .news-more-meta { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: var(--fs-0); color: var(--text-2);
+    & > :not(:last-child)::after { content: "·" / ""; margin-inline: 8px; color: var(--text-3); } }
+  .news-more-all { margin: 0; }
+
+  /* ===== The way across the silo at a list's foot: the hub and each category with articles, as 44px links ===== */
+  .news-silo { display: grid; gap: var(--sp-4); margin-top: var(--section-y); padding-top: var(--sp-6); border-top: 1px solid var(--line); }
+  .news-silo-title { font-size: var(--fs-4); }
+  .news-silo-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px;
+    & a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
+      font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; transition: border-color var(--d-1) var(--e-cut); }
+    & a:hover { border-color: var(--text-2); } }
 }

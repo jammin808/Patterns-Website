@@ -11,7 +11,9 @@ namespace Psc\News;
  * published or scheduled, except that an administrator's draft needs its headline.
  *
  * Rules by origin: an AI draft's sources and links must come from the research (refs), and an address the desk
- * may not use is dropped or unlinked rather than refused; an AI draft's overshoots that lose nothing are fixed
+ * may not use is dropped or unlinked rather than refused; it may follow up and link to live articles only (a link to
+ * one that is not live keeps its text, a follow-up of one is refused), and every link to a live article is written
+ * as that article's own address (Paths::article()) whoever wrote it; an AI draft's overshoots that lose nothing are fixed
  * with a warning (fit()), and its lengths only a rewrite can fix are repairable (Result::repairable()); banned
  * topics and duplicates refuse AI and import drafts and only warn on manual ones; the phrases to avoid hold an AI
  * draft for repair or review. Errors are in an administrator's words, keyed by field (sources.2.url for a field in
@@ -269,8 +271,8 @@ final class Validator
     }
 
     /**
-     * Every follow-up must be an article that exists (not this one); they are resolved to ids. Returns the
-     * canonical keys of their sources, which an AI draft may link to.
+     * Every follow-up must be an article that exists (not this one), and for an AI draft one that is live; they are
+     * resolved to ids. Returns the canonical keys of their sources, which an AI draft may link to.
      *
      * @return list<string>
      */
@@ -285,6 +287,11 @@ final class Validator
                 } else {
                     $r->reject('follow_up', 'The earlier article ' . $f . ' does not exist.');
                 }
+                continue;
+            }
+            // The desk follows up only what readers can see: an article not live may still change or go.
+            if ($ctx->origin === 'ai' && !$this->store->isLive($row)) {
+                $r->reject('follow_up', 'The earlier article ' . $f . ' is not published.');
                 continue;
             }
             if (!in_array((int) $row['id'], $ids, true)) {
@@ -408,13 +415,16 @@ final class Validator
      * Links in the body, the impact and the confirmed and speculation items (all Markdown, all printed as links).
      * Every writer's must be http(s) addresses on named sites, never on a banned site; an AI draft's must also be on
      * this site, one of the research's addresses, or a source of an article it follows up, and any other keeps only
-     * its text. Runs after checkItems(), so an item's field names the item as it is kept.
+     * its text. A link on this site to an article (Paths::parse()) is written as that article's own address while it
+     * is live; an AI draft's link to one that is not live, or not there, keeps only its text. Runs after
+     * checkItems(), so an item's field names the item as it is kept.
      *
      * @param list<string> $followSources
      */
     private function checkLinks(Draft $d, Context $ctx, Result $r, array $followSources): void
     {
         $ai = $ctx->origin === 'ai';
+        $store = $this->store;
         $allowed = array_merge($d->sourceKeys(), $followSources);
         foreach ($ctx->refs as $ref) {
             $key = is_array($ref) && is_string($ref['url'] ?? null) ? Urls::key($ref['url']) : null;
@@ -423,9 +433,23 @@ final class Validator
             }
         }
         // One link's address, judged: the link as written, its text alone (AI), or an error on the field.
-        $check = static fn (string $md, string $field): string => (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', static function (array $m) use ($ctx, $r, $ai, $allowed, $field): string {
+        $check = static fn (string $md, string $field): string => (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', static function (array $m) use ($ctx, $r, $ai, $allowed, $field, $store): string {
             $href = $m[2];
             if (Urls::isOwn($href, $ctx->baseUrl !== '' ? $ctx->baseUrl : 'https://invalid.invalid') || !preg_match('#^https?://#i', $href)) {
+                // On this site: an article's link goes to its own address, and the desk links only to live ones.
+                $named = Paths::parse((string) parse_url($href, PHP_URL_PATH));
+                if ($named === null) {
+                    return $m[0];
+                }
+                $article = $store->findBySlug($named['slug'], false);
+                if ($article !== null && $store->isLive($article)) {
+                    $fragment = (string) parse_url($href, PHP_URL_FRAGMENT);
+                    return '[' . $m[1] . '](' . ($named['comment'] ? Paths::comment($article) : Paths::article($article)) . ($fragment !== '' ? '#' . $fragment : '') . ')';
+                }
+                if ($ai) {
+                    $r->warnings[] = 'Unlinked "' . $m[1] . '": the article it links to is not published.';
+                    return $m[1];
+                }
                 return $m[0];
             }
             $key = Urls::key($href);

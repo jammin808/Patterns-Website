@@ -29,6 +29,30 @@ final class CategoriesTest extends TestCase
         self::assertNull(Categories::get('nope'));
     }
 
+    /**
+     * Each key is a path segment of its hub and its articles (Paths), so none is a word the routes use, none holds
+     * anything but lower-case letters (no dot, so never a file such as feed.xml or a sitemap), and every hub's title and
+     * description is its own.
+     */
+    public function testEveryKeyIsAPathOfItsOwnAndEveryHubSaysSomethingOfItsOwn(): void
+    {
+        foreach (Categories::KEYS as $key) {
+            self::assertMatchesRegularExpression('/^[a-z]+$/', $key);
+            self::assertNotContains($key, \Psc\News\Paths::RESERVED, $key);
+            self::assertStringStartsNotWith('sitemap', $key);
+            self::assertSame('/news/' . $key . '/', \Psc\News\Paths::category($key));
+            self::assertSame('/assets/img/og/news-' . $key . '.png', Categories::shareCard($key));
+            self::assertStringEndsWith(' | Industry Updates', Categories::get($key)['title']);
+            self::assertSame(Categories::get($key)['title'], Categories::headline($key) . ' | Industry Updates');
+        }
+        $all = Categories::all();
+        self::assertSame(count($all), count(array_unique(array_column($all, 'title'))), 'every title its own');
+        self::assertSame(count($all), count(array_unique(array_column($all, 'description'))), 'every description its own');
+        self::assertNotContains(Content::page('/news/')['title'], array_column($all, 'title'));
+        self::assertNotContains(Content::page('/news/')['description'], array_column($all, 'description'));
+        self::assertSame('', Categories::headline('nope'));
+    }
+
     public function testEachCategoryPageHasATitleDescriptionIntroAndIcon(): void
     {
         $sprite = (string) file_get_contents(PSC_ROOT . '/public/assets/img/icons.svg');
@@ -62,6 +86,8 @@ final class CategoriesTest extends TestCase
             'sources' => 'Sources',
             'later' => 'Later updates',
             'follow_up' => 'Follow-up to',
+            'more' => 'More in :category',
+            'more_all' => 'Every article in :category',
         ], $news['sections']);
         self::assertSame('Industry Updates', $news['index']['title']);
         foreach (['index', 'category', 'search'] as $state) {

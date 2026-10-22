@@ -12,9 +12,11 @@ use Psc\Db\Database;
  * every page uses. Every save stores the draft as Draft::normalised() gives it (no em dash reaches the database),
  * fills in the SEO title and meta description when they were left empty, registers each link once by its
  * canonical key (the sources, then every other external address in the body, impact and items) keeping the click
- * counts of links that stay, counts the words and makes the slug unique (-2, -3 ...): a new article's comes from
- * Draft::slugBase(), and a stored one's changes only when a draft names one. Each write is one transaction; a slug
- * taken by a concurrent save is retried with the next number.
+ * counts of links that stay, counts the words and makes the slug unique (-2, -3 ...) and clear of the words the
+ * routes use (Paths::isReserved()): a new article's comes from Draft::slugBase(), and a stored one's changes only
+ * when a draft names one and never once the article has been live (hasBeenLive()), so an address that has been
+ * shared always finds it. Each write is one transaction; a slug taken by a concurrent save is retried with the next
+ * number.
  *
  * Live means status published and published_at at or before now; a published article with a later time is
  * scheduled. Rows come back with confirmed and speculation decoded to lists of {text, url}, plus categories (the
@@ -28,7 +30,13 @@ final class ArticleStore
     /** Where article images are stored, under storage. */
     public const IMAGE_DIR = 'uploads/news';
 
+    /** A change within this many seconds of going live (or of being stored) is part of publishing, not an update. */
+    public const UPDATED_AFTER = 600;
+
     private const SLUG_TRIES = 20;
+
+    /** The primary category of the article a, for rows that are not hydrated. */
+    private const PRIMARY = '(SELECT c.category FROM news_article_categories c WHERE c.article_id = a.id ORDER BY c.position, c.category LIMIT 1)';
 
     private const LIST_COLUMNS = 'a.id, a.slug, a.title, a.seo_title, a.dek, a.summary, a.verdict, a.tags, a.byline, a.status,'
         . ' a.published_at, a.origin, a.ai_written, a.story_key, a.comments_open, a.comment_count, a.word_count, a.created_at, a.updated_at';
@@ -80,7 +88,8 @@ final class ArticleStore
      * Changes an article's words, categories, sources and follow-ups, and returns the names of the fields that
      * changed (the article JSON's names: title, body, sources ...); nothing changed is [] and writes nothing. Its
      * status and time are changed only by publish() and unpublish(), its origin never, its slug only when the
-     * draft names one. An AI article stays AI-written. Throws for an article that does not exist.
+     * draft names one and the article has never been live. An AI article stays AI-written. Throws for an article
+     * that does not exist.
      *
      * $expectedUpdatedAt is the updated_at of the row the editor's form was made from. When it is given and the
      * article has been saved, published or unpublished since, nothing is written and the answer is null, so a stale
@@ -115,7 +124,7 @@ final class ArticleStore
             }
         }
         $slug = null;
-        if ($d->slug !== null && $d->slug !== $old['slug']) {
+        if ($d->slug !== null && $d->slug !== $old['slug'] && !self::hasBeenLive($old)) {
             $changed[] = 'slug';
             $slug = $d->slug;
         }
@@ -171,6 +180,10 @@ final class ArticleStore
     /**
      * Publishes an article at $at (a later time schedules it), or else at the time it was first published, or now.
      * False when it was already published at that time, or does not exist.
+     *
+     * Like every other write it moves updated_at past where it was (to now, or one second on when a save has already
+     * put it there), so a form opened before it is stale; and a time the article already went live is kept in
+     * first_live_at before a new time replaces it (hasBeenLive()).
      */
     public function publish(int $id, ?int $at = null): bool
     {
@@ -185,20 +198,27 @@ final class ArticleStore
         if ($row['status'] === 'published' && $first === $when) {
             return false;
         }
-        return $db->update('news_articles', ['status' => 'published', 'published_at' => $when, 'updated_at' => $now], ['id' => $id]) === 1;
+        // first_live_at is set first: MySQL reads a column assigned earlier in the same SET as its new value.
+        return $db->exec(
+            "UPDATE news_articles SET first_live_at = COALESCE(first_live_at, CASE WHEN published_at <= ? THEN published_at ELSE NULL END),"
+            . " status = 'published', published_at = ?, updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END WHERE id = ?",
+            [$now, $when, $now, $now, $id]
+        ) === 1;
     }
 
     /**
      * Takes a published or scheduled article back to a draft, keeping its time if it went live then; a schedule that
      * never arrived is dropped, so publishing it later goes live then, not at the slot it missed. False when it was
-     * not published.
+     * not published. updated_at moves on as publish() moves it, and a time it went live is kept in first_live_at.
      */
     public function unpublish(int $id): bool
     {
         $now = time();
         return $this->db()->exec(
-            "UPDATE news_articles SET status = 'draft', published_at = CASE WHEN published_at > ? THEN NULL ELSE published_at END, updated_at = ? WHERE id = ? AND status = 'published'",
-            [$now, $now, $id]
+            "UPDATE news_articles SET first_live_at = COALESCE(first_live_at, CASE WHEN published_at <= ? THEN published_at ELSE NULL END),"
+            . " status = 'draft', published_at = CASE WHEN published_at > ? THEN NULL ELSE published_at END,"
+            . " updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END WHERE id = ? AND status = 'published'",
+            [$now, $now, $now, $now, $id]
         ) === 1;
     }
 
@@ -235,7 +255,7 @@ final class ArticleStore
         return $row !== null ? $this->hydrate($row) : null;
     }
 
-    /** @return array<string, mixed>|null the article at /news/{slug}/: live only, unless $liveOnly is false */
+    /** @return array<string, mixed>|null the article whose slug this is (Paths::article()): live only, unless $liveOnly is false */
     public function findBySlug(string $slug, bool $liveOnly = true): ?array
     {
         $slug = strtolower(trim($slug));
@@ -371,7 +391,8 @@ final class ArticleStore
 
     /**
      * The articles this one follows up (earlier) and those that follow it up (later), the oldest first; live ones
-     * only unless $liveOnly is false. Rows: id, slug, title, status, published_at.
+     * only unless $liveOnly is false. Rows: id, slug, title, status, published_at and category (the primary, for
+     * Paths::article()).
      *
      * @return array{earlier: list<array<string, mixed>>, later: list<array<string, mixed>>}
      */
@@ -379,7 +400,7 @@ final class ArticleStore
     {
         $live = $liveOnly ? " AND a.status = 'published' AND a.published_at <= ?" : '';
         $params = $liveOnly ? [$id, time()] : [$id];
-        $cols = 'a.id, a.slug, a.title, a.status, a.published_at';
+        $cols = 'a.id, a.slug, a.title, a.status, a.published_at, ' . self::PRIMARY . ' AS category';
         return [
             'earlier' => $this->db()->all("SELECT {$cols} FROM news_related r JOIN news_articles a ON a.id = r.related_id WHERE r.article_id = ?{$live} ORDER BY COALESCE(a.published_at, a.created_at), a.id", $params),
             'later' => $this->db()->all("SELECT {$cols} FROM news_related r JOIN news_articles a ON a.id = r.article_id WHERE r.related_id = ?{$live} ORDER BY COALESCE(a.published_at, a.created_at), a.id", $params),
@@ -396,6 +417,135 @@ final class ArticleStore
     public function isLive(array $row, ?int $now = null): bool
     {
         return ($row['status'] ?? '') === 'published' && ($row['published_at'] ?? null) !== null && (int) $row['published_at'] <= ($now ?? time());
+    }
+
+    /**
+     * Whether the article has ever been live: it went live at a time that has passed (published_at, which a takedown
+     * keeps), or first_live_at kept that time before a reschedule moved it. From then on its slug never changes.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function hasBeenLive(array $row, ?int $now = null): bool
+    {
+        return ($row['first_live_at'] ?? null) !== null
+            || (($row['published_at'] ?? null) !== null && (int) $row['published_at'] <= ($now ?? time()));
+    }
+
+    /**
+     * When the article was updated after it went live: its last change, when that came more than UPDATED_AFTER after
+     * it went live and after it was stored (an import dated earlier than it was stored has not changed since), else
+     * null. The page's "Updated" line and its dateModified.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function updatedAfterLive(array $row): ?int
+    {
+        if (($row['published_at'] ?? null) === null) {
+            return null;
+        }
+        $changed = (int) $row['updated_at'];
+        return $changed - max((int) $row['published_at'], (int) $row['created_at']) > self::UPDATED_AFTER ? $changed : null;
+    }
+
+    /**
+     * The article's last change that counts: updatedAfterLive(), else the time it went live (else its last save). What
+     * the page's dateModified, the feeds and the sitemaps all give.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function lastChange(array $row): int
+    {
+        return self::updatedAfterLive($row) ?? (($row['published_at'] ?? null) !== null ? (int) $row['published_at'] : (int) $row['updated_at']);
+    }
+
+    /**
+     * Up to $limit of the newest live articles in a category, never $exceptId: an article's "More in" list. Rows as
+     * live() gives them (no body, no image).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function moreIn(string $category, int $exceptId, int $limit): array
+    {
+        if (!Categories::has($category) || $limit <= 0) {
+            return [];
+        }
+        $rows = $this->db()->all(
+            'SELECT ' . self::LIST_COLUMNS . " FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ? AND a.id <> ?"
+            . ' AND EXISTS (SELECT 1 FROM news_article_categories c WHERE c.article_id = a.id AND c.category = ?)'
+            . ' ORDER BY a.published_at DESC, a.id DESC LIMIT ' . $limit,
+            [time(), $exceptId, $category]
+        );
+        return $this->hydrateList($rows, false);
+    }
+
+    /**
+     * Each category with live articles, with the newest lastChange() among them, in Categories::KEYS order: when its
+     * hub last changed.
+     *
+     * @return array<string, int> key => Unix time
+     */
+    public function categoryTimes(): array
+    {
+        $times = [];
+        foreach ($this->db()->all(
+            'SELECT c.category, a.published_at, a.updated_at, a.created_at FROM news_article_categories c JOIN news_articles a ON a.id = c.article_id'
+            . " WHERE a.status = 'published' AND a.published_at <= ?",
+            [time()]
+        ) as $row) {
+            $key = (string) $row['category'];
+            $times[$key] = max($times[$key] ?? 0, self::lastChange($row));
+        }
+        $out = [];
+        foreach (Categories::KEYS as $key) {
+            if (isset($times[$key])) {
+                $out[$key] = $times[$key];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * The London months with live articles, the newest first, each with the newest lastChange() among its articles:
+     * the section's sitemaps, one a month.
+     *
+     * @return array<string, int> YYYY-MM => Unix time
+     */
+    public function months(): array
+    {
+        $zone = new \DateTimeZone(Schedule::ZONE);
+        $out = [];
+        foreach ($this->db()->all("SELECT a.published_at, a.updated_at, a.created_at FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ?", [time()]) as $row) {
+            $month = (new \DateTimeImmutable('@' . (int) $row['published_at']))->setTimezone($zone)->format('Y-m');
+            $out[$month] = max($out[$month] ?? 0, self::lastChange($row));
+        }
+        krsort($out, SORT_STRING);
+        return $out;
+    }
+
+    /**
+     * The live articles that went live in one London month (YYYY-MM), the newest first, each with its lead image
+     * (image, or null). Empty for a month that is not one.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function liveInMonth(string $month): array
+    {
+        $zone = new \DateTimeZone(Schedule::ZONE);
+        $start = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month) === 1 ? \DateTimeImmutable::createFromFormat('!Y-m-d', $month . '-01', $zone) : false;
+        if ($start === false) {
+            return [];
+        }
+        return $this->liveBetween($start->getTimestamp(), $start->modify('first day of next month')->getTimestamp());
+    }
+
+    /**
+     * The live articles that went live at or after $since, the newest first, each with its lead image (image, or null).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function liveSince(int $since): array
+    {
+        return $this->liveBetween($since, PHP_INT_MAX);
     }
 
     /**
@@ -531,17 +681,39 @@ final class ArticleStore
         ];
     }
 
-    /** The first free slug among $base, $base-2, $base-3 ..., skipping $skip free ones (a retry after a clash). */
+    /**
+     * The first free slug among $base, $base-2, $base-3 ... (Paths::numbered()), passing over the words the routes use
+     * and the category keys, and skipping $skip free ones (a retry after a clash).
+     */
     private function uniqueSlug(Database $db, string $base, ?int $exceptId, int $skip): string
     {
         $base = $base !== '' ? $base : 'article';
         for ($n = 1; ; $n++) {
-            $slug = $n === 1 ? $base : $base . '-' . $n;
+            $slug = Paths::numbered($base, $n);
+            if (Paths::isReserved($slug)) {
+                continue;
+            }
             $id = $db->value('SELECT id FROM news_articles WHERE slug = ?', [$slug]);
             if (($id === null || (int) $id === $exceptId) && $skip-- <= 0) {
                 return $slug;
             }
         }
+    }
+
+    /**
+     * The live articles that went live in [$from, $to), the newest first, with their lead images.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function liveBetween(int $from, int $to): array
+    {
+        $now = time();
+        $rows = $this->db()->all(
+            'SELECT ' . self::LIST_COLUMNS . " FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ? AND a.published_at >= ? AND a.published_at < ?"
+            . ' ORDER BY a.published_at DESC, a.id DESC',
+            [$now, $from, min($to, $now + 1)]
+        );
+        return $this->hydrateList($rows, true);
     }
 
     /** @param list<string> $categories */

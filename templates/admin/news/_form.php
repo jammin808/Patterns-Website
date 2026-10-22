@@ -1,7 +1,8 @@
 <?php
 /**
  * The article editor (docs/NEWS.md §11), shared by the new and edit pages, in the order an article reads: the error
- * summary; the headline, SEO title and meta description; the standfirst, the body, what is confirmed and what is
+ * summary; the headline, SEO title, address and meta description (the address is the administrator's to change only
+ * until the article has been live; after that it is shown, never offered); the standfirst, the body, what is confirmed and what is
  * still speculation; what it means, the verdict and its note; the categories and tags; the sources; the articles it
  * follows up; the byline and the ticks; the schedule; then the buttons the article's state allows. Every button
  * saves what is in the form first (Unpublish takes the article down even when the save is refused), and a save over
@@ -23,9 +24,13 @@
  * @var string $deskByline
  * @var int $spare
  */
+use Psc\News\ArticleStore;
+use Psc\News\Paths;
 use Psc\News\Validator;
 
 $state ??= null;
+$frozen = $article !== null && ArticleStore::hasBeenLive($article);
+$address = $article !== null ? Paths::article($article) : null;
 $err = static fn (string $k): ?string => $errors[$k] ?? null;
 $field = fn (array $p): string => $this->render('admin/news/_field', $p);
 $origin = (string) ($article['origin'] ?? 'manual');
@@ -36,7 +41,7 @@ $chosen = array_map('strval', $values['categories']);
 $rowFields = ['confirmed' => ['text', 'url'], 'speculation' => ['text', 'url'], 'sources' => ['url', 'title', 'publisher', 'kind']];
 
 // The summary's links, in the order of the page; a list's own error links to its first control.
-$summary = ['title' => 'f-title', 'seo_title' => 'f-seo-title', 'summary' => 'f-summary', 'dek' => 'f-dek', 'body' => 'f-body'];
+$summary = ['title' => 'f-title', 'seo_title' => 'f-seo-title', 'slug' => 'f-slug', 'summary' => 'f-summary', 'dek' => 'f-dek', 'body' => 'f-body'];
 $rowLinks = static function (string $list) use ($values, $rowFields): array {
     $links = [$list => $list . '-0-' . $rowFields[$list][0]];
     foreach (array_keys($values[$list]) as $i) {
@@ -81,6 +86,16 @@ $buttons = match ($state) {
         'help' => 'The heading readers see, 10 to 160 characters. A draft needs nothing else.', 'attrs' => ['autocomplete' => 'off']]) ?>
     <?= $field(['name' => 'seo_title', 'label' => 'SEO title', 'value' => $values['seo_title'], 'error' => $err('seo_title'), 'count' => Validator::SEO_TITLE_MAX,
         'help' => 'The title search results and browser tabs show, up to 60 characters. Leave it empty to use the headline.', 'attrs' => ['autocomplete' => 'off']]) ?>
+    <?php if ($frozen): ?>
+        <div class="pt-field">
+            <p><strong>Address</strong> <span class="pt-mono"><?= e((string) $address) ?></span></p>
+            <p class="pt-help">The article has been live at this address, so it never changes: links to it keep working. A change of main category moves it to that category, and the old address leads there.</p>
+        </div>
+    <?php else: ?>
+        <?= $field(['name' => 'slug', 'label' => 'Address', 'value' => $values['slug'], 'error' => $err('slug'), 'count' => Paths::SLUG_MAX,
+            'help' => ($address !== null ? 'Now ' . $address . '. ' : '') . 'The words after /news/ and the main category, in lower case with hyphens, up to ' . Paths::SLUG_MAX . ' characters. Leave it empty to make it from the SEO title or the headline. It can change until the article has been live; after that it never does.',
+            'attrs' => ['autocomplete' => 'off', 'spellcheck' => 'false']]) ?>
+    <?php endif; ?>
     <?= $field(['name' => 'summary', 'label' => 'Meta description', 'kind' => 'textarea', 'value' => $values['summary'], 'error' => $err('summary'), 'count' => Validator::SUMMARY_MAX,
         'help' => 'What search results show under the title, 50 to 155 characters. Leave it empty to use the standfirst.', 'attrs' => ['rows' => 2]]) ?>
 

@@ -142,15 +142,53 @@ final class ValidatorTest extends TestCase
 
     public function testFollowUpsMustExistAndResolveToIds(): void
     {
-        $earlier = $this->makeArticle(['slug' => 'the-earlier-story']);
+        $earlier = $this->makeArticle(['slug' => 'earlier-story']);
         self::assertSame('Choose the earlier articles from the list.', $this->check(Draft::fromArray(self::article(['follow_up_of' => ['999']]), 'manual'), 'manual')->errors['follow_up_of'] ?? null);
         $missing = $this->check(Draft::fromArray(self::article(['follow_up_of' => ['no-such-story']]), 'import'), 'import');
         self::assertSame([['rule' => 'follow_up', 'detail' => 'The earlier article no-such-story does not exist.']], $missing->rejections);
-        $found = $this->check(Draft::fromArray(self::article(['follow_up_of' => ['the-earlier-story']]), 'import'), 'import');
+        $found = $this->check(Draft::fromArray(self::article(['follow_up_of' => ['earlier-story']]), 'import'), 'import');
         self::assertTrue($found->ok(), implode('; ', $found->reasons()));
         self::assertSame([$earlier], $found->followUps);
         self::assertSame([$earlier], $found->draft->followUps);
         self::assertArrayHasKey('follow_up_of', $this->check(Draft::fromArray(self::article(['follow_up_of' => [$earlier]]), 'manual'), 'manual', 'publish', ['editingId' => $earlier])->errors, 'never its own follow-up');
+    }
+
+    /**
+     * The desk links to and follows up only articles readers can see: a link on this site to an article that is not
+     * live (or not there) keeps only its text, a declared follow-up of one is refused; and every writer's link to a
+     * live article is written as that article's own address (Paths::article()).
+     */
+    public function testTheDeskLinksToAndFollowsUpLiveArticlesOnlyAtTheirOwnAddresses(): void
+    {
+        $live = $this->makeArticle(['slug' => 'live-console-story', 'categories' => ['audio', 'video']]);
+        $draft = $this->makeArticle(['slug' => 'unpublished-console-story', 'status' => 'draft']);
+        $scheduled = $this->makeArticle(['slug' => 'scheduled-console-story', 'published_at' => time() + 3600]);
+        $body = self::article()['body'] . ' Read [the earlier story](/news/live-console-story/), [its comments](' . self::BASE . '/news/video/live-console-story/comment/#comments),'
+            . ' [a draft](/news/video/unpublished-console-story/), [a scheduled one](/news/scheduled-console-story/), [a slug no one has](/news/video/no-such-story/),'
+            . ' [a hub](/news/audio/) and [our guide](/workflows/).';
+
+        $ai = $this->check(Draft::fromArray(self::aiArticle(['body' => $body]), 'ai', self::refs()), 'ai', 'publish', ['refs' => self::refs()]);
+        self::assertTrue($ai->ok(), implode('; ', $ai->reasons()));
+        $text = $ai->draft->body;
+        self::assertStringContainsString('[the earlier story](/news/audio/live-console-story/)', $text, 'at its own address');
+        self::assertStringContainsString('[its comments](/news/audio/live-console-story/comment/#comments)', $text);
+        self::assertStringContainsString(' a draft, a scheduled one, a slug no one has,', $text, 'unlinked, keeping their words');
+        self::assertStringContainsString('[a hub](/news/audio/)', $text, 'a hub is no article');
+        self::assertStringContainsString('[our guide](/workflows/)', $text);
+        self::assertContains('Unlinked "a draft": the article it links to is not published.', $ai->warnings);
+
+        $manual = $this->check(Draft::fromArray(self::article(['body' => $body]), 'manual'), 'manual');
+        self::assertStringContainsString('[the earlier story](/news/audio/live-console-story/)', $manual->draft->body, 'every writer\'s link goes to the address');
+        self::assertStringContainsString('[a draft](/news/video/unpublished-console-story/)', $manual->draft->body, 'an administrator may link to a draft to publish later');
+
+        foreach ([$draft, $scheduled] as $id) {
+            $refused = $this->check(Draft::fromArray(self::aiArticle(['follow_up_of' => [$id]]), 'ai', self::refs()), 'ai', 'publish', ['refs' => self::refs()]);
+            self::assertSame([['rule' => 'follow_up', 'detail' => 'The earlier article ' . $id . ' is not published.']], $refused->rejections, (string) $id);
+        }
+        $kept = $this->check(Draft::fromArray(self::aiArticle(['follow_up_of' => [$live], 'story_key' => 'a-new-story']), 'ai', self::refs()), 'ai', 'publish', ['refs' => self::refs()]);
+        self::assertSame([], $kept->rejections, implode('; ', $kept->reasons()));
+        self::assertSame([$live], $kept->followUps);
+        self::assertTrue($this->check(Draft::fromArray(self::article(['follow_up_of' => [$draft]]), 'manual'), 'manual')->ok(), 'an administrator may follow up a draft');
     }
 
     /** @return array<string, array<string, mixed>> */

@@ -448,7 +448,11 @@ final class Pipeline
             $outcomes = [];
             $at = null;
             foreach ($ready as $i => $item) {
-                $again = $this->validator->check($item['result']->draft, $ctx->with(['recent' => null, 'seen' => array_merge($seen, $published, $drafts)]));
+                // Checked again as the desk wrote it: the follow-ups the duplicate rule added are found again (and
+                // held below when not live), while one the desk declared must be live (Validator::checkFollowUps()).
+                $draft = clone $item['result']->draft;
+                $draft->followUps = array_values(array_diff($draft->followUps, $item['result']->autoFollowUps));
+                $again = $this->validator->check($draft, $ctx->with(['recent' => null, 'seen' => array_merge($seen, $published, $drafts)]));
                 if (!$again->ok()) {
                     $outcomes[$i] = ['status' => 'dropped', 'note' => 'Refused when checked again before publishing.', 'rules' => self::rules($again)];
                     continue;
@@ -905,7 +909,7 @@ final class Pipeline
         foreach ($candidate['follow_up_of'] as $id) {
             $a = $this->store->find((int) $id);
             if ($a !== null && $this->store->isLive($a)) {
-                $follows[] = $id . ' (/news/' . $a['slug'] . '/): ' . $a['title'];
+                $follows[] = $id . ' (' . Paths::article($a) . '): ' . $a['title'];
             }
         }
         return [

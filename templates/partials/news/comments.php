@@ -18,7 +18,7 @@
 $comments ??= [];
 $closed ??= (new \Psc\News\Comments($app))->closedReason($article);
 $articleId = (int) $article['id'];
-$page = \Psc\Controllers\NewsCommentController::pagePath($article);
+$page = \Psc\News\Paths::comment($article);
 // The call to action follows security.registration; an unrecognised mode is treated as by invitation (AuthController).
 $canRegister = in_array($app->config->string('security.registration', 'open'), ['open', 'approval'], true);
 $register = '/portal/register/?next=' . rawurlencode($page);

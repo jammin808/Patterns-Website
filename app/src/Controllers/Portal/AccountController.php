@@ -14,8 +14,9 @@ use Psc\Support\Audit;
 use Psc\Support\Uploads;
 
 /**
- * The signed-in person's own account: details, password, a copy of their data, and deleting the account. Every
- * handler acts on the session's account only; nothing posted can name another one.
+ * The signed-in person's own account: details, password, their Industry Updates comments (each with the way to its
+ * comment page, where it can be deleted, also on an article that is no longer live), a copy of their data, and
+ * deleting the account. Every handler acts on the session's account only; nothing posted can name another one.
  *
  * Deleting anonymises rather than removes the row: tickets, ticket comments and licences are business records and
  * stay, shown as "Deleted user"; the name, email, company, password and every sign-in token go. Comments on Industry
@@ -26,6 +27,9 @@ use Psc\Support\Uploads;
 final class AccountController extends Controller
 {
     public const DELETE_WORD = 'DELETE';
+
+    /** The newest of the person's Industry Updates comments the account page lists (the data copy has every one). */
+    public const NEWS_COMMENTS_SHOWN = 50;
 
     /** The profile columns a copy of the data carries (never the password hash or the sign-in counters). */
     private const PROFILE_COLUMNS = ['id', 'email', 'name', 'company', 'role', 'status', 'marketing_opt_in', 'email_verified_at', 'last_login_at', 'created_at', 'updated_at'];
@@ -47,6 +51,8 @@ final class AccountController extends Controller
                 'tickets' => (int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$id]),
             ],
             'newsComments' => (int) $db->value('SELECT COUNT(*) FROM news_comments WHERE user_id = ?', [$id]),
+            // Listed with the way to each comment page, so a comment on an article taken down can still be deleted.
+            'newsList' => (new Comments($this->app))->ofAccount($id, self::NEWS_COMMENTS_SHOWN),
             'deleteWord' => self::DELETE_WORD,
             'soleAdmin' => $this->isSoleAdmin($user),
         ], 'Your account');

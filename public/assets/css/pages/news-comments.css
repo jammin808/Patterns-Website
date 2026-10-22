@@ -2,7 +2,8 @@
  * Industry Updates comments: the section at the foot of an article (templates/partials/news/comments.php, filled in
  * by news-comments.js) and the comment page for readers without scripting (templates/news/comment.php). Everything
  * sits in the components layer and uses the tokens from site.css; no raw colours. A waiting comment is amber and
- * dashed (standing by) beside the words that say so, so colour is never the only cue.
+ * dashed (standing by) beside the words that say so, and a hidden one dotted and dimmed beside its note, so colour is
+ * never the only cue.
  */
 @layer components {
   /* ===== The section: its heading, the list, the box ===== */
@@ -19,6 +20,11 @@
     &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } }
   .news-comment--staff { border-left: 3px solid var(--text); }
   .news-comment--pending { --focus: var(--text); border: 1px dashed var(--ink-standby); background: color-mix(in srgb, var(--lamp-standby) 7%, var(--s1)); }
+  /* Hidden by a moderator, shown to its author alone: set back on the page, dotted, its words dimmed, beside the note
+     that says so (the note, not the look, carries the meaning). */
+  .news-comment--hidden { border: 1px dotted var(--line-2); background: var(--bg);
+    & .news-comment-body { color: var(--text-2); }
+    & .news-comment-note { color: var(--text-2); } }
   .news-comment-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 8px; font-size: var(--fs-0); color: var(--text-2); }
   .news-comment-author { font-size: var(--fs-1); font-weight: 650; color: var(--text); }
   .news-comment-note { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: var(--fs-0); font-weight: 600; color: var(--ink-standby);
@@ -50,5 +56,6 @@
 
   @media (forced-colors: active) {
     .news-comment--pending { border-style: dashed; }
+    .news-comment--hidden { border-style: dotted; }
   }
 }

@@ -10,13 +10,15 @@ use Psc\Db\Database;
 use Psc\Http\Response;
 use Psc\News\ArticleStore;
 use Psc\News\Categories;
+use Psc\News\Paths;
 use Psc\News\Settings;
 use Psc\Tests\TestCase;
 
 /**
- * Industry Updates' public pages (docs/NEWS.md §10): the lists and their indexing rules, the category pages, the
+ * Industry Updates' public pages (docs/NEWS.md §10): the lists and their indexing rules, the category hubs, the
  * article in its order with its head and structured data, the images, the feed, the tracked links and their
- * counting, the sitemap, robots, llms.txt and /health. Headers, rows and the published markup first, words second.
+ * counting, the site's sitemap, robots, llms.txt and /health. Headers, rows and the published markup first, words
+ * second. The silo's addresses, redirects and the section's own sitemaps are NewsSiloTest's.
  */
 final class NewsPagesTest extends TestCase
 {
@@ -48,7 +50,7 @@ final class NewsPagesTest extends TestCase
     /** @return list<string> the slugs the page's cards link to, in order */
     private static function cards(string $body): array
     {
-        preg_match_all('#<article class="c-card news-card[^"]*">\s*<h3 class="c-card-title"><a href="/news/([a-z0-9-]+)/">#', $body, $m);
+        preg_match_all('#<article class="c-card news-card[^"]*">\s*<h3 class="c-card-title"><a href="/news/[a-z]+/([a-z0-9-]+)/">#', $body, $m);
         return $m[1];
     }
 
@@ -115,36 +117,43 @@ final class NewsPagesTest extends TestCase
         self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
         self::assertSame(array_map(static fn (int $i): string => 'story-' . $i, range(1, 12)), self::cards($r->body), 'twelve a page, the newest first');
         self::assertSame(1, substr_count($r->body, 'class="c-card news-card news-card--lead"'));
-        self::assertMatchesRegularExpression('#<article class="c-card news-card news-card--lead">\s*<h3 class="c-card-title"><a href="/news/story-1/">#', $r->body, 'the newest is the wide one');
-        self::assertStringContainsString('<a rel="next" href="/news/?page=2">', $r->body);
+        self::assertMatchesRegularExpression('#<article class="c-card news-card news-card--lead">\s*<h3 class="c-card-title"><a href="/news/video/story-1/">#', $r->body, 'the newest is the wide one');
+        self::assertStringContainsString('<a rel="next" href="/news/page/2/">', $r->body, 'the next page has a path of its own');
         self::assertStringNotContainsString('rel="prev"', $r->body);
         self::assertStringContainsString('<span class="c-pager-info">1 to 12 of 14</span>', $r->body);
         self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/">', $r->body);
         self::assertSame('index, follow, max-image-preview:large, max-snippet:-1', self::meta($r->body, 'name', 'robots'));
         $list = self::node($r->body, 'ItemList');
         self::assertCount(12, $list['itemListElement']);
-        self::assertSame(self::BASE . '/news/story-1/', $list['itemListElement'][0]['url']);
+        self::assertSame(self::BASE . '/news/video/story-1/', $list['itemListElement'][0]['url'], 'each article at its own address');
         self::assertSame(['@id' => self::BASE . '/news/#list'], self::node($r->body, 'CollectionPage')['mainEntity']);
         self::assertStringContainsString('<link rel="alternate" type="application/rss+xml" title="Industry Updates RSS feed" href="/news/feed.xml">', $r->body);
 
-        $two = $this->request('GET', '/news/?page=2');
+        // Page 2 is a page of its own: indexed, naming itself as canonical, with words of its own.
+        $two = $this->request('GET', '/news/page/2/');
         self::assertSame(200, $two->status);
         self::assertSame(['story-13', 'story-14'], self::cards($two->body));
         self::assertStringNotContainsString('news-card--lead', $two->body, 'only a first page has the wide card');
-        self::assertSame('noindex, follow', self::meta($two->body, 'name', 'robots'));
-        self::assertStringNotContainsString('rel="canonical"', $two->body);
-        self::assertStringNotContainsString('application/ld+json', $two->body);
+        self::assertSame('index, follow, max-image-preview:large, max-snippet:-1', self::meta($two->body, 'name', 'robots'));
+        self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/page/2/">', $two->body);
+        self::assertSame(self::BASE . '/news/page/2/#list', self::node($two->body, 'ItemList')['@id']);
+        self::assertSame(['Home', 'Industry Updates', 'Page 2'], array_column(self::node($two->body, 'BreadcrumbList')['itemListElement'], 'name'));
         self::assertStringContainsString('<a rel="prev" href="/news/">', $two->body, 'page 1 is the clean address');
         self::assertStringContainsString('<title>Industry Updates: AV and live event news, page 2</title>', $two->body);
+        self::assertStringStartsWith('Page 2: ', (string) self::meta($two->body, 'name', 'description'));
+        self::assertNotSame(self::meta($r->body, 'name', 'description'), self::meta($two->body, 'name', 'description'));
         self::assertSame(NewsController::CACHE, $two->getHeader('Cache-Control'));
 
-        self::assertSame(404, $this->request('GET', '/news/?page=3')->status, 'past the end');
-        foreach (['/news/?page=0', '/news/?page=abc', '/news/?page=02', '/news/?page=-1'] as $uri) {
-            self::assertSame(404, $this->request('GET', $uri)->status, $uri);
+        self::assertSame(404, $this->request('GET', '/news/page/3/')->status, 'past the end');
+        foreach (['/news/?page=0', '/news/?page=abc', '/news/?page=02', '/news/?page=-1', '/news/page/0/', '/news/page/02/', '/news/page/x/'] as $uri) {
+            $bad = $this->request('GET', $uri);
+            self::assertSame(404, $bad->status, $uri);
+            self::assertNull($bad->getHeader('Location'), $uri);
         }
-        $one = $this->request('GET', '/news/?page=1');
-        self::assertSame(301, $one->status);
-        self::assertSame('/news/', $one->getHeader('Location'));
+        foreach (['/news/?page=1' => '/news/', '/news/page/1/' => '/news/', '/news/?page=2' => '/news/page/2/', '/news/?page=3' => '/news/page/3/'] as $uri => $to) {
+            $moved = $this->request('GET', $uri);
+            self::assertSame([301, $to], [$moved->status, $moved->getHeader('Location')], $uri);
+        }
     }
 
     public function testCategoryPagesListTheirOwnLiveArticles(): void
@@ -154,7 +163,7 @@ final class NewsPagesTest extends TestCase
         $this->makeArticle(['slug' => 'secret-fixture', 'categories' => ['lighting'], 'status' => 'draft']);
         $this->makeArticle(['slug' => 'tomorrows-law', 'categories' => ['legal'], 'published_at' => time() + 86400]);
 
-        $r = $this->request('GET', '/news/category/audio/');
+        $r = $this->request('GET', '/news/audio/');
         self::assertSame(200, $r->status);
         self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies());
@@ -163,39 +172,39 @@ final class NewsPagesTest extends TestCase
         self::assertSame($audio['description'], self::meta($r->body, 'name', 'description'));
         self::assertStringContainsString('<h1 class="c-hero-title" id="page-title">Audio</h1>', $r->body);
         self::assertStringContainsString(e($audio['intro']), $r->body);
-        self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/category/audio/">', $r->body);
+        self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/audio/">', $r->body);
         self::assertSame(['radio-mics', 'desks-and-mics'], self::cards($r->body));
         $crumbs = self::node($r->body, 'BreadcrumbList')['itemListElement'];
         self::assertSame(['Home', 'Industry Updates', 'Audio'], array_column($crumbs, 'name'));
-        self::assertSame(self::BASE . '/news/category/audio/', $crumbs[2]['item']);
+        self::assertSame(self::BASE . '/news/audio/', $crumbs[2]['item']);
         self::assertMatchesRegularExpression('#<main id="main"[^>]*>\s*<section class="c-hero[^"]*"[^>]*>\s*<div class="l-wrap[^"]*"><nav class="c-crumbs" aria-label="Breadcrumb">.*?</nav>\s*<div class="c-hero-grid#s', $r->body);
 
         // The bar lists All and the categories with live articles, with their counts; the draft's and the
         // scheduled article's categories are not there.
         self::assertSame(1, preg_match('#<ul class="news-cats" role="list">(.*?)</ul>#s', $r->body, $bar));
-        preg_match_all('#<a href="(/news/(?:category/[a-z]+/)?)"([^>]*)>([^<]+) <span class="news-cats-count"><span class="u-visually-hidden">, </span>(\d+)#', $bar[1], $chips, PREG_SET_ORDER);
-        self::assertSame([['/news/', 'All', '2'], ['/news/category/video/', 'Video', '1'], ['/news/category/audio/', 'Audio', '2']], array_map(static fn (array $c): array => [$c[1], $c[3], $c[4]], $chips));
+        preg_match_all('#<a href="(/news/(?:[a-z]+/)?)"([^>]*)>([^<]+) <span class="news-cats-count"><span class="u-visually-hidden">, </span>(\d+)#', $bar[1], $chips, PREG_SET_ORDER);
+        self::assertSame([['/news/', 'All', '2'], ['/news/video/', 'Video', '1'], ['/news/audio/', 'Audio', '2']], array_map(static fn (array $c): array => [$c[1], $c[3], $c[4]], $chips));
         self::assertSame(' aria-current="page"', $chips[2][2]);
         self::assertSame('', $chips[0][2]);
         self::assertStringContainsString('<option value="audio" selected>Audio (2)</option>', $r->body, 'the phone form names the same choice');
 
-        $empty = $this->request('GET', '/news/category/lighting/');
+        $empty = $this->request('GET', '/news/lighting/');
         self::assertSame(200, $empty->status, 'a known category with nothing live');
         self::assertStringContainsString('Nothing in this category yet.', $empty->body);
         self::assertStringNotContainsString('secret-fixture', $empty->body);
         self::assertSame('noindex, follow', self::meta($empty->body, 'name', 'robots'));
         self::assertStringContainsString('<a class="c-btn c-btn--secondary" href="/news/">See every article</a>', $empty->body);
-        self::assertSame(404, $this->request('GET', '/news/category/legal/?page=2')->status);
-        self::assertSame(404, $this->request('GET', '/news/category/rumours/')->status);
+        self::assertSame(404, $this->request('GET', '/news/legal/page/2/')->status);
+        self::assertSame(404, $this->request('GET', '/news/rumours/')->status);
 
-        $one = $this->request('GET', '/news/category/audio/?page=1');
-        self::assertSame([301, '/news/category/audio/'], [$one->status, $one->getHeader('Location')]);
+        $one = $this->request('GET', '/news/audio/?page=1');
+        self::assertSame([301, '/news/audio/'], [$one->status, $one->getHeader('Location')]);
     }
 
     public function testThePhonesCategoryFormSendsEachCategoryToItsOwnAddress(): void
     {
         $go = $this->request('GET', '/news/?category=streaming');
-        self::assertSame([302, '/news/category/streaming/'], [$go->status, $go->getHeader('Location')]);
+        self::assertSame([302, '/news/streaming/'], [$go->status, $go->getHeader('Location')]);
         $all = $this->request('GET', '/news/?category=');
         self::assertSame([302, '/news/'], [$all->status, $all->getHeader('Location')]);
         self::assertSame(404, $this->request('GET', '/news/?category=rumours')->status);
@@ -247,6 +256,8 @@ final class NewsPagesTest extends TestCase
         self::assertStringContainsString('<a rel="prev" href="/news/?q=wireless">', $two);
         $redirect = $this->request('GET', '/news/?q=wireless&page=1');
         self::assertSame([301, '/news/?q=wireless'], [$redirect->status, $redirect->getHeader('Location')]);
+        $byPath = $this->request('GET', '/news/page/2/?q=wireless');
+        self::assertSame([301, '/news/?q=wireless&page=2'], [$byPath->status, $byPath->getHeader('Location')], 'a search pages by its query');
     }
 
     /**
@@ -260,7 +271,7 @@ final class NewsPagesTest extends TestCase
         $working = $this->db;
         $this->db = Database::connect('sqlite::memory:');
         try {
-            foreach (['/news/', '/news/category/video/', '/news/?page=2', '/news/category/video/?page=3', '/news/?q=sample'] as $uri) {
+            foreach (['/news/', '/news/video/', '/news/page/2/', '/news/video/page/3/', '/news/?q=sample'] as $uri) {
                 $r = $this->request('GET', $uri);
                 self::assertSame(503, $r->status, $uri);
                 self::assertSame((string) NewsController::RETRY_AFTER, $r->getHeader('Retry-After'), $uri);
@@ -280,6 +291,12 @@ final class NewsPagesTest extends TestCase
             self::assertSame(200, $llms->status);
             self::assertSame('private, no-store', $llms->getHeader('Cache-Control'), 'llms.txt is not stored without its articles');
             self::assertStringContainsString('(' . self::BASE . '/news/): ', $llms->body);
+            foreach (['/news/sitemap.xml', '/news/sitemap-news.xml', '/news/sitemap-' . date('Y-m') . '.xml'] as $uri) {
+                $news = $this->request('GET', $uri);
+                self::assertSame(503, $news->status, $uri . ': asked again later, not recorded empty');
+                self::assertSame('private, no-store', $news->getHeader('Cache-Control'), $uri);
+                self::assertSame((string) NewsController::RETRY_AFTER, $news->getHeader('Retry-After'), $uri);
+            }
         } finally {
             $this->db = $working;
         }
@@ -293,7 +310,7 @@ final class NewsPagesTest extends TestCase
     public function testAnArticleIsLaidOutInTheOrderTheDesignGives(): void
     {
         $posted = time() - 3600;
-        $earlier = $this->makeArticle(['slug' => 'the-first-report', 'title' => 'The first report on the new pay rules', 'categories' => ['legal'], 'published_at' => time() - 7200]);
+        $earlier = $this->makeArticle(['slug' => 'first-report', 'title' => 'The first report on the new pay rules', 'categories' => ['legal'], 'published_at' => time() - 7200]);
         $source = 'https://www.gov.example/guidance/pay';
         $id = $this->makeArticle([
             'origin' => 'import',
@@ -313,20 +330,21 @@ final class NewsPagesTest extends TestCase
             'speculation' => [['text' => 'Some agencies may pay sooner.', 'url' => 'https://press.example/report']],
             'verdict' => 'test',
             'verdict_note' => 'Try the new wording on your next invoice.',
-            'follow_up_of' => ['the-first-report'],
+            'follow_up_of' => ['first-report'],
             'published_at' => $posted,
         ]);
         $this->makeArticle(['slug' => 'pay-rules-update', 'title' => 'The pay rules: what happened next', 'categories' => ['legal'], 'follow_up_of' => ['pay-rules-follow-up']]);
         self::assertGreaterThan(0, $earlier);
 
-        $r = $this->request('GET', '/news/pay-rules-follow-up/');
+        $r = $this->request('GET', '/news/legal/pay-rules-follow-up/');
         self::assertSame(200, $r->status);
         self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies());
         $b = $r->body;
 
         $order = ['<nav class="c-crumbs"', '<ul class="news-tags"', '<h1 class="c-hero-title news-story-title"', 'news-story-dek', '<p class="news-meta">', 'news-followup',
-            'news-lead-art', 'c-prose news-body', 'id="news-confirmed"', 'id="news-speculation"', 'id="news-impact"', 'news-verdict', 'id="news-sources"', 'id="news-later"', 'news-ainote'];
+            'news-lead-art', 'c-prose news-body', 'id="news-confirmed"', 'id="news-speculation"', 'id="news-impact"', 'news-verdict', 'id="news-sources"', 'id="news-later"', 'news-ainote',
+            'id="news-more"', 'id="comments"'];
         $at = array_map(static fn (string $marker): int|false => strpos($b, $marker), $order);
         self::assertNotContains(false, $at, 'every part is there');
         $sorted = $at;
@@ -335,7 +353,7 @@ final class NewsPagesTest extends TestCase
         self::assertNoHeadingJumps($b, 'the article');
         self::assertMatchesRegularExpression('#<main id="main"[^>]*>\s*<section class="c-hero[^"]*"[^>]*>\s*<div class="l-wrap[^"]*"><nav class="c-crumbs" aria-label="Breadcrumb">.*?</nav>\s*<div class="c-hero-grid#s', $b);
 
-        // The head: the title tag, the share title, the article tags.
+        // The head: the title tag (the SEO title, too long to take the section's name), the share title, the article tags.
         self::assertStringContainsString('<title>Late payment rules now reach freelance crew</title>', $b);
         self::assertSame('Late payment rules now reach freelance crew, and the clock starts at the invoice', self::meta($b, 'property', 'og:title'));
         self::assertSame('article', self::meta($b, 'property', 'og:type'));
@@ -343,8 +361,16 @@ final class NewsPagesTest extends TestCase
         self::assertNotNull(self::meta($b, 'property', 'article:modified_time'));
         self::assertSame('Legal', self::meta($b, 'property', 'article:section'));
         self::assertSame(2, substr_count($b, '<meta property="article:tag"'));
-        self::assertSame(self::BASE . '/assets/img/og/news.png', self::meta($b, 'property', 'og:image'), 'the section\'s card without a picture');
-        self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/pay-rules-follow-up/">', $b);
+        self::assertSame(self::BASE . '/assets/img/og/news-legal.png', self::meta($b, 'property', 'og:image'), 'its category\'s card without a picture');
+        self::assertSame('Legal news for live events and AV, from Industry Updates', self::meta($b, 'property', 'og:image:alt'));
+        self::assertSame(['1200', '630'], [self::meta($b, 'property', 'og:image:width'), self::meta($b, 'property', 'og:image:height')]);
+        self::assertSame('summary_large_image', self::meta($b, 'name', 'twitter:card'));
+        self::assertSame(self::BASE . '/news/legal/pay-rules-follow-up/', self::meta($b, 'property', 'og:url'));
+        self::assertSame('The late payment rules now cover freelance crew. What changed, when it applies and what to put on your next invoice.', self::meta($b, 'property', 'og:description'));
+        self::assertSame('index, follow, max-image-preview:large, max-snippet:-1', self::meta($b, 'name', 'robots'));
+        self::assertStringContainsString('<link rel="canonical" href="' . self::BASE . '/news/legal/pay-rules-follow-up/">', $b);
+        self::assertStringContainsString('<link rel="alternate" type="application/rss+xml" title="Industry Updates RSS feed" href="/news/feed.xml">', $b);
+        self::assertStringContainsString('<link rel="alternate" type="application/rss+xml" title="Legal: Industry Updates RSS feed" href="/news/legal/feed.xml">', $b);
         self::assertStringContainsString('<script type="module" src="/assets/js/news.js?v=', $b);
 
         // The structured data: the NewsArticle on the base graph, every reference resolving.
@@ -353,7 +379,7 @@ final class NewsPagesTest extends TestCase
         self::assertSame(array_unique($ids), $ids);
         self::assertSame(['Organization', 'Person', 'WebSite', 'WebPage', 'NewsArticle', 'BreadcrumbList'], array_column($graph, '@type'));
         $article = self::node($b, 'NewsArticle');
-        self::assertSame(self::BASE . '/news/pay-rules-follow-up/#article', $article['@id']);
+        self::assertSame(self::BASE . '/news/legal/pay-rules-follow-up/#article', $article['@id']);
         self::assertSame('Late payment rules now reach freelance crew, and the clock starts at the invoice', $article['headline']);
         self::assertSame('The late payment rules now cover freelance crew. What changed, when it applies and what to put on your next invoice.', $article['description']);
         self::assertSame(date(DATE_ATOM, $posted), $article['datePublished']);
@@ -362,16 +388,20 @@ final class NewsPagesTest extends TestCase
         self::assertSame(['@id' => self::BASE . '/#organization'], $article['author'], 'an AI-written article is the organisation\'s');
         self::assertSame(['@id' => self::BASE . '/#organization'], $article['publisher']);
         self::assertSame([$source, 'https://press.example/report'], $article['isBasedOn']);
-        self::assertSame(['@id' => self::BASE . '/news/pay-rules-follow-up/#webpage'], $article['mainEntityOfPage']);
+        self::assertSame(['@id' => self::BASE . '/news/legal/pay-rules-follow-up/#webpage'], $article['mainEntityOfPage']);
         self::assertContains($article['mainEntityOfPage']['@id'], $ids);
-        self::assertSame(self::BASE . '/assets/img/og/news.png', $article['image']);
+        self::assertSame('WebPage', self::node($b, 'WebPage')['@type']);
+        self::assertSame([self::BASE . '/assets/img/og/news-legal.png'], $article['image'], 'a list of pictures');
+        self::assertTrue($article['isAccessibleForFree']);
+        self::assertSame('en-GB', $article['inLanguage']);
+        self::assertSame((int) $this->db->value('SELECT word_count FROM news_articles WHERE id = ?', [$id]), $article['wordCount']);
         $crumbs = self::node($b, 'BreadcrumbList')['itemListElement'];
         self::assertSame(['Home', 'Industry Updates', 'Legal', 'Late payment rules now reach freelance crew'], array_column($crumbs, 'name'));
-        self::assertSame([self::BASE . '/', self::BASE . '/news/', self::BASE . '/news/category/legal/', self::BASE . '/news/pay-rules-follow-up/'], array_column($crumbs, 'item'));
+        self::assertSame([self::BASE . '/', self::BASE . '/news/', self::BASE . '/news/legal/', self::BASE . '/news/legal/pay-rules-follow-up/'], array_column($crumbs, 'item'));
 
-        // The hero: the categories as tags, the meta line with the desk's byline.
-        self::assertStringContainsString('<li><a class="c-tag" href="/news/category/legal/">Legal</a></li>', $b);
-        self::assertStringContainsString('<li><a class="c-tag" href="/news/category/freelance/">Freelance</a></li>', $b);
+        // The hero: the categories as tags linking to their hubs, the meta line with the desk's byline.
+        self::assertStringContainsString('<li><a class="c-tag" href="/news/legal/">Legal</a></li>', $b);
+        self::assertStringContainsString('<li><a class="c-tag" href="/news/freelance/">Freelance</a></li>', $b);
         self::assertStringContainsString('<time datetime="' . date(DATE_ATOM, $posted) . '">' . date('j F Y, H:i', $posted) . '</time>', $b, 'the London date and time');
         self::assertStringContainsString('min read</span>', $b);
         self::assertStringContainsString('<span>By Industry Updates desk</span>', $b);
@@ -402,9 +432,16 @@ final class NewsPagesTest extends TestCase
         self::assertMatchesRegularExpression('#<div class="c-callout c-callout--info news-verdict" role="note">\s*<svg[^>]*><use href="\#i-idea"/></svg>\s*<h2 class="c-callout-title"><span class="u-visually-hidden">Our verdict: </span>Worth testing</h2>\s*<p>Try the new wording on your next invoice.</p>#', $b);
         self::assertStringContainsString('Spotted something off? <a href="/contact/">Tell us</a> and we will put it right.', $b);
 
-        // The follow-ups both ways.
-        self::assertMatchesRegularExpression('#news-followup.*?Follow-up to:</strong>\s*<ul>\s*<li><a href="/news/the-first-report/">The first report on the new pay rules</a></li>#s', $b);
-        self::assertMatchesRegularExpression('#<ul class="news-later" role="list">\s*<li><a href="/news/pay-rules-update/">The pay rules: what happened next</a> <time#', $b);
+        // The follow-ups both ways, at their own addresses.
+        self::assertMatchesRegularExpression('#news-followup.*?Follow-up to:</strong>\s*<ul>\s*<li><a href="/news/legal/first-report/">The first report on the new pay rules</a></li>#s', $b);
+        self::assertMatchesRegularExpression('#<ul class="news-later" role="list">\s*<li><a href="/news/legal/pay-rules-update/">The pay rules: what happened next</a> <time#', $b);
+
+        // It ends with the newest of its primary category, never itself, and the way to that category's hub.
+        self::assertSame(1, preg_match('#<section class="news-part news-more" aria-labelledby="news-more">(.*?)</section>#s', $b, $more));
+        self::assertStringContainsString('<h2 id="news-more">More in Legal</h2>', $more[1]);
+        preg_match_all('#<li>\s*<a href="([^"]+)">#', $more[1], $moreLinks);
+        self::assertSame(['/news/legal/pay-rules-update/', '/news/legal/first-report/'], $moreLinks[1]);
+        self::assertStringContainsString('<a class="c-btn c-btn--secondary" href="/news/legal/">Every article in Legal</a>', $more[1]);
 
         // No style attribute and no inline script anywhere in the page.
         self::assertStringNotContainsString(' style="', $b);
@@ -416,19 +453,19 @@ final class NewsPagesTest extends TestCase
 
     public function testTheAuthorIsThePublisherOnlyForHisOwnWords(): void
     {
-        $this->makeArticle(['slug' => 'by-ben', 'byline' => 'Ben Rohleder']);
-        $this->makeArticle(['slug' => 'by-a-guest', 'byline' => 'A Guest Writer']);
+        $this->makeArticle(['slug' => 'ben-writes', 'byline' => 'Ben Rohleder']);
+        $this->makeArticle(['slug' => 'guest-writes', 'byline' => 'A Guest Writer']);
         $this->makeArticle(['slug' => 'ben-with-ai-help', 'byline' => 'Ben Rohleder', 'ai_written' => true]);
 
-        $ben = $this->body('/news/by-ben/');
+        $ben = $this->body('/news/video/ben-writes/');
         self::assertSame(['@id' => self::BASE . '/about/#ben'], self::node($ben, 'NewsArticle')['author']);
         self::assertStringContainsString('<span>By Ben Rohleder</span>', $ben);
         self::assertStringNotContainsString('news-ainote', $ben, 'no AI note on his own words');
         self::assertStringNotContainsString('id="news-speculation"', $ben, 'speculation only if there is any');
         self::assertStringNotContainsString('news-followup', $ben);
         self::assertStringNotContainsString('id="news-later"', $ben);
-        self::assertSame(['@id' => self::BASE . '/#organization'], self::node($this->body('/news/by-a-guest/'), 'NewsArticle')['author']);
-        $helped = $this->body('/news/ben-with-ai-help/');
+        self::assertSame(['@id' => self::BASE . '/#organization'], self::node($this->body('/news/video/guest-writes/'), 'NewsArticle')['author']);
+        $helped = $this->body('/news/video/ben-with-ai-help/');
         self::assertSame(['@id' => self::BASE . '/#organization'], self::node($helped, 'NewsArticle')['author'], 'written with AI help');
         self::assertStringContainsString('news-ainote', $helped);
     }
@@ -438,7 +475,7 @@ final class NewsPagesTest extends TestCase
         $id = $this->makeArticle(['slug' => 'changed-later', 'published_at' => time() - 7200]);
         $changed = time() - 60;
         $this->db->update('news_articles', ['created_at' => time() - 7200, 'updated_at' => $changed], ['id' => $id]);
-        $body = $this->body('/news/changed-later/');
+        $body = $this->body('/news/video/changed-later/');
         self::assertStringContainsString('<span>Updated <time datetime="' . date(DATE_ATOM, $changed) . '">', $body);
         self::assertSame(date(DATE_ATOM, $changed), self::node($body, 'NewsArticle')['dateModified']);
         self::assertSame(date(DATE_ATOM, $changed), self::meta($body, 'property', 'article:modified_time'));
@@ -446,7 +483,7 @@ final class NewsPagesTest extends TestCase
         // An article stored now with an earlier date (an import) has not changed since it went live.
         $yesterday = time() - 86400;
         $this->makeArticle(['slug' => 'dated-earlier', 'published_at' => $yesterday]);
-        $dated = $this->body('/news/dated-earlier/');
+        $dated = $this->body('/news/video/dated-earlier/');
         self::assertStringNotContainsString('>Updated <', $dated);
         self::assertSame(date(DATE_ATOM, $yesterday), self::node($dated, 'NewsArticle')['dateModified']);
     }
@@ -456,11 +493,12 @@ final class NewsPagesTest extends TestCase
         $this->makeArticle(['slug' => 'still-a-draft', 'status' => 'draft']);
         $this->makeArticle(['slug' => 'not-yet', 'published_at' => time() + 3600]);
         $id = $this->makeArticle(['slug' => 'taken-down']);
-        self::assertSame(200, $this->request('GET', '/news/taken-down/')->status);
+        self::assertSame(200, $this->request('GET', '/news/video/taken-down/')->status);
         (new ArticleStore($this->app))->unpublish($id);
-        foreach (['/news/still-a-draft/', '/news/not-yet/', '/news/taken-down/', '/news/no-such-story/'] as $uri) {
+        foreach (['/news/video/still-a-draft/', '/news/video/not-yet/', '/news/video/taken-down/', '/news/taken-down/', '/news/video/no-such-story/', '/news/no-such-story/'] as $uri) {
             $r = $this->request('GET', $uri);
             self::assertSame(404, $r->status, $uri);
+            self::assertNull($r->getHeader('Location'), $uri . ': no redirect tells anyone a draft is there');
             self::assertSame('private, no-store', $r->getHeader('Cache-Control'), $uri);
             self::assertStringContainsString('noindex', (string) $r->getHeader('X-Robots-Tag'), $uri);
         }
@@ -468,10 +506,10 @@ final class NewsPagesTest extends TestCase
 
     public function testArticleImagesComeFromTheMediaRouteWithEveryWidth(): void
     {
-        $id = $this->makeArticle(['slug' => 'with-pictures']);
+        $id = $this->makeArticle(['slug' => 'pictures-included']);
         $lead = $this->image($id, 0, 'A wall of LED panels at a conference', ['caption' => 'The wall at load-in', 'credit' => 'Maker Ltd', 'credit_url' => 'https://maker.example/press']);
         $other = $this->image($id, 1, 'The processor rack', ['widths' => '480,960', 'width' => 900, 'height' => 600]);
-        $b = $this->body('/news/with-pictures/');
+        $b = $this->body('/news/video/pictures-included/');
 
         self::assertMatchesRegularExpression('#<figure class="news-figure">\s*<img src="/news/media/' . $lead . '-960\.webp" srcset="([^"]+)" sizes="[^"]+" width="1600" height="900" alt="A wall of LED panels at a conference" fetchpriority="high" decoding="async">#', $b);
         preg_match('#srcset="([^"]*' . $lead . '[^"]*)"#', $b, $set);
@@ -485,13 +523,13 @@ final class NewsPagesTest extends TestCase
         self::assertLessThan(strpos($b, 'id="news-sources"'), strpos($b, 'news-gallery'), 'the other images come before the sources');
         self::assertSame(self::BASE . '/news/media/' . $lead . '-og.jpg', self::meta($b, 'property', 'og:image'));
         self::assertSame('A wall of LED panels at a conference', self::meta($b, 'property', 'og:image:alt'));
-        self::assertSame(self::BASE . '/news/media/' . $lead . '-og.jpg', self::node($b, 'NewsArticle')['image']);
+        self::assertSame([self::BASE . '/news/media/' . $lead . '-og.jpg', self::BASE . '/news/media/' . $lead . '-1600.webp'], self::node($b, 'NewsArticle')['image'], 'the share card, then the picture at its widest');
 
         $card = $this->body('/news/');
         self::assertMatchesRegularExpression('#<div class="news-card-media">\s*<img src="/news/media/' . $lead . '-960\.webp" srcset="[^"]+" sizes="[^"]+" width="1600" height="900" alt="" decoding="async">#', $card, 'the card\'s picture is decoration: its title says it');
 
         $this->makeArticle(['slug' => 'no-pictures', 'categories' => ['streaming']]);
-        $plain = $this->body('/news/no-pictures/');
+        $plain = $this->body('/news/streaming/no-pictures/');
         self::assertMatchesRegularExpression('#<div class="news-lead-art"><span class="news-art news-art--wide"><svg class="news-art-svg" viewBox="0 0 160 90" aria-hidden="true" focusable="false"><use href="/assets/img/news-art\.svg\?v=[a-f0-9]+\#art-streaming"/></svg></span>#', $plain);
         self::assertStringContainsString('#art-streaming"/>', $this->body('/news/'), 'the card has the artwork too');
     }
@@ -547,16 +585,17 @@ final class NewsPagesTest extends TestCase
         self::assertStringContainsString('<atom:link href="' . self::BASE . '/news/feed.xml" rel="self" type="application/rss+xml"/>', $r->body);
         self::assertCount(NewsController::FEED_ITEMS, $xml->channel->item);
         $first = $xml->channel->item[0];
-        self::assertSame(self::BASE . '/news/feed-story-1/', (string) $first->link);
-        self::assertSame(self::BASE . '/news/feed-story-1/', (string) $first->guid);
+        self::assertSame(self::BASE . '/news/video/feed-story-1/', (string) $first->link, 'the article\'s own address');
+        self::assertSame(self::BASE . '/news/feed-story-1/', (string) $first->guid, 'its lasting address, whatever its category');
         self::assertSame('true', (string) $first->guid['isPermaLink']);
+        self::assertSame(301, $this->request('GET', '/news/feed-story-1/')->status, 'which leads to the article');
         self::assertSame(date(DATE_RSS, $now - 60), (string) $first->pubDate);
         self::assertSame(['Video', 'Tips'], array_map('strval', iterator_to_array($first->category, false)));
         $link = $this->sourceLink((int) $this->db->value("SELECT id FROM news_articles WHERE slug = 'feed-story-1'"));
         self::assertStringContainsString('<a href="' . self::BASE . '/news/go/' . $link['id'] . '/">Sample source', (string) $first->description, 'sources through the tracked link');
         self::assertStringNotContainsString('feed-story-31', $r->body, 'thirty, the newest');
         self::assertStringNotContainsString('feed-draft', $r->body);
-        self::assertStringContainsString('<link rel="alternate" type="application/rss+xml"', $this->body('/news/feed-story-2/'));
+        self::assertStringContainsString('<link rel="alternate" type="application/rss+xml"', $this->body('/news/video/feed-story-2/'));
     }
 
     public function testGoSendsToTheStoredAddressAndCountsByTheRules(): void
@@ -635,7 +674,8 @@ final class NewsPagesTest extends TestCase
             $this->makeArticle(['slug' => 'cookie-story-' . $i, 'published_at' => time() - 60 * $i]);
         }
         $link = $this->sourceLink((int) $this->db->value("SELECT id FROM news_articles WHERE slug = 'cookie-story-1'"));
-        $paths = ['/news/', '/news/?page=2', '/news/?q=story', '/news/category/video/', '/news/cookie-story-1/', '/news/feed.xml', '/news/go/' . $link['id'] . '/', '/news/?category=video'];
+        $paths = ['/news/', '/news/page/2/', '/news/?q=story', '/news/video/', '/news/video/cookie-story-1/', '/news/cookie-story-1/', '/news/feed.xml', '/news/video/feed.xml', '/news/go/' . $link['id'] . '/',
+            '/news/?category=video', '/news/category/video/', '/news/sitemap.xml', '/news/sitemap-news.xml', '/news/sitemap-' . date('Y-m', time() - 60) . '.xml'];
         $anonymous = [];
         foreach ($paths as $path) {
             $anonymous[$path] = $this->request('GET', $path)->body;
@@ -644,7 +684,7 @@ final class NewsPagesTest extends TestCase
         self::assertNotSame([], $this->jar, 'the browser holds the session');
         foreach ($paths as $path) {
             $r = $this->request('GET', $path);
-            self::assertContains($r->status, [200, 302], $path);
+            self::assertContains($r->status, [200, 301, 302], $path);
             self::assertSame([], $r->cookies(), $path . ' sets no cookie');
             self::assertSame(self::withoutStamps($anonymous[$path]), self::withoutStamps($r->body), $path . ' is the same for everyone');
         }
@@ -652,39 +692,51 @@ final class NewsPagesTest extends TestCase
 
     // ------------------------------------------------------------------------------- sitemap, robots, llms, health
 
-    public function testTheSitemapListsLiveArticlesAndTheCategoriesThatHaveThem(): void
+    /**
+     * The site's sitemap lists the hub and each category hub with a live article, each with its newest article's
+     * time, and never an article (the section's own sitemaps list those), so it stays small however many there are.
+     */
+    public function testTheSitemapListsTheHubsWithLiveArticlesAndNoArticle(): void
     {
-        $first = $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video'], 'published_at' => time() - 900]);
+        $first = $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video'], 'published_at' => time() - 7200]);
         $newest = time() - 300;
-        $this->db->update('news_articles', ['updated_at' => $newest], ['id' => $first]);
-        $later = $this->makeArticle(['slug' => 'also-in-the-map', 'categories' => ['audio', 'freelance'], 'published_at' => time() - 7200]);
-        $changed = time() - 600;
-        $this->db->update('news_articles', ['updated_at' => $changed], ['id' => $later]);
+        $this->db->update('news_articles', ['created_at' => time() - 7200, 'updated_at' => $newest], ['id' => $first]);
+        $later = $this->makeArticle(['slug' => 'also-in-the-map', 'categories' => ['audio', 'freelance'], 'published_at' => time() - 3600]);
+        $this->db->update('news_articles', ['created_at' => time() - 3600, 'updated_at' => time() - 3500], ['id' => $later]);
         $this->makeArticle(['slug' => 'a-draft-not-in-the-map', 'categories' => ['lighting'], 'status' => 'draft']);
         $this->makeArticle(['slug' => 'scheduled-not-in-the-map', 'categories' => ['legal'], 'published_at' => time() + 600]);
 
         $xml = simplexml_load_string($this->body('/sitemap.xml'));
         self::assertNotFalse($xml);
+        self::assertSame(['' => 'http://www.sitemaps.org/schemas/sitemap/0.9'], $xml->getDocNamespaces());
         $map = [];
         foreach ($xml->url as $u) {
             $map[(string) $u->loc] = (string) $u->lastmod;
         }
-        foreach (['/news/in-the-map/', '/news/also-in-the-map/', '/news/category/video/', '/news/category/audio/', '/news/category/freelance/', '/news/'] as $path) {
+        foreach (['/news/', '/news/video/', '/news/audio/', '/news/freelance/'] as $path) {
             self::assertArrayHasKey(self::BASE . $path, $map, $path);
         }
-        foreach (['/news/a-draft-not-in-the-map/', '/news/scheduled-not-in-the-map/', '/news/category/lighting/', '/news/category/legal/', '/news/category/tips/'] as $path) {
+        foreach (['/news/lighting/', '/news/legal/', '/news/tips/', '/news/category/video/'] as $path) {
             self::assertArrayNotHasKey(self::BASE . $path, $map, $path);
         }
-        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $changed), $map[self::BASE . '/news/also-in-the-map/'], 'its last change');
-        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $changed), $map[self::BASE . '/news/category/freelance/'], 'its newest article\'s');
+        foreach (array_keys($map) as $loc) {
+            self::assertNull(Paths::parse((string) parse_url($loc, PHP_URL_PATH)), $loc . ': no article in the site\'s sitemap');
+        }
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $newest), $map[self::BASE . '/news/video/'], 'its article was updated after it went live');
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', time() - 3600), $map[self::BASE . '/news/freelance/'], 'a change within minutes of going live is part of it');
         $since = (int) strtotime(\Psc\Content\Content::page('/news/')['updated'] . ' 00:00:00 UTC');
-        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', max($newest, $since)), $map[self::BASE . '/news/'], 'the index changes with its newest article');
-        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $newest), $map[self::BASE . '/news/category/video/']);
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', max($newest, $since)), $map[self::BASE . '/news/'], 'the hub changes with its newest article');
         $r = $this->request('GET', '/sitemap.xml');
-        self::assertSame(['public, max-age=3600', 'application/xml; charset=utf-8'], [$r->getHeader('Cache-Control'), $r->getHeader('Content-Type')]);
+        self::assertSame([SeoController::SITEMAP_CACHE, 'application/xml; charset=utf-8'], [$r->getHeader('Cache-Control'), $r->getHeader('Content-Type')]);
+    }
 
-        $robots = $this->body('/robots.txt');
-        self::assertStringContainsString("Disallow: /api/\nDisallow: /news/go/\n", $robots);
+    public function testRobotsNamesBothSitemapsAndKeepsCrawlersOffTheTrackedLinks(): void
+    {
+        $robots = $this->request('GET', '/robots.txt');
+        self::assertSame('public, max-age=3600', $robots->getHeader('Cache-Control'));
+        self::assertStringContainsString("Disallow: /api/\nDisallow: /news/go/\n", $robots->body);
+        preg_match_all('/^Sitemap: (.+)$/m', $robots->body, $m);
+        self::assertSame([self::BASE . '/sitemap.xml', self::BASE . '/news/sitemap.xml'], $m[1]);
     }
 
     public function testLlmsTxtListsTheTenNewestArticles(): void
@@ -698,7 +750,7 @@ final class NewsPagesTest extends TestCase
         $lines = explode("\n", trim($m[1]));
         self::assertSame('- [Industry Updates](' . self::BASE . '/news/): ' . \Psc\Content\Content::page('/news/')['description'], $lines[0]);
         self::assertCount(11, $lines, 'the section and its ten newest articles');
-        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/llms-story-1/): ', $lines[1]);
+        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[1]);
         self::assertStringNotContainsString('llms-story-11', $llms);
         self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
         self::assertStringNotContainsString('llms-draft', $llms);
@@ -723,6 +775,14 @@ final class NewsPagesTest extends TestCase
         $stale = $this->request('GET', '/health');
         self::assertSame(200, $stale->status, 'a stale desk is reported, not failed');
         self::assertSame(['status' => 'ok', 'news' => 'stale'], array_intersect_key(json_decode($stale->body, true), ['status' => 1, 'news' => 1]));
+        // A session still inside its time keeps the desk alive, as the desk page judges it (Settings::cronState()).
+        self::assertSame(SeoController::NEWS_STALE_SECONDS, Settings::TICK_STALE);
+        $runs = new \Psc\News\Runs($this->app);
+        $run = (int) $runs->queueManual(null);
+        self::assertTrue($runs->start($run, time() + 600));
+        self::assertSame('ok', $body()['news'], 'a session running inside its time');
+        $this->db->update('news_runs', ['deadline_at' => time() - \Psc\News\Runs::REAP_AFTER - 60], ['id' => $run]);
+        self::assertSame('stale', $body()['news'], 'one past the time the reaper fails it');
         self::assertSame(['enabled'], $settings->save(['enabled' => false], null)['changed']);
         self::assertSame('off', $body()['news'], 'paused');
 
@@ -737,7 +797,7 @@ final class NewsPagesTest extends TestCase
         for ($i = 1; $i <= 13; $i++) {
             $this->makeArticle(['slug' => 'fence-' . $i, 'categories' => ['showcalling', 'interactive'], 'published_at' => time() - 60 * $i]);
         }
-        foreach (['/news/', '/news/?page=2', '/news/?q=sample', '/news/category/showcalling/', '/news/category/interactive/?page=2', '/news/category/legal/', '/news/fence-1/'] as $uri) {
+        foreach (['/news/', '/news/page/2/', '/news/?q=sample', '/news/showcalling/', '/news/interactive/page/2/', '/news/legal/', '/news/showcalling/fence-1/'] as $uri) {
             $b = $this->body($uri);
             self::assertNoHeadingJumps($b, $uri);
             self::assertSame(1, preg_match('#<title>(.*?)</title>#', $b, $t));
@@ -773,8 +833,8 @@ final class NewsPagesTest extends TestCase
         $nav = array_column(\Psc\Content\Content::get('site')['nav'], 'label');
         self::assertSame(['Ecosystem', 'Products', 'Workflows', 'Licensing', 'News', 'Support'], $nav);
         self::assertStringContainsString('<a class="c-nav-link" href="/news/" aria-current="page">News</a>', $this->body('/news/'));
-        $this->makeArticle(['slug' => 'a-highlight']);
-        self::assertStringContainsString('<a class="c-nav-link" href="/news/" aria-current="true">News</a>', $this->body('/news/a-highlight/'), 'the section stays lit on its pages');
+        $this->makeArticle(['slug' => 'highlighted-story']);
+        self::assertStringContainsString('<a class="c-nav-link" href="/news/" aria-current="true">News</a>', $this->body('/news/video/highlighted-story/'), 'the section stays lit on its pages');
         self::assertStringContainsString('<a href="/news/">Industry Updates</a>', $this->body('/'), 'the footer link');
     }
 }
