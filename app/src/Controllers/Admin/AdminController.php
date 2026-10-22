@@ -12,6 +12,10 @@ use Psc\Controllers\Portal\TicketController;
 use Psc\Db\Database;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\AnthropicNewsModel;
+use Psc\News\Pipeline;
+use Psc\News\Runs;
+use Psc\News\Settings;
 use Psc\Support\Audit;
 use Psc\Support\Paginator;
 
@@ -109,6 +113,7 @@ final class AdminController extends Controller
             'waiting' => self::waitingCounts($db),
             'licencesWaiting' => $licences,
             'assistant' => $this->assistantUsage($db),
+            'news' => $this->newsOverview($db),
             'latest' => $latest,
             'licenceNames' => $licenceNames,
             'ticketTypes' => TicketController::TYPES,
@@ -133,6 +138,34 @@ final class AdminController extends Controller
             'licences' => (int) $db->value('SELECT COUNT(*) FROM licences WHERE status IN (' . self::placeholders(self::LICENCE_WAITING) . ')', self::LICENCE_WAITING),
             'messages' => (int) $db->value("SELECT COUNT(*) FROM contact_messages WHERE status = 'new'"),
         ];
+    }
+
+    /**
+     * Industry Updates at a glance, counted apart from waitingCounts(): the AI desk's drafts waiting for a person,
+     * reported comments and comments waiting for approval, whether the desk would start a session now (null) or why
+     * not (Pipeline::skipReason()), this London month's estimated spend against the cap, and the newest run. Null
+     * when the news tables cannot be read, so the overview still opens.
+     *
+     * @return array{held: int, reported: int, pending: int, desk: ?string, spent: float, budget: int, last: array<string, mixed>|null}|null
+     */
+    private function newsOverview(Database $db): ?array
+    {
+        try {
+            $settings = new Settings($this->app);
+            $runs = new Runs($this->app);
+            return [
+                'held' => (int) $db->value("SELECT COUNT(*) FROM news_articles WHERE status = 'draft' AND origin = 'ai'"),
+                'reported' => (int) $db->value('SELECT COUNT(*) FROM news_comments WHERE reports > 0'),
+                'pending' => (int) $db->value("SELECT COUNT(*) FROM news_comments WHERE status = 'pending'"),
+                'desk' => Pipeline::skipReason($this->app, $settings, $runs, AnthropicNewsModel::available()),
+                'spent' => $runs->spentThisMonth(),
+                'budget' => (int) $settings->get('monthly_budget_usd'),
+                'last' => $runs->recent(1)[0] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'admin news overview');
+            return null;
+        }
     }
 
     /**
@@ -452,6 +485,11 @@ final class AdminController extends Controller
             'licence' => '/portal/admin/licences/' . $subject . '/',
             'release' => '/portal/admin/releases/' . $subject . '/',
             'message' => '/portal/admin/messages/',
+            // news.* rows (images too) name the article; comment.* rows a comment, moderated in one list.
+            'news', 'article' => '/portal/admin/news/' . $subject . '/',
+            'comment' => '/portal/admin/news/comments/',
+            // desk.run_queued names the run it queued.
+            'desk' => '/portal/admin/news/desk/runs/' . $subject . '/',
             default => null,
         };
     }
