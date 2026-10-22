@@ -7,6 +7,7 @@ namespace Psc\Tests\Feature\News;
 use Psc\News\ArticleStore;
 use Psc\News\Draft;
 use Psc\News\Markdown;
+use Psc\News\Prose;
 use Psc\News\Urls;
 use Psc\Tests\TestCase;
 
@@ -302,6 +303,109 @@ final class ArticleStoreTest extends TestCase
         self::assertSame([], $store->update($id, $draft, 7), 'nothing changed');
         self::assertSame([], $store->update($id, Draft::fromArray($draft->toArray(), 'manual'), 7), 'nor through the editor\'s copy');
         self::assertNull($store->draft(999));
+    }
+
+    /** A link inside an item is registered like the body's, so a click on it is counted. */
+    public function testLinksInsideItemsAreRegistered(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft([
+            'confirmed' => [['text' => 'Bookings open on 1 March, says [the booking page](https://bookings.example/open?utm_source=x).', 'url' => 'https://regulator.example/guidance']],
+            'speculation' => [['text' => 'Prices may rise, [one report](https://press.example/report) says.', 'url' => 'https://press.example/report']],
+        ]), null);
+        $links = array_map(static fn (array $l): array => [$l['url'], (int) $l['is_source']], $store->links($id));
+        self::assertContains(['https://bookings.example/open?utm_source=x', 0], $links, 'an item\'s link, once');
+        self::assertSame(1, count(array_filter($links, static fn (array $l): bool => $l[0] === 'https://press.example/report')), 'a source linked from an item is still one row');
+        $item = $store->find($id)['confirmed'][0]['text'];
+        $linkId = (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ? AND url_key = ?', [$id, Urls::key('https://bookings.example/open')]);
+        self::assertGreaterThan(0, $linkId);
+        self::assertStringContainsString('data-news-link="' . $linkId . '"', Markdown::inline($item, $store->linkIds($id), $this->app->baseUrl()));
+    }
+
+    /** A slot that never arrived is not a time the article was live: publishing later goes live then. */
+    public function testUnpublishingAScheduledArticleDropsTheSlotItNeverReached(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(['status' => 'draft']), null);
+        self::assertTrue($store->publish($id, time() + 3600));
+        self::assertTrue($store->unpublish($id));
+        $row = $store->find($id);
+        self::assertSame(['draft', null], [$row['status'], $row['published_at']], 'the schedule is dropped');
+
+        // The slot has passed while it was a draft: published now, it is dated now.
+        $this->db->update('news_articles', ['status' => 'published', 'published_at' => time() + 5], ['id' => $id]);
+        self::assertTrue($store->unpublish($id));
+        $before = time();
+        self::assertTrue($store->publish($id));
+        self::assertGreaterThanOrEqual($before, (int) $store->find($id)['published_at']);
+        self::assertLessThanOrEqual(time(), (int) $store->find($id)['published_at']);
+
+        $live = time() - 86400;
+        $this->db->update('news_articles', ['published_at' => $live], ['id' => $id]);
+        self::assertTrue($store->unpublish($id));
+        self::assertSame($live, (int) $store->find($id)['published_at'], 'a time it was live is kept');
+    }
+
+    /** A form made from an earlier version of the article is refused, and writes nothing. */
+    public function testAStaleFormChangesNothing(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(), null);
+        $this->db->update('news_articles', ['updated_at' => 1000], ['id' => $id]);
+        $theirs = self::draft(['title' => 'Wireless mic licences change, and the deadline moves', 'categories' => ['legal']]);
+        $mine = self::draft(['title' => 'Wireless mic licences change for an older reason', 'categories' => ['audio']]);
+
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $theirs, null, 1000), 'the form was made from the article as it is');
+        $saved = (int) $store->find($id)['updated_at'];
+        self::assertGreaterThan(1000, $saved);
+        self::assertNull($store->update($id, $mine, null, 1000), 'the other form was made before that save');
+        $row = $store->find($id);
+        self::assertSame(['Wireless mic licences change, and the deadline moves', ['legal'], $saved], [$row['title'], $row['categories'], (int) $row['updated_at']], 'nothing written');
+        self::assertNull($store->update($id, $theirs, null, 1000), 'even when it changes nothing, a stale form is refused');
+        self::assertSame([], $store->update($id, $theirs, null, $saved));
+
+        // Within one second: a save always moves the version on.
+        $soon = time() + 100;
+        $this->db->update('news_articles', ['updated_at' => $soon], ['id' => $id]);
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $mine, null, $soon));
+        self::assertSame($soon + 1, (int) $store->find($id)['updated_at']);
+        self::assertNull($store->update($id, $theirs, null, $soon), 'a form from before that save is stale');
+
+        $loaded = (int) $store->find($id)['updated_at'];
+        $this->db->update('news_articles', ['updated_at' => $loaded - 200], ['id' => $id]);
+        $loaded -= 200;
+        self::assertTrue($store->unpublish($id));
+        self::assertNull($store->update($id, $theirs, null, $loaded), 'a takedown since counts as a change');
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $theirs, null), 'without a version, as before');
+    }
+
+    /** A new article's address comes from its own SEO title when it has one, else its headline, and then stays. */
+    public function testANewArticlesAddressComesFromItsSeoTitle(): void
+    {
+        $store = $this->store();
+        $seo = $store->create(self::draft(['title' => 'Wireless mic licences change for the spring season, and the booking deadline is earlier than last year', 'seo_title' => 'Mic licences: book by March']), null);
+        self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug']);
+        $long = 'Wireless mic licences change for the spring season, and the booking deadline for shared channels is earlier';
+        $plain = $store->create(self::draft(['title' => $long]), null);
+        self::assertSame(Prose::slug($long), $store->find($plain)['slug']);
+        self::assertGreaterThan(60, strlen(Prose::slug($long)), 'the headline, longer than its default SEO title');
+        self::assertLessThanOrEqual(Prose::SLUG_MAX, strlen(Prose::slug($long)));
+        $default = Draft::fromArray(['title' => $long, 'seo_title' => Prose::cut($long, 60)], 'manual');
+        self::assertSame(Prose::slug($long), $default->slugBase(), 'an SEO title that is only the headline cut short is not one of its own');
+        self::assertSame('article', Draft::fromArray(['title' => '!!!'], 'manual')->slugBase());
+
+        self::assertSame(['seo_title'], $store->update($seo, self::draft(['title' => 'Wireless mic licences change for the spring season, and the booking deadline is earlier than last year', 'seo_title' => 'A new SEO title for the story']), null));
+        self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug'], 'the address changes only when a draft names one');
+    }
+
+    /** news_links.host holds the longest host an address can have (the MySQL leg proves the column). */
+    public function testTheLongestHostIsStored(): void
+    {
+        $host = implode('.', [str_repeat('a', 63), str_repeat('b', 63), str_repeat('c', 63), str_repeat('d', 53), 'example']);
+        self::assertSame(Urls::HOST_MAX, strlen($host));
+        $url = 'https://' . $host . '/story';
+        $id = $this->store()->create(self::draft(['sources' => [['url' => $url, 'title' => 'A long host', 'publisher' => 'Long', 'kind' => 'press']], 'confirmed' => [], 'speculation' => []]), null);
+        self::assertSame($host, (string) $this->db->value('SELECT host FROM news_links WHERE article_id = ? AND is_source = 1', [$id]));
     }
 
     public function testAnAiArticleStaysAiWritten(): void

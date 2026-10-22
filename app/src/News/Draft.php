@@ -230,6 +230,21 @@ final class Draft
         return $this->seoTitle !== '' ? $this->seoTitle : Prose::cut($this->title, 60);
     }
 
+    /**
+     * The address a new article is given when the draft names none: the SEO title when it is one of its own (not
+     * the headline cut short), which makes a shorter address, else the headline; at most Prose::SLUG_MAX characters
+     * before ArticleStore numbers it to be unique, and 'article' when nothing is left.
+     */
+    public function slugBase(): string
+    {
+        $own = $this->seoTitle !== '' && $this->seoTitle !== Prose::cut($this->title, 60);
+        $slug = Prose::slug($own ? $this->seoTitle : $this->title);
+        if ($slug === '' && $own) {
+            $slug = Prose::slug($this->title);
+        }
+        return $slug !== '' ? $slug : 'article';
+    }
+
     /** The meta description: the summary, or the standfirst as plain text cut to 155, padded with the headline under 50. */
     public function summaryOrDefault(): string
     {
@@ -294,13 +309,15 @@ final class Draft
     }
 
     /**
-     * Every link written in the body and impact Markdown, as [text](address).
+     * Every link written as [text](address) in the body, the impact and the confirmed and speculation items, whose
+     * text is Markdown too.
      *
      * @return list<string>
      */
     public function inlineLinks(): array
     {
-        preg_match_all('/\[[^\]]+\]\(([^)\s]+)\)/u', $this->body . "\n" . $this->impact, $m);
+        $md = implode("\n", [$this->body, $this->impact, ...array_column($this->confirmed, 'text'), ...array_column($this->speculation, 'text')]);
+        preg_match_all('/\[[^\]]+\]\(([^)\s]+)\)/u', $md, $m);
         return array_values(array_unique($m[1]));
     }
 
@@ -349,6 +366,8 @@ final class Draft
                     $this->notes[] = ['rule' => 'refs', 'detail' => 'Dropped a ' . $list . ' item citing ' . ($ref !== '' ? $ref : 'no reference') . ', which the research did not return.'];
                     continue;
                 }
+                // An item's text is Markdown, and its links cite references the way the body's do.
+                $text = $this->mapLinks($text, $refs);
                 $r = $refs[$ref];
                 $addSource($r, '', 'other');
                 if ($list === 'confirmed' && $r['via'] !== 'fetch' && !$r['cited']) {

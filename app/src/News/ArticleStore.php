@@ -12,8 +12,9 @@ use Psc\Db\Database;
  * every page uses. Every save stores the draft as Draft::normalised() gives it (no em dash reaches the database),
  * fills in the SEO title and meta description when they were left empty, registers each link once by its
  * canonical key (the sources, then every other external address in the body, impact and items) keeping the click
- * counts of links that stay, counts the words and makes the slug unique (-2, -3 ...). Each write is one
- * transaction; a slug taken by a concurrent save is retried with the next number.
+ * counts of links that stay, counts the words and makes the slug unique (-2, -3 ...): a new article's comes from
+ * Draft::slugBase(), and a stored one's changes only when a draft names one. Each write is one transaction; a slug
+ * taken by a concurrent save is retried with the next number.
  *
  * Live means status published and published_at at or before now; a published article with a later time is
  * scheduled. Rows come back with confirmed and speculation decoded to lists of {text, url}, plus categories (the
@@ -56,7 +57,7 @@ final class ArticleStore
             'updated_at' => $now,
         ];
         return $this->db()->transaction(function (Database $db) use ($d, $row, $now): int {
-            $base = $d->slug ?? (Prose::slug($d->title) ?: 'article');
+            $base = $d->slug ?? $d->slugBase();
             for ($try = 0; ; $try++) {
                 $row['slug'] = $this->uniqueSlug($db, $base, null, $try);
                 try {
@@ -81,14 +82,23 @@ final class ArticleStore
      * status and time are changed only by publish() and unpublish(), its origin never, its slug only when the
      * draft names one. An AI article stays AI-written. Throws for an article that does not exist.
      *
-     * @return list<string>
+     * $expectedUpdatedAt is the updated_at of the row the editor's form was made from. When it is given and the
+     * article has been saved, published or unpublished since, nothing is written and the answer is null, so a stale
+     * form never overwrites someone else's change; the check and the write are one statement. A save it allows
+     * always moves updated_at past the expected one, so a form made from the row before a save is stale after it,
+     * even within the same second.
+     *
+     * @return list<string>|null null: the article changed since $expectedUpdatedAt
      */
-    public function update(int $id, Draft $draft, ?int $userId): array
+    public function update(int $id, Draft $draft, ?int $userId, ?int $expectedUpdatedAt = null): ?array
     {
         $db = $this->db();
         $old = $db->one('SELECT * FROM news_articles WHERE id = ?', [$id]);
         if ($old === null) {
             throw new \InvalidArgumentException('No article ' . $id);
+        }
+        if ($expectedUpdatedAt !== null && (int) $old['updated_at'] !== $expectedUpdatedAt) {
+            return null;
         }
         $d = $draft->normalised();
         $cols = $this->columns($d);
@@ -127,13 +137,16 @@ final class ArticleStore
         if ($changed === []) {
             return [];
         }
-        $now = time();
-        $db->transaction(function (Database $db) use ($id, $cols, $slug, $d, $categories, $followUps, $now): void {
+        $now = $expectedUpdatedAt !== null ? max(time(), $expectedUpdatedAt + 1) : time();
+        $where = ['id' => $id] + ($expectedUpdatedAt !== null ? ['updated_at' => $expectedUpdatedAt] : []);
+        $written = $db->transaction(function (Database $db) use ($id, $cols, $slug, $d, $categories, $followUps, $now, $where, $expectedUpdatedAt): bool {
+            // The article's row is written first: when a save since has moved updated_at, it matches no row and
+            // nothing else is written either.
             if ($slug !== null) {
                 for ($try = 0; ; $try++) {
                     $cols['slug'] = $this->uniqueSlug($db, $slug, $id, $try);
                     try {
-                        $db->update('news_articles', $cols + ['updated_at' => $now], ['id' => $id]);
+                        $rows = $db->update('news_articles', $cols + ['updated_at' => $now], $where);
                         break;
                     } catch (\PDOException $e) {
                         if (!self::isDuplicate($e) || $try >= self::SLUG_TRIES) {
@@ -142,13 +155,17 @@ final class ArticleStore
                     }
                 }
             } else {
-                $db->update('news_articles', $cols + ['updated_at' => $now], ['id' => $id]);
+                $rows = $db->update('news_articles', $cols + ['updated_at' => $now], $where);
+            }
+            if ($expectedUpdatedAt !== null && $rows !== 1) {
+                return false;
             }
             $this->writeCategories($db, $id, $categories);
             $this->writeLinks($db, $id, $d, $now);
             $this->writeRelated($db, $id, $followUps);
+            return true;
         });
-        return $changed;
+        return $written ? $changed : null;
     }
 
     /**
@@ -171,10 +188,18 @@ final class ArticleStore
         return $db->update('news_articles', ['status' => 'published', 'published_at' => $when, 'updated_at' => $now], ['id' => $id]) === 1;
     }
 
-    /** Takes a published or scheduled article back to a draft, keeping its time. False when it was not published. */
+    /**
+     * Takes a published or scheduled article back to a draft, keeping its time if it went live then; a schedule that
+     * never arrived is dropped, so publishing it later goes live then, not at the slot it missed. False when it was
+     * not published.
+     */
     public function unpublish(int $id): bool
     {
-        return $this->db()->update('news_articles', ['status' => 'draft', 'updated_at' => time()], ['id' => $id, 'status' => 'published']) === 1;
+        $now = time();
+        return $this->db()->exec(
+            "UPDATE news_articles SET status = 'draft', published_at = CASE WHEN published_at > ? THEN NULL ELSE published_at END, updated_at = ? WHERE id = ? AND status = 'published'",
+            [$now, $now, $id]
+        ) === 1;
     }
 
     /**

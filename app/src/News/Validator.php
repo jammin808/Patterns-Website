@@ -11,9 +11,11 @@ namespace Psc\News;
  * published or scheduled, except that an administrator's draft needs its headline.
  *
  * Rules by origin: an AI draft's sources and links must come from the research (refs), and an address the desk
- * may not use is dropped or unlinked rather than refused; banned topics and duplicates refuse AI and import drafts
- * and only warn on manual ones; the phrases to avoid hold an AI draft for repair or review. Errors are in an
- * administrator's words, keyed by field (sources.2.url for a field in a list).
+ * may not use is dropped or unlinked rather than refused; an AI draft's overshoots that lose nothing are fixed
+ * with a warning (fit()), and its lengths only a rewrite can fix are repairable (Result::repairable()); banned
+ * topics and duplicates refuse AI and import drafts and only warn on manual ones; the phrases to avoid hold an AI
+ * draft for repair or review. Errors are in an administrator's words, keyed by field (sources.2.url for a field in
+ * a list).
  */
 final class Validator
 {
@@ -32,12 +34,17 @@ final class Validator
     public const TAGS_MAX = 8;
     public const TAG_MIN = 2;
     public const TAG_MAX = 40;
+    /** The tags as stored, joined by commas (news_articles.tags). */
+    public const TAGS_TEXT_MAX = 320;
     public const SOURCES_MAX = 12;
     public const SOURCE_TITLE_MAX = 300;
     public const PUBLISHER_MAX = 160;
     public const URL_MAX = 2000;
     public const ITEMS_MAX = 12;
+    /** An item's length as it reads, each link counted by its text. */
     public const ITEM_MAX = 400;
+    /** The bytes an item's Markdown may hold, its links' addresses included: twelve fit their TEXT column. */
+    public const ITEM_MARKDOWN_MAX = 4000;
     public const VERDICT_NOTE_MAX = 320;
     public const BYLINE_MAX = 120;
     public const KEY_MAX = 190;
@@ -77,6 +84,9 @@ final class Validator
             $r->warnings[] = $note['detail'];
         }
 
+        if ($ctx->origin === 'ai') {
+            $this->fit($d, $r);
+        }
         $this->checkFields($d, $ctx, $r, $publish);
         $followSources = $this->checkFollowUps($d, $ctx, $r);
         $this->checkSources($d, $ctx, $r, $publish);
@@ -160,17 +170,62 @@ final class Validator
         return array_values(array_unique($m[0]));
     }
 
+    /**
+     * An AI draft's overshoots that lose nothing worth a rewrite are fixed rather than refused, each with a warning:
+     * an SEO title or meta description too long is cut at a word (one too short gives way to the standfirst's), tags
+     * outside 2 to 40 characters go and the first 8 stay, and each item list keeps its first 12. The sources keep 12
+     * in checkSources(), once those the desk may not use are gone.
+     */
+    private function fit(Draft $d, Result $r): void
+    {
+        if (mb_strlen($d->seoTitle) > self::SEO_TITLE_MAX) {
+            $d->seoTitle = Prose::cut($d->seoTitle, self::SEO_TITLE_MAX);
+            $r->warnings[] = 'Cut the SEO title to 60 characters.';
+        }
+        if (mb_strlen($d->summary) > self::SUMMARY_MAX) {
+            $d->summary = Prose::cut($d->summary, self::SUMMARY_MAX);
+            $r->warnings[] = 'Cut the meta description to 155 characters.';
+        }
+        if ($d->summary !== '' && mb_strlen($d->summary) < self::SUMMARY_MIN) {
+            $d->summary = '';
+            $r->warnings[] = 'The meta description was under 50 characters, so the standfirst is used instead.';
+        }
+        $tags = array_values(array_filter($d->tags, static fn (string $t): bool => mb_strlen($t) >= self::TAG_MIN && mb_strlen($t) <= self::TAG_MAX));
+        $tags = array_slice($tags, 0, self::TAGS_MAX);
+        while (mb_strlen(implode(',', $tags)) > self::TAGS_TEXT_MAX) {
+            array_pop($tags);
+        }
+        if ($tags !== $d->tags) {
+            $r->warnings[] = 'Kept ' . count($tags) . ' of the ' . count($d->tags) . ' tags: up to 8, each 2 to 40 characters.';
+            $d->tags = $tags;
+        }
+        foreach (['confirmed' => "What's confirmed", 'speculation' => 'Still speculation'] as $list => $label) {
+            if (count($d->{$list}) > self::ITEMS_MAX) {
+                $r->warnings[] = 'Kept the first 12 of the ' . count($d->{$list}) . ' items in ' . $label . '.';
+                $d->{$list} = array_slice($d->{$list}, 0, self::ITEMS_MAX);
+            }
+        }
+    }
+
     private function checkFields(Draft $d, Context $ctx, Result $r, bool $publish): void
     {
         $len = static fn (string $s): int => mb_strlen($s);
+        // A length only a rewrite can fix: repairable in an AI draft, so the desk repairs it instead of dropping it.
+        $rewrite = static function (string $field, string $message, string $problem) use ($ctx, $r): void {
+            if ($ctx->origin === 'ai') {
+                $r->repairError($field, $message, $problem);
+            } else {
+                $r->error($field, $message);
+            }
+        };
         if ($len($d->title) < self::TITLE_MIN || $len($d->title) > self::TITLE_MAX || str_contains($d->title, "\n")) {
-            $r->error('title', self::TITLE);
+            $rewrite('title', self::TITLE, 'The title is ' . $len($d->title) . ' characters long; it must be 10 to 160.');
         }
         if ($len($d->seoTitle) > self::SEO_TITLE_MAX) {
             $r->error('seo_title', 'Keep the SEO title to 60 characters, or leave it empty to use the headline.');
         }
         if ($len($d->dek) > self::DEK_MAX || ($publish && $len($d->dek) < self::DEK_MIN)) {
-            $r->error('dek', self::DEK);
+            $rewrite('dek', self::DEK, 'The dek is ' . $len($d->dek) . ' characters long; it must be 50 to 320.');
         }
         $summary = 'Enter a meta description of 50 to 155 characters, or leave it empty to use the standfirst.';
         if ($d->summary !== '') {
@@ -182,10 +237,12 @@ final class Validator
         }
         $min = $ctx->origin === 'manual' ? self::BODY_MIN_MANUAL : self::BODY_MIN;
         if ($len($d->body) > self::BODY_MAX || strlen($d->body) > 65000 || ($publish && $len($d->body) < $min)) {
-            $r->error('body', 'Write the article in ' . number_format($min) . ' to 20,000 characters.');
+            $rewrite('body', 'Write the article in ' . number_format($min) . ' to 20,000 characters.', $len($d->body) < $min
+                ? 'The body is ' . $len($d->body) . ' characters long; write at least ' . number_format($min) . '.'
+                : 'The body is ' . number_format($len($d->body)) . ' characters long; keep it well under 20,000.');
         }
         if ($len($d->impact) > self::IMPACT_MAX) {
-            $r->error('impact', 'Keep this section to 6,000 characters.');
+            $rewrite('impact', 'Keep this section to 6,000 characters.', 'The impact is ' . number_format($len($d->impact)) . ' characters long; keep it to 6,000.');
         }
         $unknown = array_filter($d->categories, static fn (string $c): bool => !Categories::has($c));
         if ($unknown !== []) {
@@ -194,14 +251,14 @@ final class Validator
             $r->error('categories', self::CATEGORIES);
         }
         $badTag = array_filter($d->tags, static fn (string $t): bool => mb_strlen($t) < self::TAG_MIN || mb_strlen($t) > self::TAG_MAX);
-        if (count($d->tags) > self::TAGS_MAX || $badTag !== [] || mb_strlen(implode(',', $d->tags)) > 320) {
+        if (count($d->tags) > self::TAGS_MAX || $badTag !== [] || mb_strlen(implode(',', $d->tags)) > self::TAGS_TEXT_MAX) {
             $r->error('tags', 'Use up to 8 tags, each 2 to 40 characters.');
         }
         if ($d->verdict !== '' ? !in_array($d->verdict, Draft::VERDICTS, true) : $ctx->origin !== 'manual') {
             $r->error('verdict', 'Choose a verdict.');
         }
         if ($len($d->verdictNote) > self::VERDICT_NOTE_MAX) {
-            $r->error('verdict_note', 'Keep the verdict note to 320 characters.');
+            $rewrite('verdict_note', 'Keep the verdict note to 320 characters.', 'The verdict_note is ' . $len($d->verdictNote) . ' characters long; keep it to 320.');
         }
         if ($len($d->byline) > self::BYLINE_MAX) {
             $r->error('byline', 'Keep the byline to 120 characters.');
@@ -269,12 +326,36 @@ final class Validator
             }
             $kept[] = $s;
         }
+        if ($ai && count($kept) > self::SOURCES_MAX) {
+            $r->warnings[] = 'Kept 12 of the ' . count($kept) . ' sources, those the items cite first.';
+            $kept = self::firstSources($kept, $d);
+        }
         if ($ai) {
             $d->sources = $kept;
         }
         if (count($d->sources) > self::SOURCES_MAX) {
             $r->error('sources', 'Use up to 12 sources.');
         }
+    }
+
+    /**
+     * The first 12 sources, every one an item cites before any other: an item needs its source listed.
+     *
+     * @param list<array{url: string, title: string, publisher: string, kind: string}> $sources
+     * @return list<array{url: string, title: string, publisher: string, kind: string}>
+     */
+    private static function firstSources(array $sources, Draft $d): array
+    {
+        $cited = array_map(static fn (array $i): ?string => Urls::key($i['url']), array_merge($d->confirmed, $d->speculation));
+        $isCited = static fn (array $s): bool => in_array(Urls::key($s['url']), $cited, true);
+        $room = self::SOURCES_MAX - count(array_filter($sources, $isCited));
+        $out = [];
+        foreach ($sources as $s) {
+            if ($isCited($s) ? count($out) < self::SOURCES_MAX : $room-- > 0) {
+                $out[] = $s;
+            }
+        }
+        return $out;
     }
 
     private function checkItems(Draft $d, Context $ctx, Result $r, bool $publish): void
@@ -287,23 +368,15 @@ final class Validator
             }
             $kept = [];
             foreach ($d->{$list} as $i => $item) {
-                $field = $list . '.' . $i;
+                // An AI draft's dropped items go, so its fields name the items as they are kept.
+                $field = $list . '.' . ($ai ? count($kept) : $i);
                 if ($item['text'] === '') {
                     $r->error($field . '.text', 'Write the item, or clear its web address.');
                     continue;
                 }
-                if (mb_strlen($item['text']) > self::ITEM_MAX) {
-                    $r->error($field . '.text', 'Keep each item to 400 characters.');
-                }
-                if ($item['url'] === '') {
-                    if ($publish) {
-                        $r->error($field . '.url', self::ITEM_SOURCE);
-                    }
-                    $kept[] = $item;
-                    continue;
-                }
-                $key = Urls::key($item['url']);
+                $key = $item['url'] !== '' ? Urls::key($item['url']) : null;
                 $problem = match (true) {
+                    $item['url'] === '' => $publish ? self::ITEM_SOURCE : null,
                     $key === null => "Enter the item's web address, starting https:// or http://.",
                     Urls::onDomain($item['url'], $ctx->bannedDomains) => self::BANNED,
                     !in_array($key, $sourceKeys, true) => $publish || $ai ? self::ITEM_SOURCE : null,
@@ -316,6 +389,13 @@ final class Validator
                     }
                     $r->error($field . '.url', $problem);
                 }
+                // Measured as it reads: a reference the desk wrote as S3 is a full address by now.
+                $chars = mb_strlen(Prose::plain($item['text']));
+                if ($chars > self::ITEM_MAX && $ai) {
+                    $r->repairError($field . '.text', 'Keep each item to 400 characters.', 'The ' . $list . ' item that begins "' . Prose::cut(Prose::plain($item['text']), 50) . '" is ' . $chars . ' characters long; keep each item to 400.');
+                } elseif ($chars > self::ITEM_MAX || strlen($item['text']) > self::ITEM_MARKDOWN_MAX) {
+                    $r->error($field . '.text', 'Keep each item to 400 characters.');
+                }
                 $kept[] = $item;
             }
             if ($ai) {
@@ -325,9 +405,10 @@ final class Validator
     }
 
     /**
-     * Links in the body and impact. Every writer's must be http(s) addresses on named sites, never on a banned
-     * site; an AI draft's must also be on this site, one of the research's addresses, or a source of an article
-     * it follows up, and any other keeps only its text.
+     * Links in the body, the impact and the confirmed and speculation items (all Markdown, all printed as links).
+     * Every writer's must be http(s) addresses on named sites, never on a banned site; an AI draft's must also be on
+     * this site, one of the research's addresses, or a source of an article it follows up, and any other keeps only
+     * its text. Runs after checkItems(), so an item's field names the item as it is kept.
      *
      * @param list<string> $followSources
      */
@@ -341,29 +422,36 @@ final class Validator
                 $allowed[] = $key;
             }
         }
-        foreach (['body', 'impact'] as $field) {
-            $d->{$field} = (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', function (array $m) use ($d, $ctx, $r, $ai, $allowed, $field): string {
-                $href = $m[2];
-                if (Urls::isOwn($href, $ctx->baseUrl !== '' ? $ctx->baseUrl : 'https://invalid.invalid') || !preg_match('#^https?://#i', $href)) {
-                    return $m[0];
-                }
-                $key = Urls::key($href);
-                $problem = match (true) {
-                    $key === null || mb_strlen($href) > self::URL_MAX => 'Each link needs a web address on a named site, starting https:// or http://.',
-                    Urls::onDomain($href, $ctx->bannedDomains) => self::BANNED,
-                    $ai && !in_array($key, $allowed, true) => 'not from the research',
-                    default => null,
-                };
-                if ($problem === null) {
-                    return $m[0];
-                }
-                if ($ai) {
-                    $r->warnings[] = 'Unlinked "' . $m[1] . '": its address could not be used.';
-                    return $m[1];
-                }
-                $r->error($field, $problem);
+        // One link's address, judged: the link as written, its text alone (AI), or an error on the field.
+        $check = static fn (string $md, string $field): string => (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', static function (array $m) use ($ctx, $r, $ai, $allowed, $field): string {
+            $href = $m[2];
+            if (Urls::isOwn($href, $ctx->baseUrl !== '' ? $ctx->baseUrl : 'https://invalid.invalid') || !preg_match('#^https?://#i', $href)) {
                 return $m[0];
-            }, $d->{$field});
+            }
+            $key = Urls::key($href);
+            $problem = match (true) {
+                $key === null || mb_strlen($href) > self::URL_MAX => 'Each link needs a web address on a named site, starting https:// or http://.',
+                Urls::onDomain($href, $ctx->bannedDomains) => self::BANNED,
+                $ai && !in_array($key, $allowed, true) => 'not from the research',
+                default => null,
+            };
+            if ($problem === null) {
+                return $m[0];
+            }
+            if ($ai) {
+                $r->warnings[] = 'Unlinked "' . $m[1] . '": its address could not be used.';
+                return $m[1];
+            }
+            $r->error($field, $problem);
+            return $m[0];
+        }, $md);
+        foreach (['body', 'impact'] as $field) {
+            $d->{$field} = $check($d->{$field}, $field);
+        }
+        foreach (['confirmed', 'speculation'] as $list) {
+            foreach ($d->{$list} as $i => $item) {
+                $d->{$list}[$i]['text'] = $check($item['text'], $list . '.' . $i . '.text');
+            }
         }
     }
 
@@ -372,7 +460,10 @@ final class Validator
         if ($ctx->bannedTopics === []) {
             return;
         }
-        $hits = Prose::mentions(implode("\n\n", [$d->title, $d->dek, $d->body, $d->impact, implode(', ', $d->tags)]), $ctx->bannedTopics);
+        // Every word the article prints as its own: the items and the verdict note too, not the byline or the
+        // sources' page titles (someone else's words; banned_domains is the rule for their sites).
+        $own = array_filter($d->texts(), static fn (string $field): bool => $field !== 'byline' && !str_starts_with($field, 'sources.'), ARRAY_FILTER_USE_KEY);
+        $hits = Prose::mentions(implode("\n\n", $own), $ctx->bannedTopics);
         if ($hits === []) {
             return;
         }

@@ -9,6 +9,11 @@ namespace Psc\News;
  * article with reasons in $hold is stored as a draft for an administrator, never published automatically. $draft is
  * the draft as it should be stored: cleaned, defaults filled in, AI links to unknown sites unlinked, follow-ups
  * resolved to article ids.
+ *
+ * Some errors in an AI draft are ones a rewrite of its text can fix (a headline, standfirst or body of the wrong
+ * length): they are errors like any other, so ok() stays false, and repairable() says what to fix in words for
+ * the model. onlyRepairable() is whether a rewrite could make the draft pass, so the desk repairs it instead of
+ * dropping it; the repaired draft is checked again from the start.
  */
 final class Result
 {
@@ -36,6 +41,12 @@ final class Result
     /** How many em and en dashes the text held (replaced with commas on save). */
     public int $dashes = 0;
 
+    /** @var array<string, string> field => what a rewrite must fix, in plain words for the model (AI drafts only) */
+    private array $repairs = [];
+
+    /** Whether an error was recorded that a rewrite cannot fix. */
+    private bool $unrepairable = false;
+
     public function __construct(public Draft $draft)
     {
     }
@@ -53,6 +64,30 @@ final class Result
     public function error(string $field, string $message): void
     {
         $this->errors[$field] ??= $message;
+        $this->unrepairable = true;
+    }
+
+    /** An error a rewrite of the text can fix: $message for an administrator, $problem for the model. */
+    public function repairError(string $field, string $message, string $problem): void
+    {
+        $this->errors[$field] ??= $message;
+        $this->repairs[$field] ??= $problem;
+    }
+
+    /**
+     * What a rewrite must fix, one problem a line, in plain words for the model.
+     *
+     * @return list<string>
+     */
+    public function repairable(): array
+    {
+        return array_values($this->repairs);
+    }
+
+    /** Whether the draft was refused only for problems a rewrite can fix: no rejection, and no other error. */
+    public function onlyRepairable(): bool
+    {
+        return $this->repairs !== [] && $this->rejections === [] && !$this->unrepairable;
     }
 
     public function reject(string $rule, string $detail): void

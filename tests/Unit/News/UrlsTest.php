@@ -73,4 +73,14 @@ final class UrlsTest extends TestCase
         self::assertNull(Urls::normaliseDomain('127.0.0.1'));
         self::assertNull(Urls::normaliseDomain(''));
     }
+
+    public function testAHostIsAtMostTheLengthDnsAllows(): void
+    {
+        $longest = implode('.', [str_repeat('a', 63), str_repeat('b', 63), str_repeat('c', 63), str_repeat('d', 53), 'example']);
+        self::assertSame(Urls::HOST_MAX, strlen($longest));
+        self::assertSame($longest, Urls::host('https://www.' . $longest . '/x'), '"www." aside');
+        self::assertNull(Urls::host('https://e' . $longest . '/x'));
+        self::assertNull(Urls::key('https://e' . $longest . '/x'));
+        self::assertNull(Urls::host('https://' . str_repeat('a', 64) . '.example/x'), 'a label is at most 63');
+    }
 }

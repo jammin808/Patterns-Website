@@ -12,6 +12,9 @@ namespace Psc\News;
  */
 final class Urls
 {
+    /** The longest host name DNS allows, and so the longest host an address has here (news_links.host holds it). */
+    public const HOST_MAX = 253;
+
     /** Query parameters that track a click and never change the page. */
     private const TRACKING = ['fbclid', 'gclid', 'mc_cid', 'mc_eid'];
 
@@ -151,7 +154,7 @@ final class Urls
         if (str_starts_with($host, 'www.')) {
             $host = substr($host, 4);
         }
-        if (strlen($host) > 253 || !preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/', $host)) {
+        if (strlen($host) > self::HOST_MAX || !preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/', $host)) {
             return null;
         }
         // Every label numeric ("127.1", "0x7f.1" aside) is an address in disguise, not a name.

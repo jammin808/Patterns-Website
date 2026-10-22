@@ -150,6 +150,18 @@ final class ImporterTest extends TestCase
         self::assertStringStartsWith('duplicate: Duplicates article ', $report['failed'][0]['reasons'][0]);
     }
 
+    /** A file's items are Markdown too: a link in one that is not a web address on a named site refuses the file. */
+    public function testALinkInsideAnItemIsCheckedLikeTheBodys(): void
+    {
+        $this->file('1-good.json', ['speculation' => [['text' => 'More may follow, [a forum](https://forum.example/t/1) says.', 'url' => 'https://source1.example/news']]]);
+        $this->file('2-bad.json', ['confirmed' => [['text' => 'Get it from [the mirror](https://10.0.0.5/patch.exe).', 'url' => 'https://source2.example/news']]]);
+        $report = $this->importer()->run($this->dir);
+        self::assertSame(['1-good.json'], array_column($report['imported'], 'file'));
+        self::assertSame(['2-bad.json' => ['confirmed.0.text: Each link needs a web address on a named site, starting https:// or http://.']], self::failures($report));
+        $id = $report['imported'][0]['id'];
+        self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM news_links WHERE article_id = ? AND url = 'https://forum.example/t/1' AND is_source = 0", [$id]), 'registered, so its clicks count');
+    }
+
     /**
      * The fence: every article file in the repository imports with origin import, in file-name order, into an
      * empty database. Launch articles are being added to content/news/articles/, so it holds for whatever files are

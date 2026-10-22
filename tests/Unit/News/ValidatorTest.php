@@ -7,6 +7,8 @@ namespace Psc\Tests\Unit\News;
 use Psc\News\ArticleStore;
 use Psc\News\Context;
 use Psc\News\Draft;
+use Psc\News\Markdown;
+use Psc\News\Prose;
 use Psc\News\Result;
 use Psc\News\Validator;
 use Psc\Tests\TestCase;
@@ -264,6 +266,150 @@ final class ValidatorTest extends TestCase
         self::assertTrue($ok->ok(), implode('; ', $ok->reasons()));
         self::assertSame([$earlier], $ok->followUps);
         self::assertSame([], $ok->autoFollowUps);
+    }
+
+    /** An item's text is Markdown and printed with its links, so its links pass the body's rules. */
+    public function testLinksInsideItemsAreCheckedLikeTheBodys(): void
+    {
+        $refs = self::refs();
+        $ai = Draft::fromArray(self::aiArticle([
+            'confirmed' => [
+                ['text' => 'Grab the patch from [the vendor](https://evil.example/download.exe).', 'ref' => 'S1'],
+                ['text' => 'The [release notes](S1) say so, and [a forum](https://other.example/y) agrees.', 'ref' => 'S1'],
+            ],
+            'speculation' => [['text' => 'A [rumour](S8) says more is coming.', 'ref' => 'S3']],
+        ]), 'ai', $refs);
+        $r = $this->check($ai, 'ai', 'publish', ['refs' => $refs, 'bannedDomains' => ['evil.example']]);
+        self::assertTrue($r->ok(), implode('; ', $r->reasons()));
+        self::assertSame(
+            ['Grab the patch from the vendor.', 'The [release notes](https://vendor.example/releases/7-2) say so, and a forum agrees.'],
+            array_column($r->draft->confirmed, 'text'),
+            'a banned address and one the research never returned keep only their text; [x](S1) is S1\'s address'
+        );
+        self::assertSame(['A rumour says more is coming.'], array_column($r->draft->speculation, 'text'), 'an unknown reference keeps only its text');
+        self::assertContains('Unlinked "the vendor": its address could not be used.', $r->warnings);
+        self::assertContains('Unlinked "a forum": its address could not be used.', $r->warnings);
+        self::assertContains('Unlinked "rumour": S8 is not a reference.', $r->warnings);
+        self::assertStringNotContainsString('<a ', Markdown::inline($r->draft->confirmed[0]['text']), 'never printed as a link');
+
+        $bad = self::article([
+            'confirmed' => [['text' => 'Grab the patch from [the vendor](https://www.evil.example/x).', 'url' => 'https://vendor.example/releases/7-2']],
+            'speculation' => [['text' => 'See [this page](https://127.0.0.1/x) and [that one](https://other.example/y).', 'url' => 'https://vendor.example/releases/7-2']],
+        ]);
+        foreach (['manual', 'import'] as $origin) {
+            $r = $this->check(Draft::fromArray($bad, $origin), $origin, 'publish', ['bannedDomains' => ['evil.example']]);
+            self::assertSame(Validator::BANNED, $r->errors['confirmed.0.text'] ?? null, $origin);
+            self::assertSame('Each link needs a web address on a named site, starting https:// or http://.', $r->errors['speculation.0.text'] ?? null, $origin);
+            self::assertSame($bad['confirmed'][0]['text'], $r->draft->confirmed[0]['text'], $origin . ': the writer fixes it');
+        }
+        $outside = self::article(['confirmed' => [['text' => 'Shown at [a trade show](https://show.example/day-1).', 'url' => 'https://vendor.example/releases/7-2']]]);
+        self::assertTrue($this->check(Draft::fromArray($outside, 'manual'), 'manual')->ok(), 'an administrator may link anywhere not banned');
+    }
+
+    /** The banned topics are looked for in every word the article prints as its own. */
+    public function testBannedTopicsAreFoundInTheItemsAndTheVerdictNote(): void
+    {
+        $topics = ['bannedTopics' => ['fraud']];
+        $rejected = [['rule' => 'banned_topic', 'detail' => 'Mentions a banned topic: fraud.']];
+        $inItem = self::article(['speculation' => [['text' => 'Joe Bloggs of Acme was convicted of fraud.', 'url' => 'https://vendor.example/releases/7-2']]]);
+        self::assertSame($rejected, $this->check(Draft::fromArray($inItem, 'import'), 'import', 'publish', $topics)->rejections, 'a speculation item');
+        $inNote = self::article(['verdict_note' => 'Skip it while the maker is under a fraud inquiry.']);
+        self::assertSame($rejected, $this->check(Draft::fromArray($inNote, 'import'), 'import', 'publish', $topics)->rejections, 'the verdict note');
+
+        $refs = self::refs();
+        $ai = Draft::fromArray(self::aiArticle(['confirmed' => [['text' => 'The maker admitted fraud last year.', 'ref' => 'S1']]]), 'ai', $refs);
+        self::assertSame($rejected, $this->check($ai, 'ai', 'publish', ['refs' => $refs] + $topics)->rejections, 'a confirmed item in an AI draft');
+
+        $manual = $this->check(Draft::fromArray($inItem, 'manual'), 'manual', 'publish', $topics);
+        self::assertTrue($manual->ok(), 'an administrator is only warned');
+        self::assertContains('This article mentions a banned topic: fraud.', $manual->warnings);
+        $sourceTitle = self::article(['sources' => [['url' => 'https://vendor.example/releases/7-2', 'title' => 'Fraud squad notes', 'publisher' => 'Vendor', 'kind' => 'primary']]]);
+        self::assertSame([], $this->check(Draft::fromArray($sourceTitle, 'import'), 'import', 'publish', $topics)->rejections, 'a source\'s own page title is someone else\'s words');
+    }
+
+    /** An AI draft is not thrown away for an overshoot that costs nothing to fix: it is fixed, with a warning. */
+    public function testAnAiDraftsCosmeticOvershootsAreFixedNotRefused(): void
+    {
+        $refs = self::refs();
+        $seo = 'LED processor firmware adds frame remapping for corporate walls';
+        $summary = 'The new firmware lets one processor drive two odd-shaped walls, which saves a box, a cable run and some rack space on most of the conference sets this season.';
+        $tags = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'x', 'eight', 'nine'];
+        $items = array_map(static fn (int $i): array => ['text' => 'Fact number ' . $i . ' from the notes.', 'ref' => 'S1'], range(1, 13));
+        $r = $this->check(Draft::fromArray(self::aiArticle(['seo_title' => $seo, 'summary' => $summary, 'tags' => $tags, 'confirmed' => $items, 'speculation' => []]), 'ai', $refs), 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($r->ok(), implode('; ', $r->reasons()));
+        $d = $r->draft;
+        self::assertSame(Prose::cut($seo, 60), $d->seoTitle);
+        self::assertLessThanOrEqual(60, mb_strlen($d->seoTitle));
+        self::assertSame(Prose::cut($summary, 155), $d->summary);
+        self::assertGreaterThan(155, mb_strlen($summary));
+        self::assertSame(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'], $d->tags, 'a tag too short goes, then the first 8 stay');
+        self::assertSame(array_slice(array_column($items, 'text'), 0, 12), array_column($d->confirmed, 'text'));
+        foreach (['Cut the SEO title to 60 characters.', 'Cut the meta description to 155 characters.', 'Kept 8 of the 10 tags: up to 8, each 2 to 40 characters.', "Kept the first 12 of the 13 items in What's confirmed."] as $warning) {
+            self::assertContains($warning, $r->warnings);
+        }
+
+        $short = $this->check(Draft::fromArray(self::aiArticle(['summary' => 'Too short']), 'ai', $refs), 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($short->ok(), implode('; ', $short->reasons()));
+        self::assertSame(self::article()['dek'], $short->draft->summary, 'a summary too short gives way to the standfirst');
+
+        $manual = $this->check(Draft::fromArray(self::article(['seo_title' => $seo, 'tags' => $tags]), 'manual'), 'manual');
+        self::assertArrayHasKey('seo_title', $manual->errors, 'an administrator is told, not overruled');
+        self::assertArrayHasKey('tags', $manual->errors);
+    }
+
+    /** Fourteen sources keep twelve: every one an item cites, then the first of the rest. */
+    public function testAnAiDraftKeepsTwelveSourcesThoseItsItemsCiteFirst(): void
+    {
+        $refs = [];
+        foreach (range(1, 14) as $n) {
+            $refs['S' . $n] = ['url' => 'https://site' . $n . '.example/story', 'title' => 'Story ' . $n, 'via' => 'fetch', 'page_age' => '', 'cited' => false];
+        }
+        $draft = Draft::fromArray(self::aiArticle([
+            'sources' => array_map(static fn (int $n): array => ['ref' => 'S' . $n, 'publisher' => 'Site ' . $n, 'kind' => 'press'], range(1, 14)),
+            'confirmed' => [['text' => 'The fourteenth site has the fact.', 'ref' => 'S14']],
+            'speculation' => [],
+            'body' => self::article()['body'],
+        ]), 'ai', $refs);
+        $r = $this->check($draft, 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($r->ok(), implode('; ', $r->reasons()));
+        $kept = array_map(static fn (int $n): string => 'https://site' . $n . '.example/story', [...range(1, 11), 14]);
+        self::assertSame($kept, array_column($r->draft->sources, 'url'));
+        self::assertSame(['The fourteenth site has the fact.'], array_column($r->draft->confirmed, 'text'), 'its item keeps its source');
+        self::assertContains('Kept 12 of the 14 sources, those the items cite first.', $r->warnings);
+    }
+
+    /** Lengths only a rewrite can fix are still refused, and say what the rewrite must fix. */
+    public function testAnAiDraftsLengthsARewriteCanFixAreRepairable(): void
+    {
+        $refs = self::refs();
+        $title = trim(str_repeat('A headline that will not stop ', 6));
+        $item = str_repeat('word ', 90) . 'end.';
+        $over = ['title' => $title, 'dek' => 'Too short a standfirst.', 'body' => 'A body far too short to publish.', 'verdict_note' => str_repeat('n', 321), 'confirmed' => [['text' => $item, 'ref' => 'S1']]];
+        $r = $this->check(Draft::fromArray(self::aiArticle($over), 'ai', $refs), 'ai', 'publish', ['refs' => $refs]);
+        self::assertFalse($r->ok(), 'refused until a rewrite passes');
+        self::assertTrue($r->onlyRepairable());
+        self::assertSame(['title', 'dek', 'body', 'verdict_note', 'confirmed.0.text'], array_keys($r->errors));
+        self::assertSame(Validator::TITLE, $r->errors['title'], 'an administrator\'s words stay the error');
+        self::assertSame([
+            'The title is 179 characters long; it must be 10 to 160.',
+            'The dek is 23 characters long; it must be 50 to 320.',
+            'The body is 32 characters long; write at least 300.',
+            'The verdict_note is 321 characters long; keep it to 320.',
+            'The confirmed item that begins "' . trim(str_repeat('word ', 10)) . '" is 454 characters long; keep each item to 400.',
+        ], $r->repairable());
+
+        $linked = $this->check(Draft::fromArray(self::aiArticle(['confirmed' => [['text' => str_repeat('fact ', 75) . '[notes](S1).', 'ref' => 'S1']]]), 'ai', $refs), 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($linked->ok(), 'an item is measured as it reads, not by the address its reference became: ' . implode('; ', $linked->reasons()));
+
+        $banned = $this->check(Draft::fromArray(self::aiArticle($over), 'ai', $refs), 'ai', 'publish', ['refs' => $refs, 'bannedTopics' => ['headline']]);
+        self::assertFalse($banned->onlyRepairable(), 'a rejection is never repaired');
+        self::assertNotSame([], $banned->repairable());
+        $hard = $this->check(Draft::fromArray(self::aiArticle($over + ['categories' => ['rumours']]), 'ai', $refs), 'ai', 'publish', ['refs' => $refs]);
+        self::assertFalse($hard->onlyRepairable(), 'nor an error a rewrite of the text cannot fix');
+        $manual = $this->check(Draft::fromArray(self::article(['title' => $title]), 'manual'), 'manual');
+        self::assertSame(Validator::TITLE, $manual->errors['title'] ?? null);
+        self::assertSame([], $manual->repairable(), 'only the desk repairs');
+        self::assertFalse($manual->onlyRepairable());
     }
 
     public function testDraftProblemsAndImportKeysAreErrors(): void

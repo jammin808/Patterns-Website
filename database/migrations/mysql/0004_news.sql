@@ -49,7 +49,8 @@ CREATE TABLE news_links (
     article_id INT UNSIGNED NOT NULL,
     url VARCHAR(2000) NOT NULL,
     url_key CHAR(64) NOT NULL,
-    host VARCHAR(190) NOT NULL,
+    -- Any host Urls accepts (up to 253 characters); not indexed, so wider than 190.
+    host VARCHAR(255) NOT NULL,
     title VARCHAR(300) NULL,
     publisher VARCHAR(160) NULL,
     kind VARCHAR(16) NOT NULL DEFAULT 'other',

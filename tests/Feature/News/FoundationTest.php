@@ -12,6 +12,7 @@ use Psc\Controllers\Admin\AdminNewsDeskController;
 use Psc\Controllers\NewsCommentController;
 use Psc\Controllers\NewsController;
 use Psc\Controllers\NewsMediaController;
+use Psc\News\Urls;
 use Psc\Tests\TestCase;
 
 /** What the rest of Industry Updates is built on: the route table, the index page, the share title, the database check. */
@@ -127,6 +128,25 @@ final class FoundationTest extends TestCase
         self::assertStringNotContainsString('application/ld+json', $head);
         $plain = $this->app->seo('A title', 'A description that is long enough for the test.', '/');
         self::assertStringContainsString('<meta property="og:title" content="A title">', $plain->toHead(), 'without one, the title');
+    }
+
+    /**
+     * news_links.host holds any host an address can have: MySQL refuses a longer value in strict mode, and the
+     * SQLite suite would never notice, so the column is read from the migration and set against Urls' own limit.
+     */
+    public function testTheLinkHostColumnHoldsEveryHostUrlsAccepts(): void
+    {
+        $mysql = (string) file_get_contents(PSC_ROOT . '/database/migrations/mysql/0004_news.sql');
+        self::assertSame(1, preg_match('/CREATE TABLE news_links \((.*?)\n\) ENGINE/s', $mysql, $table));
+        self::assertSame(1, preg_match('/^\s*host VARCHAR\((\d+)\) NOT NULL,$/m', $table[1], $column));
+        self::assertGreaterThanOrEqual(Urls::HOST_MAX, (int) $column[1]);
+        $sqlite = (string) file_get_contents(PSC_ROOT . '/database/migrations/sqlite/0004_news.sql');
+        self::assertSame(1, preg_match('/CREATE TABLE news_links \((.*?)\n\);/s', $sqlite, $table));
+        self::assertMatchesRegularExpression('/^\s*host TEXT NOT NULL,$/m', $table[1]);
+
+        $longest = implode('.', [str_repeat('a', 63), str_repeat('b', 63), str_repeat('c', 63), str_repeat('d', 53), 'example']);
+        self::assertSame($longest, Urls::host('https://' . $longest . '/x'));
+        self::assertNull(Urls::host('https://' . 'e' . $longest . '/x'), 'one character more is not a host name');
     }
 
     /**
