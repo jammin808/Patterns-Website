@@ -11,6 +11,7 @@ use Psc\Db\Database;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Support\Audit;
+use Psc\Support\Names;
 use Psc\Support\Paginator;
 use Psc\Support\Uploads;
 
@@ -80,14 +81,6 @@ final class TicketController extends Controller
     private const LIMIT_TICKETS = [20, 86400];
     private const LIMIT_COMMENTS = [60, 3600];
     private const LIMIT_VOTES = [100, 3600];
-
-    /**
-     * Characters that are invisible or reorder the text around them (zero-width space, word joiner, byte-order
-     * mark, bidirectional embeddings, overrides and isolates). They are removed from titles, version numbers and
-     * file names, where they could make a title look empty, or make a zip file whose name holds a right-to-left
-     * override look like a PNG.
-     */
-    private const INVISIBLE = '/[\x{200B}\x{2060}\x{FEFF}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u';
 
     private const BOARD_SORTS = [
         'votes' => 't.votes DESC, t.last_activity_at DESC, t.id DESC',
@@ -603,10 +596,10 @@ final class TicketController extends Controller
         return trim((string) preg_replace('/[\s\x00-\x1F\x7F]+/u', ' ', $v));
     }
 
-    /** A single-line value without invisible or reordering characters (see INVISIBLE), its spaces tidied again. */
+    /** A single-line value without invisible or reordering characters (Names::INVISIBLE), its spaces tidied again. */
     public static function visible(string $value): string
     {
-        return trim((string) preg_replace('/ {2,}/', ' ', (string) preg_replace(self::INVISIBLE, '', $value)));
+        return Names::visible($value);
     }
 
     /**
@@ -944,24 +937,14 @@ final class TicketController extends Controller
 
     /**
      * How a comment's author is shown: "You", staff by name, and other clients by first name and initial (on a
-     * public ticket other clients read the thread; their full names and email addresses stay private). A deleted
-     * account (anonymised with a reserved .invalid address) is "A former client" to clients.
+     * public ticket other clients read the thread; their full names and email addresses stay private). The rule is
+     * Names::commentAuthor, shared with every other place clients read each other's names.
      *
      * @param array<string, mixed> $comment
      */
     private static function commentAuthor(array $comment, int $viewerId, bool $viewerIsAdmin): string
     {
-        $name = (string) ($comment['author_name'] ?? '');
-        if ((int) $comment['user_id'] === $viewerId) {
-            return 'You';
-        }
-        if ((int) $comment['is_staff'] === 1 || $viewerIsAdmin) {
-            return $name !== '' ? $name : 'Former account';
-        }
-        if ((int) ($comment['author_gone'] ?? 0) === 1) {
-            return 'A former client';
-        }
-        return self::shortName($name);
+        return Names::commentAuthor($comment, $viewerId, $viewerIsAdmin);
     }
 
     /** @param array<string, mixed>|null $owner */
@@ -979,22 +962,9 @@ final class TicketController extends Controller
         return str_ends_with((string) $owner['email'], '.invalid') ? 'A former client' : self::shortName((string) $owner['name']);
     }
 
-    /**
-     * "Ada Lovelace" → "Ada L."; one word stays as it is. A word with an @ in it is left out, so a name typed as
-     * an email address ("ada@example.com", "Ada (ada@example.com)") never shows the address to other clients.
-     */
+    /** "Ada Lovelace" becomes "Ada L."; a word with an @ in it is left out (Names::shortName). */
     public static function shortName(string $name): string
     {
-        $parts = array_values(array_filter(
-            preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [],
-            static fn (string $part): bool => !str_contains($part, '@')
-        ));
-        if ($parts === []) {
-            return 'A client';
-        }
-        if (count($parts) === 1) {
-            return $parts[0];
-        }
-        return $parts[0] . ' ' . mb_strtoupper(mb_substr((string) end($parts), 0, 1)) . '.';
+        return Names::shortName($name);
     }
 }

@@ -109,6 +109,28 @@ final class App
         return $this->db;
     }
 
+    /**
+     * The database, checked with SELECT 1 first: a MySQL connection the server dropped while a long model call ran is
+     * replaced by a new one to the configured database. SQLite is never reconnected (a file needs no reconnecting,
+     * and the tests' in-memory database lives only in its connection), so its failure is thrown as it is.
+     */
+    public function dbAlive(): Database
+    {
+        $db = $this->db();
+        try {
+            $db->value('SELECT 1');
+            return $db;
+        } catch (\PDOException $e) {
+            if ($db->driver() !== 'mysql') {
+                throw $e;
+            }
+            $this->log->warning('database connection lost, reconnecting', ['error' => $e->getMessage()]);
+            $this->db = null;
+            $this->limiter = null;
+            return $this->db();
+        }
+    }
+
     /** The schema migrator for the configured database, its marker keyed to that database's DSN and user. */
     public function migrator(): Migrator
     {

@@ -13,6 +13,8 @@ use Psc\Db\Migrator;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Mail\Mailer;
+use Psc\News\ArticleStore;
+use Psc\News\Draft;
 use Psc\Support\FormGuard;
 
 /**
@@ -323,6 +325,74 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected function signIn(string $email = 'client@example.test', string $password = 'correct horse battery'): Response
     {
         return $this->post('/portal/login/', ['email' => $email, 'password' => $password]);
+    }
+
+    /** Signs in as an administrator (admin@example.test, made if missing) and returns the account's id. */
+    protected function signInAdmin(): int
+    {
+        return $this->signInAccount('admin@example.test', 'admin');
+    }
+
+    /** Signs in as a client ($email, made if missing) and returns the account's id. */
+    protected function signInClient(string $email = 'client@example.test'): int
+    {
+        return $this->signInAccount($email, 'client');
+    }
+
+    private function signInAccount(string $email, string $role): int
+    {
+        $id = $this->db->value('SELECT id FROM users WHERE email = ?', [$email]);
+        $id = $id !== null ? (int) $id : $this->makeUser($email, 'correct horse battery', $role);
+        $this->signIn($email, 'correct horse battery');
+        self::assertSame($id, (int) ($_SESSION['uid'] ?? 0), $email . ' is signed in');
+        return $id;
+    }
+
+    /** How many articles makeArticle() has made in this test, so each has words and a source of its own. */
+    private int $articleCount = 0;
+
+    /**
+     * Creates a valid live article through ArticleStore and returns its id: a manual article in Video with one
+     * source and one confirmed item, published a minute ago. $over replaces any field of the article JSON
+     * (Draft::fromArray(): title, slug, categories, sources, story_key, status ...), and sets origin (manual, ai or
+     * import; ai and import are AI-written with the desk's byline unless ai_written or byline say otherwise) and
+     * published_at (Unix seconds, a date and time, or null for none; a draft has none unless given one).
+     *
+     * @param array<string, mixed> $over
+     */
+    protected function makeArticle(array $over = []): int
+    {
+        $n = ++$this->articleCount;
+        $origin = (string) ($over['origin'] ?? 'manual');
+        $source = 'https://example.com/news/story-' . $n;
+        $data = $over + [
+            'title' => 'Sample story number ' . $n . ' from the test suite',
+            'dek' => 'A standfirst for sample story number ' . $n . ', long enough for the rules that apply when an article is published.',
+            'body' => str_repeat('This paragraph stands in for the body of sample story ' . $n . ', and it is repeated until the body is long enough to publish. ', 4),
+            'impact' => 'Nothing changes for a show tomorrow; it is a sample.',
+            'categories' => ['video'],
+            'tags' => ['sample'],
+            'sources' => [['url' => $source, 'title' => 'Sample source ' . $n, 'publisher' => 'Example News', 'kind' => 'press']],
+            'confirmed' => [['text' => 'The sample story was published.', 'url' => $source]],
+            'verdict' => 'watch',
+            'verdict_note' => 'Worth keeping an eye on.',
+            'status' => 'published',
+        ];
+        $published = array_key_exists('published_at', $over) ? $over['published_at'] : ($data['status'] === 'published' ? time() - 60 : null);
+        unset($data['origin'], $data['published_at'], $data['publish_at']);
+        if (is_string($published)) {
+            $data['published_at'] = $published;
+        }
+        $draft = Draft::fromArray($data, 'manual');
+        $draft->origin = $origin;
+        $draft->aiWritten = array_key_exists('ai_written', $over) ? (bool) $over['ai_written'] : $origin !== 'manual';
+        if (is_int($published) || $published === null) {
+            $draft->publishAt = $published;
+        }
+        if ($origin !== 'manual' && !array_key_exists('byline', $over)) {
+            $draft->byline = Draft::deskByline();
+        }
+        return (new ArticleStore($this->app))->create($draft, null, null);
     }
 
     protected static function rmrf(string $dir): void

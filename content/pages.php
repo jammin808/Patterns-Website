@@ -390,6 +390,17 @@ return [
         'og' => '/assets/img/og/support.png',
         'updated' => $updated,
     ],
+    '/news/' => [
+        'template' => 'news/index',
+        'title' => 'Industry Updates: AV and live event news',
+        'description' => 'AV and live event industry news for freelance crew and corporate event teams: video, audio, lighting, streaming, show control, AI and the law.',
+        'crumb' => 'Industry Updates',
+        'parent' => '/',
+        'section' => 'news',
+        'type' => 'hub',
+        'og' => '/assets/img/og/default.png',
+        'updated' => '2026-10-22',
+    ],
     '/contact/' => [
         'template' => 'pages/contact',
         'title' => 'Contact Patterns Show Control',

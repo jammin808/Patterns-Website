@@ -20,7 +20,8 @@ use Psc\Http\Request;
  *
  * The inline part is allowed by the CSP through its SHA-256 hash, so the snippet and the hash are built from one
  * string here and can never drift apart. Pages whose address carries a one-time token (password reset, email
- * confirmation, invitations) never load it: the tag sends the full address to Google.
+ * confirmation, invitations) never load it: the tag sends the full address to Google. Nor do the admin pages, whose
+ * titles name draft articles and accounts.
  */
 final class Analytics
 {
@@ -52,9 +53,15 @@ final class Analytics
         return $id !== '' && ($request === null || self::allowedOn($request)) ? $id : '';
     }
 
-    /** Whether this request's page may carry the tag: never when its address holds a token. */
+    /**
+     * Whether this request's page may carry the tag: never on the admin pages (their addresses and titles name
+     * drafts and accounts no one outside should see) and never when the address holds a token.
+     */
     public static function allowedOn(Request $request): bool
     {
+        if (str_starts_with($request->path, '/portal/admin/')) {
+            return false;
+        }
         foreach (array_keys($request->query) as $key) {
             if (stripos((string) $key, 'token') !== false) {
                 return false;
