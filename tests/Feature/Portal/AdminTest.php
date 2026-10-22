@@ -186,6 +186,17 @@ final class AdminTest extends TestCase
             '/portal/admin/releases/1/',
             '/portal/admin/licences/',
             '/portal/admin/licences/1/',
+            '/portal/admin/news/',
+            '/portal/admin/news/new/',
+            '/portal/admin/news/1/',
+            '/portal/admin/news/1/preview/',
+            '/portal/admin/news/media/' . str_repeat('a', 32) . '-480.webp',
+            '/portal/admin/news/comments/',
+            '/portal/admin/news/desk/',
+            '/portal/admin/news/desk/settings/',
+            '/portal/admin/news/desk/calendar/',
+            '/portal/admin/news/desk/prompt/',
+            '/portal/admin/news/desk/runs/1/',
         ] as $path) {
             yield $path => [$path];
         }
@@ -250,8 +261,22 @@ final class AdminTest extends TestCase
         $this->conversation(self::CONVERSATION, $client);
         $this->chatMessage(self::CONVERSATION, 'user', 'Hello');
         $this->chatMessage(self::CONVERSATION, 'assistant', 'Hi there', 'in_scope', 10, 5);
+        $article = $this->makeArticle();
+        $this->db->insert('news_comments', ['article_id' => $article, 'user_id' => $client, 'body' => 'Useful, thanks.', 'status' => 'visible', 'reports' => 1, 'created_at' => time(), 'updated_at' => time()]);
+        $run = $this->db->insert('news_runs', ['slot' => '2026-10-22 06:00', 'kind' => 'scheduled', 'status' => 'skipped', 'summary' => 'Slow news', 'created_at' => time()]);
 
+        // The article preview renders in the public layout and the media route returns an image, so neither is here.
         foreach ([
+            '/portal/admin/news/',
+            '/portal/admin/news/new/',
+            '/portal/admin/news/' . $article . '/',
+            '/portal/admin/news/comments/',
+            '/portal/admin/news/comments/?tab=reported',
+            '/portal/admin/news/desk/',
+            '/portal/admin/news/desk/settings/',
+            '/portal/admin/news/desk/calendar/',
+            '/portal/admin/news/desk/prompt/',
+            '/portal/admin/news/desk/runs/' . $run . '/',
             '/portal/admin/',
             '/portal/admin/messages/',
             '/portal/admin/messages/?status=read',
@@ -1032,7 +1057,8 @@ final class AdminTest extends TestCase
         }
         $this->freshBrowser();
         $this->signInAsAdmin();
-        foreach (['/portal/admin/', '/portal/admin/tickets/', '/portal/admin/licences/', '/portal/admin/releases/', '/portal/admin/users/', '/portal/admin/users/' . $client . '/', '/portal/admin/chats/', '/portal/admin/audit/'] as $path) {
+        $this->makeArticle();
+        foreach (['/portal/admin/', '/portal/admin/tickets/', '/portal/admin/licences/', '/portal/admin/releases/', '/portal/admin/users/', '/portal/admin/users/' . $client . '/', '/portal/admin/chats/', '/portal/admin/audit/', '/portal/admin/news/'] as $path) {
             $tables += $this->assertWideTablesStack($path);
         }
         self::assertGreaterThanOrEqual(14, $tables, 'every wide table was found and checked');

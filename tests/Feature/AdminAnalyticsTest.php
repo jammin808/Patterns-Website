@@ -26,7 +26,7 @@ final class AdminAnalyticsTest extends TestCase
     public function testNoAdminPageCarriesTheTag(): void
     {
         $this->signInAdmin();
-        foreach (['/portal/admin/' => 200, '/portal/admin/users/' => 200, '/portal/admin/news/' => 404, '/portal/admin/news/desk/' => 404] as $path => $status) {
+        foreach (['/portal/admin/' => 200, '/portal/admin/users/' => 200, '/portal/admin/news/' => 200, '/portal/admin/news/desk/' => 200] as $path => $status) {
             $r = $this->request('GET', $path);
             self::assertSame($status, $r->status, $path);
             self::assertStringNotContainsString('googletagmanager', $r->body, $path);
