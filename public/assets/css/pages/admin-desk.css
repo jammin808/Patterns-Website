@@ -3,8 +3,9 @@
  * list and the read-only rules. Tokens only, no raw colours; pushed only by those pages (their tabs partial).
  */
 @layer components {
-  /* ===== The state line and the cron line ===== */
+  /* ===== The state line, holding the scheduled articles, and the cron line ===== */
   .pt-desk-state { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; max-width: 70ch; }
+  .pt-desk-hold { margin-top: 16px; max-width: 70ch; }
   .pt-desk-cron { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s2); font-size: 13px; overflow-wrap: anywhere; }
   .pt-desk-next { display: grid; gap: 6px; margin: 0; padding-left: 1.4em; }
 

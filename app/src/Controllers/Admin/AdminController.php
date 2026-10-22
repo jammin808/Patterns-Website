@@ -12,8 +12,6 @@ use Psc\Controllers\Portal\TicketController;
 use Psc\Db\Database;
 use Psc\Http\Request;
 use Psc\Http\Response;
-use Psc\News\AnthropicNewsModel;
-use Psc\News\Pipeline;
 use Psc\News\Runs;
 use Psc\News\Settings;
 use Psc\Support\Audit;
@@ -142,11 +140,12 @@ final class AdminController extends Controller
 
     /**
      * Industry Updates at a glance, counted apart from waitingCounts(): the AI desk's drafts waiting for a person,
-     * reported comments and comments waiting for approval, whether the desk would start a session now (null) or why
-     * not (Pipeline::skipReason()), this London month's estimated spend against the cap, and the newest run. Null
-     * when the news tables cannot be read, so the overview still opens.
+     * reported comments and comments waiting for approval, the desk's state as its own page says it
+     * (AdminNewsDeskController::state(): on only while the cron is ticking, else why no session can start), this
+     * London month's estimated spend against the cap, and the newest run. Null when the news tables cannot be read,
+     * so the overview still opens.
      *
-     * @return array{held: int, reported: int, pending: int, desk: ?string, spent: float, budget: int, last: array<string, mixed>|null}|null
+     * @return array{held: int, reported: int, pending: int, desk: string, spent: float, budget: int, last: array<string, mixed>|null}|null
      */
     private function newsOverview(Database $db): ?array
     {
@@ -157,7 +156,7 @@ final class AdminController extends Controller
                 'held' => (int) $db->value("SELECT COUNT(*) FROM news_articles WHERE status = 'draft' AND origin = 'ai'"),
                 'reported' => (int) $db->value('SELECT COUNT(*) FROM news_comments WHERE reports > 0'),
                 'pending' => (int) $db->value("SELECT COUNT(*) FROM news_comments WHERE status = 'pending'"),
-                'desk' => Pipeline::skipReason($this->app, $settings, $runs, AnthropicNewsModel::available()),
+                'desk' => AdminNewsDeskController::state($this->app)['key'],
                 'spent' => $runs->spentThisMonth(),
                 'budget' => (int) $settings->get('monthly_budget_usd'),
                 'last' => $runs->recent(1)[0] ?? null,

@@ -1,12 +1,15 @@
 <?php
 /**
  * The desk's main page (docs/NEWS.md §11 Desk): its state and the buttons that change it, the last tick, the next
- * sessions, this month's estimated spend against the cap, and the last 20 runs.
+ * sessions, this month's estimated spend against the cap, and the last 20 runs. Pausing stops new sessions only, so
+ * the pause form offers (ticked) to hold the articles a session has already scheduled, and a paused desk says how
+ * many still go live.
  *
  * @var array{key: string, label: string, badge: string, text: string} $state
  * @var bool $enabled
  * @var array<string, mixed>|null $tick the last tick (t, run, status)
- * @var bool $tickStale
+ * @var bool $tickStale the cron is not ticking (Settings::cronState()), with a key set
+ * @var int $scheduled AI articles a session has scheduled that are not live yet
  * @var list<array{date: string, time: string, slot: string, at: int}> $upcoming
  * @var float $spent this month, estimated
  * @var int $cap
@@ -46,8 +49,17 @@ $cron = '*/15 * * * * /usr/bin/php /home/<user>/domains/<domain>/public_html/too
     <?php elseif ($queued !== null): ?>
         <div class="pt-alert pt-alert--info" role="status">A session is queued. It starts within 15 minutes, at the next tick.</div>
     <?php endif; ?>
+    <?php if ($enabled): ?>
+        <div class="pt-field pt-field--inline pt-desk-hold">
+            <input type="checkbox" id="f-hold" name="hold" value="1" form="desk-control" checked aria-describedby="f-hold-help">
+            <label for="f-hold">When pausing, also hold the articles the desk has already scheduled<?= $scheduled > 0 ? ' (' . (int) $scheduled . ' now)' : '' ?></label>
+            <p class="pt-help" id="f-hold-help">Pausing stops new sessions; one already running finishes. Articles a session has already scheduled still go live at their times unless you hold them: held, each becomes a draft under Held for review.</p>
+        </div>
+    <?php elseif ($scheduled > 0): ?>
+        <p class="pt-desk-hold"><?= (int) $scheduled ?> <?= $scheduled === 1 ? 'article the desk has scheduled still goes live at its time' : 'articles the desk has scheduled still go live at their times' ?>. <a href="/portal/admin/news/?tab=scheduled">Open the scheduled articles</a> to unpublish any of them.</p>
+    <?php endif; ?>
     <div class="pt-actions">
-        <form method="post" action="/portal/admin/news/desk/">
+        <form method="post" action="/portal/admin/news/desk/" id="desk-control">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="<?= $enabled ? 'pause' : 'resume' ?>">
             <button type="submit" class="pt-btn <?= $enabled ? 'pt-btn--secondary' : 'pt-btn--primary' ?>"><?= $enabled ? 'Pause the desk' : 'Continue the desk' ?></button>

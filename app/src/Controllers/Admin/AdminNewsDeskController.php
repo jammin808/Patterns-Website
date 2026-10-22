@@ -41,20 +41,47 @@ final class AdminNewsDeskController extends Controller
     private const KEPT_SETTINGS = 'news_desk_settings';
     private const KEPT_PROMPT = 'news_desk_prompt';
 
+    /** Every setting the settings form posts (so the ones its fingerprints cover), by the name the form gives it. */
+    private const SETTING_NAMES = [
+        'max_per_session' => 'Articles per session',
+        'min_importance' => 'How newsworthy a story must be',
+        'research_model' => 'Model for research',
+        'compose_model' => 'Model for choosing and writing',
+        'max_searches' => 'Web searches per session',
+        'max_fetches' => 'Pages read per session',
+        'monthly_budget_usd' => 'Monthly spending cap',
+        'watch_urls' => 'Pages to check every session',
+        'banned_domains' => 'Banned websites',
+        'banned_topics' => 'Banned topics',
+        'avoid_phrases' => 'Phrases to avoid',
+        'ai_note' => 'The note on AI-written articles',
+        'comments' => 'Comments on articles',
+        'auto_publish' => 'Publish articles automatically',
+        'slots' => 'Sessions',
+    ];
+
+    /** The review note on a scheduled AI article that pausing the desk turned back into a draft. */
+    public const HELD_ON_PAUSE = 'Held when the desk was paused';
+
     /**
-     * The desk's state as its pages and the admin overview say it: on, or why no session can start.
+     * The desk's state as its pages and the admin overview say it: on, or why no session can start. A session
+     * starts only at a tick, so the desk is on only while the cron is ticking (Settings::cronState()).
      *
      * @return array{key: string, label: string, badge: string, text: string}
      */
     public static function state(App $app): array
     {
         $settings = new Settings($app);
-        $reason = Pipeline::skipReason($app, $settings, new Runs($app), AnthropicNewsModel::available());
+        $runs = new Runs($app);
+        $reason = Pipeline::skipReason($app, $settings, $runs, AnthropicNewsModel::available())
+            ?? ['never' => 'no_tick', 'stopped' => 'stopped', 'ok' => null][$settings->cronState($runs->running())];
         return match ($reason) {
             null => ['key' => 'on', 'label' => 'On', 'badge' => 'active', 'text' => 'Sessions run on the schedule below.'],
             'paused' => ['key' => 'paused', 'label' => 'Paused', 'badge' => 'pending', 'text' => 'No sessions run until you continue the desk. A session already running finishes.'],
             'no_key' => ['key' => 'no_key', 'label' => 'Stopped: no key', 'badge' => 'declined', 'text' => 'No Anthropic key is set. Add news.api_key (or chat.api_key) to the server\'s config file, as docs/DEPLOY.md describes.'],
             'sdk_missing' => ['key' => 'sdk_missing', 'label' => 'Stopped: SDK missing', 'badge' => 'declined', 'text' => 'The Anthropic SDK is not installed on the server. Deploy a full build, which includes the vendor folder.'],
+            'no_tick' => ['key' => 'no_tick', 'label' => 'Stopped: no tick yet', 'badge' => 'declined', 'text' => 'The cron job has not ticked yet, and a session starts only at a tick. Add the news cron job in hPanel, as docs/DEPLOY.md describes.'],
+            'stopped' => ['key' => 'stopped', 'label' => 'Stopped: cron not ticking', 'badge' => 'declined', 'text' => 'The cron job has not ticked for more than 35 minutes, and a session starts only at a tick. Check the news cron job in hPanel.'],
             default => ['key' => 'budget', 'label' => 'Stopped: cap reached', 'badge' => 'declined', 'text' => 'Another session could take this month past its spending cap. Raise the cap in the settings, or sessions start again next month.'],
         };
     }
@@ -65,18 +92,20 @@ final class AdminNewsDeskController extends Controller
     {
         $settings = new Settings($this->app);
         $runs = new Runs($this->app);
-        $tick = $settings->lastTick();
+        $running = $runs->running();
         $state = self::state($this->app);
         return $this->portal('admin/news/desk/index', [
             'state' => $state,
             'enabled' => $settings->get('enabled') === true,
-            'tick' => $tick,
-            'tickStale' => $state['key'] !== 'no_key' && ($tick === null || (int) ($tick['t'] ?? 0) < time() - \Psc\Controllers\SeoController::NEWS_STALE_SECONDS),
+            'tick' => $settings->lastTick(),
+            // A session still in its time keeps the cron healthy, however long ago its tick last wrote the heartbeat.
+            'tickStale' => $state['key'] !== 'no_key' && $settings->cronState($running) !== 'ok',
+            'scheduled' => self::scheduledAi($this->app),
             'upcoming' => Schedule::upcoming(new \DateTimeImmutable('now'), $settings, 6),
             'spent' => $runs->spentThisMonth(),
             'cap' => (int) $settings->get('monthly_budget_usd'),
             'typical' => $runs->p90Cost(),
-            'running' => $runs->running(),
+            'running' => $running,
             'queued' => $runs->queued(),
             'runs' => $runs->recent(20),
             'perWeek' => Schedule::perWeek($settings),
@@ -97,10 +126,17 @@ final class AdminNewsDeskController extends Controller
                     return $this->redirect(self::BASE, 'info', $paused ? 'The desk is already paused.' : 'The desk is already running.');
                 }
                 $settings->save(['enabled' => $action === 'resume'], (int) $admin['id']);
-                Audit::log($this->app, (int) $admin['id'], $action === 'pause' ? 'desk.paused' : 'desk.resumed');
-                return $this->redirect(self::BASE, 'success', $action === 'pause'
-                    ? 'The desk is paused. No session starts until you continue it; one already running finishes.'
-                    : 'The desk is running again. Its next session starts at the time shown below.');
+                if ($action === 'resume') {
+                    Audit::log($this->app, (int) $admin['id'], 'desk.resumed');
+                    return $this->redirect(self::BASE, 'success', 'The desk is running again. Its next session starts at the time shown below.');
+                }
+                $hold = $request->input('hold') === '1';
+                $held = $hold ? $this->holdScheduled((int) $admin['id']) : [];
+                Audit::log($this->app, (int) $admin['id'], 'desk.paused', null, $hold ? ['held' => count($held)] : []);
+                $left = self::scheduledAi($this->app);
+                return $this->redirect(self::BASE, 'success', 'The desk is paused. No session starts until you continue it; one already running finishes.'
+                    . ($held !== [] ? ' ' . self::articles(count($held)) . ' it had scheduled ' . (count($held) === 1 ? 'is a draft' : 'are drafts') . ' again, under Held for review.' : '')
+                    . ($left > 0 ? ' ' . self::articles($left) . ' it scheduled still ' . ($left === 1 ? 'goes' : 'go') . ' live at ' . ($left === 1 ? 'its time' : 'their times') . '; unpublish any you want to stop from the Scheduled tab.' : ''));
             case 'run_now':
                 $state = self::state($this->app);
                 if ($state['key'] !== 'on') {
@@ -135,6 +171,8 @@ final class AdminNewsDeskController extends Controller
         }
         return $this->portal('admin/news/desk/settings', [
             'values' => $values,
+            // The stored values' fingerprints, never the kept copy's: a refused form saves against what is stored now.
+            'loaded' => $settings->fingerprints(array_keys(self::SETTING_NAMES)),
             'errors' => $this->takeErrors(),
             'estimates' => [
                 'research' => array_map(static fn (string $m): array => Pricing::session($m, $current['compose_model'], (int) $current['max_searches'])['research'], array_combine(array_keys(Settings::MODELS), array_keys(Settings::MODELS))),
@@ -151,12 +189,26 @@ final class AdminNewsDeskController extends Controller
         $admin = $this->currentUser();
         $post = $request->post;
         $values = [];
-        foreach (['max_per_session', 'min_importance', 'research_model', 'compose_model', 'max_searches', 'max_fetches', 'monthly_budget_usd', 'watch_urls', 'banned_domains', 'banned_topics', 'avoid_phrases', 'ai_note', 'comments'] as $name) {
+        foreach (array_diff(array_keys(self::SETTING_NAMES), ['auto_publish', 'slots']) as $name) {
             $values[$name] = $request->input($name);
         }
         $values['auto_publish'] = $request->input('auto_publish') === '1' ? '1' : '0';
         $values['slots'] = self::slotRows($post['slots'] ?? null);
-        $result = (new Settings($this->app))->save($values, (int) $admin['id']);
+        $settings = new Settings($this->app);
+        // A form posts every setting, so one drawn before someone else's save would put their values back: a setting
+        // whose stored value is not the one the form was drawn with refuses the save, and the form comes back as typed.
+        $loaded = is_array($post['loaded'] ?? null) ? $post['loaded'] : [];
+        $stale = [];
+        foreach ($settings->fingerprints(array_keys(self::SETTING_NAMES)) as $name => $print) {
+            if (!is_string($loaded[$name] ?? null) || !hash_equals($print, $loaded[$name])) {
+                $stale[$name] = self::SETTING_NAMES[$name] . ': someone else changed this after you opened the page. Check it, then save again.';
+            }
+        }
+        if ($stale !== []) {
+            $this->app->session()->set(self::KEPT_SETTINGS, $values);
+            return $this->backWithErrors(self::BASE . 'settings/', $request, $stale, 'The settings were changed by someone else after you opened this page, so nothing was saved. Your changes are kept below: check the highlighted settings, then save again.');
+        }
+        $result = $settings->save($values, (int) $admin['id']);
         if ($result['errors'] !== []) {
             $this->app->session()->set(self::KEPT_SETTINGS, $values);
             return $this->backWithErrors(self::BASE . 'settings/', $request, $result['errors'], 'The settings were not saved. Check the highlighted fields.');
@@ -196,20 +248,22 @@ final class AdminNewsDeskController extends Controller
                 $ticked[$day] = true;
             }
         }
+        // Only the months the form drew (it posts them) change: a day the page never showed keeps its state, so a form
+        // drawn before the month turned can never switch off a month it did not show.
+        $shown = [];
+        foreach (is_array($request->post['months'] ?? null) ? array_slice($request->post['months'], 0, self::CALENDAR_MONTHS) : [] as $key) {
+            $first = is_string($key) ? $this->shownMonth($key) : null;
+            for ($d = $first; $d !== null && $d->format('Y-m') === $key; $d = $d->modify('+1 day')) {
+                $shown[$d->format('Y-m-d')] = $key;
+            }
+        }
+        if ($shown === []) {
+            return $this->redirect($back, 'warning', 'The calendar has changed since this page was opened, so nothing was saved. Make your changes again below.');
+        }
         $reset = $request->input('reset');
         $today = (new \DateTimeImmutable('now', Schedule::zone()))->format('Y-m-d');
         $old = (array) $settings->get('date_overrides');
         $new = [];
-        $shown = [];
-        foreach (self::months($from, $settings) as $month) {
-            foreach ($month['weeks'] as $week) {
-                foreach ($week as $day) {
-                    if ($day !== null) {
-                        $shown[$day['date']] = substr($day['date'], 0, 7);
-                    }
-                }
-            }
-        }
         // Days outside the months shown keep their changes.
         foreach ($old as $date => $state) {
             if (!isset($shown[(string) $date])) {
@@ -388,6 +442,40 @@ final class AdminNewsDeskController extends Controller
         return $out;
     }
 
+    /** How many AI articles are scheduled: published with a time still to come. */
+    private static function scheduledAi(App $app): int
+    {
+        return (int) $app->db()->value("SELECT COUNT(*) FROM news_articles WHERE status = 'published' AND origin = 'ai' AND published_at > ?", [time()]);
+    }
+
+    /**
+     * Turns the AI articles still scheduled into drafts held for review (HELD_ON_PAUSE), each audited as unpublished;
+     * returns their ids. Each is one conditional UPDATE, so an article that went live meanwhile is never taken down,
+     * and its time is dropped, so publishing it later puts it live then (ArticleStore::unpublish() does the same).
+     *
+     * @return list<int>
+     */
+    private function holdScheduled(int $adminId): array
+    {
+        $db = $this->app->db();
+        $held = [];
+        foreach ($db->all("SELECT id FROM news_articles WHERE status = 'published' AND origin = 'ai' AND published_at > ? ORDER BY published_at, id", [time()]) as $row) {
+            $now = time();
+            $id = (int) $row['id'];
+            if ($db->exec("UPDATE news_articles SET status = 'draft', published_at = NULL, review_reason = ?, updated_at = ? WHERE id = ? AND status = 'published' AND published_at > ?", [self::HELD_ON_PAUSE, $now, $id, $now]) === 1) {
+                $held[] = $id;
+                Audit::log($this->app, $adminId, 'news.unpublished', (string) $id, ['was' => 'scheduled', 'by' => 'desk.paused']);
+            }
+        }
+        return $held;
+    }
+
+    /** "1 article", "3 articles". */
+    private static function articles(int $n): string
+    {
+        return $n . ' ' . ($n === 1 ? 'article' : 'articles');
+    }
+
     /** "October 2026" for "2026-10". */
     private static function monthName(string $key): string
     {
@@ -404,6 +492,17 @@ final class AdminNewsDeskController extends Controller
             return $first;
         }
         return $d;
+    }
+
+    /**
+     * The first day of a month a calendar form posted (YYYY-MM), or null when it is not one the calendar could have
+     * shown: up to its last month ahead. An earlier month is fine, since its days that have passed are never changed.
+     */
+    private function shownMonth(string $key): ?\DateTimeImmutable
+    {
+        $d = preg_match('/^\d{4}-\d{2}$/', $key) ? \DateTimeImmutable::createFromFormat('!Y-m', $key, Schedule::zone()) : false;
+        $last = $this->thisMonth()->modify('+' . (self::CALENDAR_AHEAD + self::CALENDAR_MONTHS - 1) . ' months');
+        return $d !== false && $d->format('Y-m') === $key && $d <= $last ? $d : null;
     }
 
     private function thisMonth(): \DateTimeImmutable

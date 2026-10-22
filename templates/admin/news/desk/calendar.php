@@ -1,7 +1,8 @@
 <?php
 /**
  * The desk's calendar (docs/NEWS.md §11 Desk): one table per month for three months, a column per weekday. Each day
- * still to come is a checkbox labelled with its full date: ticked, its sessions run. A day that differs from its
+ * still to come is a checkbox labelled with its full date: ticked, its sessions run. The form posts the months it
+ * drew, and a save changes only their days, however long the page was open. A day that differs from its
  * weekday's sessions is marked Changed (an icon and the word); turning a day on runs every session that day. Each
  * month can go back to the weekly pattern with Reset this month. Below 40rem each week stacks as a list of the days
  * still to come.
@@ -31,6 +32,9 @@ foreach ($perDay as $day => $n) {
 <form method="post" action="/portal/admin/news/desk/calendar/" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="from" value="<?= e($from) ?>">
+    <?php foreach ($months as $month): ?>
+        <input type="hidden" name="months[]" value="<?= e($month['key']) ?>">
+    <?php endforeach; ?>
     <div class="pt-actions">
         <button type="submit" class="pt-btn pt-btn--primary" data-busy="Saving…">Save the calendar</button>
         <span class="pt-small pt-muted">A day turned on runs every session; a day turned off runs none.</span>

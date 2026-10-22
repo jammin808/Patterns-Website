@@ -159,11 +159,22 @@ final class Schedule
         return $times;
     }
 
-    /** The Unix time of a London date and time, or null when either is not one. */
+    /**
+     * The Unix time of a London date and time, or null when either is not one. A time the spring clock change skips
+     * (01:00 to 01:59) is the first minute after the change (02:00 BST), so a session set then runs late that day,
+     * never not at all; a time the autumn change repeats is its one GMT instant, so it runs once.
+     */
     public static function at(string $date, string $time): ?int
     {
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
+            return null;
+        }
         $d = \DateTimeImmutable::createFromFormat('!Y-m-d H:i', $date . ' ' . $time, self::zone());
-        return $d !== false && $d->format('Y-m-d H:i') === $date . ' ' . $time ? $d->getTimestamp() : null;
+        if ($d === false || $d->format('Y-m-d') !== $date) {
+            return null;
+        }
+        // PHP moves a skipped time on by the hour the clocks jump, into the hour from 02:00; its first minute is the change.
+        return $d->format('H:i') === $time ? $d->getTimestamp() : $d->setTime((int) $d->format('G'), 0)->getTimestamp();
     }
 
     /** A slot's name as people read it: "Thursday 22 October 2026 at 06:00", or as given when it is not a date. */

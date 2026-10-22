@@ -4,8 +4,10 @@
  * rows are ignored, so no script is needed), the articles per session and how newsworthy a story must be, publishing
  * automatically, the research limits and lists, the models with their estimated cost, the monthly cap, the phrases
  * to avoid, the AI note and the comments. One form, saved all at once; a refused save comes back as it was typed.
+ * It posts the stored values' fingerprints, so a save over someone else's newer settings is refused.
  *
  * @var array<string, mixed> $values the stored settings, or what was posted when a save was refused
+ * @var array<string, string> $loaded each stored setting's fingerprint (Settings::fingerprints())
  * @var array<string, string> $errors
  * @var array{research: array<string, array{low: float, high: float}>, writing: array<string, array{low: float, high: float}>, session: array{low: float, high: float}} $estimates
  * @var array<int, int> $perDay sessions by weekday, as stored
@@ -91,6 +93,9 @@ $radios = function (string $name, string $legend, array $options, string $help) 
 
 <form class="pt-form" method="post" action="/portal/admin/news/desk/settings/" novalidate>
     <?= csrf_field() ?>
+    <?php foreach ($loaded as $name => $print): ?>
+        <input type="hidden" name="loaded[<?= e($name) ?>]" value="<?= e($print) ?>">
+    <?php endforeach; ?>
     <?= $this->partial('error-summary', ['errors' => $errors, 'fields' => $fields, 'flashes' => $flashes ?? [], 'action' => 'before saving', 'failed' => 'The settings were not saved']) ?>
 
     <section class="pt-section" aria-labelledby="desk-sessions">

@@ -73,6 +73,9 @@ final class Settings
         'avoid_phrases' => [200, 80],
     ];
 
+    /** The last tick older than this means the cron has stopped, unless a session is still in its time (docs/NEWS.md §6.1). */
+    public const TICK_STALE = 35 * 60;
+
     public const MAX_SLOTS = 6;
     public const AI_NOTE_MAX = 300;
     public const PROMPT_MAX = 20000;
@@ -152,6 +155,22 @@ final class Settings
         });
         $this->stored = null;
         return ['changed' => $changed, 'errors' => []];
+    }
+
+    /**
+     * A short fingerprint of each named setting's current value. A form posts the ones it was drawn with, so a save
+     * from a page opened before someone else's save can be refused instead of putting their values back.
+     *
+     * @param list<string> $names
+     * @return array<string, string>
+     */
+    public function fingerprints(array $names): array
+    {
+        $out = [];
+        foreach ($names as $name) {
+            $out[$name] = substr(hash('sha256', self::encode($this->get($name))), 0, 16);
+        }
+        return $out;
     }
 
     /**
@@ -263,6 +282,26 @@ final class Settings
         $value = $this->db()->value("SELECT value FROM news_settings WHERE name = 'heartbeat'");
         $tick = is_string($value) ? json_decode($value, true) : null;
         return is_array($tick) ? $tick : null;
+    }
+
+    /**
+     * Whether the cron is ticking: 'never' before the first tick; 'ok' while the last tick is under TICK_STALE old,
+     * or while a session is running and not yet past the time the reaper would fail it (its deadline plus
+     * Runs::REAP_AFTER), since the tick that runs it may record nothing until it ends; 'stopped' otherwise.
+     *
+     * @param array<string, mixed>|null $running the running run (Runs::running())
+     */
+    public function cronState(?array $running, ?int $now = null): string
+    {
+        $now ??= time();
+        $tick = $this->lastTick();
+        if ($tick === null) {
+            return 'never';
+        }
+        if ((int) ($tick['t'] ?? 0) >= $now - self::TICK_STALE) {
+            return 'ok';
+        }
+        return $running !== null && (int) ($running['deadline_at'] ?? 0) + Runs::REAP_AFTER >= $now ? 'ok' : 'stopped';
     }
 
     /**

@@ -207,6 +207,39 @@ final class SettingsTest extends TestCase
         self::assertSame(Settings::DEFAULTS, $s->all(), 'the internal rows are never settings');
     }
 
+    public function testFingerprintsChangeOnlyWithTheirSetting(): void
+    {
+        $s = $this->settings();
+        $before = $s->fingerprints(['banned_domains', 'max_per_session']);
+        self::assertSame(['banned_domains', 'max_per_session'], array_keys($before));
+        self::assertMatchesRegularExpression('/^[0-9a-f]{16}$/', $before['banned_domains']);
+        self::assertSame($before, $this->settings()->fingerprints(['banned_domains', 'max_per_session']), 'the same values, the same prints');
+        $s->save(['banned_domains' => 'spam.example'], null);
+        $after = $this->settings()->fingerprints(['banned_domains', 'max_per_session']);
+        self::assertNotSame($before['banned_domains'], $after['banned_domains']);
+        self::assertSame($before['max_per_session'], $after['max_per_session']);
+    }
+
+    public function testTheCronStateReadsTheHeartbeatAndARunStillInItsTime(): void
+    {
+        $s = $this->settings();
+        $now = time();
+        $running = ['status' => 'running', 'deadline_at' => $now + 600];
+        self::assertSame('never', $s->cronState(null, $now));
+        self::assertSame('never', $s->cronState($running, $now), 'a session started by hand is no tick');
+        $s->heartbeat(['run' => null, 'status' => 'idle']);
+        self::assertSame('ok', $s->cronState(null, $now));
+        self::assertSame('ok', $s->cronState(null, $now + Settings::TICK_STALE));
+        self::assertSame('stopped', $s->cronState(null, $now + Settings::TICK_STALE + 2));
+        // A tick busy with a session writes nothing until it ends: the session in its time keeps the cron alive, until
+        // the reaper would fail it.
+        $late = $now + Settings::TICK_STALE + 600;
+        self::assertSame('ok', $s->cronState(['deadline_at' => $late - 60], $late));
+        self::assertSame('ok', $s->cronState(['deadline_at' => $late - \Psc\News\Runs::REAP_AFTER], $late));
+        self::assertSame('stopped', $s->cronState(['deadline_at' => $late - \Psc\News\Runs::REAP_AFTER - 1], $late));
+        self::assertSame(\Psc\Controllers\SeoController::NEWS_STALE_SECONDS, Settings::TICK_STALE, '/health and the desk agree');
+    }
+
     public function testTheValidationContextAndTheKey(): void
     {
         $this->settings()->save(['banned_domains' => 'spam.example', 'banned_topics' => 'gossip', 'avoid_phrases' => 'delve'], null);

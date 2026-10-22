@@ -8,8 +8,8 @@
  * @var array{approval: int, tickets: int, licences: int, messages: int} $waiting
  * @var array{requested: int, awaiting_payment: int} $licencesWaiting
  * @var array{today: array<string, int>, week: array<string, int>} $assistant
- * @var array{held: int, reported: int, pending: int, desk: ?string, spent: float, budget: int, last: array<string, mixed>|null}|null $news
- *      Industry Updates (null when its tables cannot be read); desk is why a session would not start, null when it would
+ * @var array{held: int, reported: int, pending: int, desk: string, spent: float, budget: int, last: array<string, mixed>|null}|null $news
+ *      Industry Updates (null when its tables cannot be read); desk is the desk's state key (AdminNewsDeskController::state())
  * @var array{approval: list<array<string, mixed>>, tickets: list<array<string, mixed>>, licences: list<array<string, mixed>>, messages: list<array<string, mixed>>} $latest
  * @var array<int, string> $licenceNames
  * @var array<string, string> $ticketTypes
@@ -201,11 +201,13 @@ $news ??= null;
 
     <?php if ($news !== null):
         [$deskBadge, $deskWords] = match ($news['desk']) {
-            null => ['active', 'Running'],
+            'on' => ['active', 'Running'],
             'paused' => ['pending', 'Paused'],
             'budget' => ['pending', 'Waiting: the monthly cap is near'],
             'no_key' => ['disabled', 'Stopped: no API key is set'],
             'sdk_missing' => ['disabled', 'Stopped: the SDK is not installed'],
+            'no_tick' => ['disabled', 'Stopped: the cron job has not ticked yet'],
+            'stopped' => ['disabled', 'Stopped: the cron job is not ticking'],
             default => ['pending', 'Not running'],
         };
         $last = $news['last'];

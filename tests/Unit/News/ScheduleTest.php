@@ -128,7 +128,41 @@ final class ScheduleTest extends TestCase
         self::assertSame('Thursday 22 October 2026 at 06:00', Schedule::label('2026-10-22 06:00'));
         self::assertSame('manual-1-abc', Schedule::label('manual-1-abc'));
         self::assertSame(self::london('2026-10-22 06:00')->getTimestamp(), Schedule::at('2026-10-22', '06:00'));
-        self::assertNull(Schedule::at('2027-03-28', '01:30'), 'a time the clocks skip does not exist');
         self::assertNull(Schedule::at('2026-02-30', '06:00'));
+        self::assertNull(Schedule::at('2026-10-22', '6:00'));
+        self::assertNull(Schedule::at('2026-10-22', '24:00'));
+    }
+
+    /** 28 March 2027: London jumps from 01:00 GMT to 02:00 BST, so 01:00 to 01:59 never happen that day. */
+    public function testASessionTheSpringChangeSkipsRunsAtTheFirstMinuteAfterIt(): void
+    {
+        $change = self::utc('2027-03-28 01:00')->getTimestamp();
+        self::assertSame($change, Schedule::at('2027-03-28', '01:30'));
+        self::assertSame($change, Schedule::at('2027-03-28', '01:00'));
+        self::assertSame($change, Schedule::at('2027-03-28', '01:59'));
+        self::assertSame($change, Schedule::at('2027-03-28', '02:00'));
+        self::assertSame(self::utc('2027-03-28 00:59')->getTimestamp(), Schedule::at('2027-03-28', '00:59'));
+        self::assertSame(self::utc('2027-03-28 01:30')->getTimestamp(), Schedule::at('2027-03-28', '02:30'));
+
+        $s = $this->settings(['slots' => [['time' => '01:30', 'days' => ['7']]]]);
+        self::assertNull(Schedule::due(self::utc('2027-03-28 00:59'), $s, null));
+        self::assertSame('2027-03-28 01:30', Schedule::due(self::utc('2027-03-28 01:00'), $s, null), 'due at 02:00 BST');
+        self::assertSame('2027-03-28 01:30', Schedule::due(self::utc('2027-03-28 02:45'), $s, null), 'for the usual two hours');
+        self::assertNull(Schedule::due(self::utc('2027-03-28 03:00'), $s, null));
+        self::assertNull(Schedule::due(self::utc('2027-03-28 01:15'), $s, null, ['2027-03-28 01:30']), 'claimed, it runs once');
+        $next = Schedule::upcoming(self::utc('2027-03-27 12:00'), $s, 2);
+        self::assertSame([['2027-03-28 01:30', $change], ['2027-04-04 01:30', self::utc('2027-04-04 00:30')->getTimestamp()]], array_map(static fn (array $u): array => [$u['slot'], $u['at']], $next));
+    }
+
+    /** 25 October 2026: London goes from 02:00 BST back to 01:00 GMT, so 01:00 to 01:59 happen twice. */
+    public function testASessionTheAutumnChangeRepeatsRunsOnce(): void
+    {
+        $at = self::utc('2026-10-25 01:30')->getTimestamp();
+        self::assertSame($at, Schedule::at('2026-10-25', '01:30'), 'the GMT 01:30');
+        $s = $this->settings(['slots' => [['time' => '01:30', 'days' => ['7']]]]);
+        self::assertNull(Schedule::due(self::utc('2026-10-25 00:30'), $s, null), 'not at the first 01:30 (BST)');
+        self::assertSame('2026-10-25 01:30', Schedule::due(self::utc('2026-10-25 01:30'), $s, null));
+        self::assertNull(Schedule::due(self::utc('2026-10-25 01:45'), $s, null, ['2026-10-25 01:30']), 'claimed, it runs once');
+        self::assertSame(['2026-10-25 01:30'], array_column(Schedule::upcoming(self::utc('2026-10-24 12:00'), $s, 1), 'slot'));
     }
 }

@@ -77,9 +77,10 @@ final class AdminNewsDeskTest extends TestCase
         return $id;
     }
 
-    /** The settings form as an administrator sends it unchanged. */
-    private function settingsForm(array $over = []): array
+    /** The settings form as an administrator sends it unchanged, with the fingerprints the page drew it with. */
+    private function settingsForm(array $over = [], ?array $loaded = null): array
     {
+        $loaded ??= $this->loadedFingerprints();
         $s = $this->settings()->all();
         $slots = [];
         foreach ($s['slots'] as $i => $slot) {
@@ -101,7 +102,16 @@ final class AdminNewsDeskTest extends TestCase
             'ai_note' => $s['ai_note'],
             'comments' => $s['comments'],
             'slots' => $slots,
+            'loaded' => $loaded,
         ];
+    }
+
+    /** @return array<string, string> the settings page's hidden fingerprints, one per setting it posts */
+    private function loadedFingerprints(): array
+    {
+        preg_match_all('#<input type="hidden" name="loaded\[([a-z_]+)\]" value="([0-9a-f]{16})">#', $this->request('GET', self::DESK . 'settings/')->body, $m);
+        self::assertCount(15, $m[1], 'every setting the form posts');
+        return array_combine($m[1], $m[2]);
     }
 
     // ------------------------------------------------------------------------------------------- the fences
@@ -197,7 +207,8 @@ final class AdminNewsDeskTest extends TestCase
     {
         $this->signInAdmin();
         $page = $this->request('GET', self::DESK)->body;
-        self::assertStringContainsString('<span class="pt-badge pt-badge--active">On</span>', $page);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--declined">Stopped: no tick yet</span>', $page, 'no session starts before the cron ticks');
+        self::assertStringNotContainsString('>On</span>', $page);
         self::assertStringContainsString('The cron job has not ticked yet.', $page);
         self::assertSame(6, substr_count($this->mainOf($this->request('GET', self::DESK)), '<li><time datetime='), 'the next six sessions');
         self::assertStringContainsString('No sessions have run yet.', $page);
@@ -205,6 +216,7 @@ final class AdminNewsDeskTest extends TestCase
         $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
         $run = $this->finishedRun();
         $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('<span class="pt-badge pt-badge--active">On</span>', $page);
         self::assertStringNotContainsString('has not ticked', $page);
         self::assertStringNotContainsString('more than 35 minutes ago', $page);
         self::assertStringContainsString('href="/portal/admin/news/desk/runs/' . $run . '/"', $page);
@@ -215,13 +227,61 @@ final class AdminNewsDeskTest extends TestCase
 
         // A tick older than 35 minutes is a warning to check the cron job.
         $this->db->exec("UPDATE news_settings SET value = ? WHERE name = 'heartbeat'", [json_encode(['t' => time() - 36 * 60])]);
-        self::assertStringContainsString('more than 35 minutes ago', $this->request('GET', self::DESK)->body);
+        $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('more than 35 minutes ago', $page);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--declined">Stopped: cron not ticking</span>', $page);
 
         $this->bootApp(['news' => ['api_key' => ''], 'chat' => ['api_key' => '']]);
         $this->signInAdmin();
         $page = $this->request('GET', self::DESK)->body;
         self::assertStringContainsString('Stopped: no key', $page);
         self::assertStringNotContainsString('more than 35 minutes', $page, 'no key, no cron warning');
+    }
+
+    /** A tick busy with a long session may write nothing for a while: the session still in its time is the cron alive. */
+    public function testASessionStillInItsTimeKeepsTheCronHealthy(): void
+    {
+        $this->signInAdmin();
+        $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
+        $this->db->exec("UPDATE news_settings SET value = ? WHERE name = 'heartbeat'", [json_encode(['t' => time() - 36 * 60])]);
+        $id = (int) (new Runs($this->app))->queueManual(null);
+        $this->db->exec("UPDATE news_runs SET status = 'running', started_at = ?, deadline_at = ? WHERE id = ?", [time() - 38 * 60, time() + 2 * 60, $id]);
+        self::assertSame('ok', $this->settings()->cronState((new Runs($this->app))->running()));
+        $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('A session is running now', $page);
+        self::assertStringNotContainsString('more than 35 minutes ago', $page);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--active">On</span>', $page);
+
+        // Past its deadline by more than the reaper allows, its process has gone: the cron is stopped.
+        $this->db->exec('UPDATE news_runs SET deadline_at = ? WHERE id = ?', [time() - Runs::REAP_AFTER - 60, $id]);
+        $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('more than 35 minutes ago', $page);
+        self::assertStringContainsString('Stopped: cron not ticking', $page);
+    }
+
+    /** The admin overview's card says the desk's state as the desk page does, the cron included. */
+    public function testTheOverviewCardSaysWhenTheCronIsNotTicking(): void
+    {
+        $this->signInAdmin();
+        $card = static function (string $page): string {
+            $start = strpos($page, 'id="ov-news"');
+            self::assertNotFalse($start, 'the Industry Updates card');
+            return substr($page, (int) $start, 2000);
+        };
+        $page = $card($this->request('GET', '/portal/admin/')->body);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--disabled">Stopped: the cron job has not ticked yet</span>', $page);
+        self::assertStringNotContainsString('Running', $page);
+
+        $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--active">Running</span>', $card($this->request('GET', '/portal/admin/')->body));
+
+        $this->db->exec("UPDATE news_settings SET value = ? WHERE name = 'heartbeat'", [json_encode(['t' => time() - 36 * 60])]);
+        $page = $card($this->request('GET', '/portal/admin/')->body);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--disabled">Stopped: the cron job is not ticking</span>', $page);
+        self::assertStringNotContainsString('Running', $page);
+
+        $this->settings()->save(['enabled' => false], null);
+        self::assertStringContainsString('<span class="pt-badge pt-badge--pending">Paused</span>', $card($this->request('GET', '/portal/admin/')->body), 'a pause says so first');
     }
 
     public function testPauseAndContinue(): void
@@ -247,9 +307,54 @@ final class AdminNewsDeskTest extends TestCase
         self::assertSame('danger', self::lastFlash()['type']);
     }
 
+    public function testPausingHoldsTheArticlesASessionHasScheduledWhenTicked(): void
+    {
+        $admin = $this->signInAdmin();
+        $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
+        $live = $this->makeArticle(['origin' => 'ai']);
+        $soon = $this->makeArticle(['origin' => 'ai', 'published_at' => time() + 600]);
+        $later = $this->makeArticle(['origin' => 'ai', 'published_at' => time() + 1800]);
+        $manual = $this->makeArticle(['published_at' => time() + 900]);
+        $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('<input type="checkbox" id="f-hold" name="hold" value="1" form="desk-control" checked', $page, 'ticked by default');
+        self::assertStringContainsString('the articles the desk has already scheduled (2 now)', $page);
+        self::assertStringContainsString('<form method="post" action="/portal/admin/news/desk/" id="desk-control">', $page);
+
+        self::assertRedirect($this->post(self::DESK, ['action' => 'pause', 'hold' => '1']), self::DESK);
+        self::assertFalse($this->settings()->get('enabled'));
+        $row = fn (int $id): array => (array) $this->db->one('SELECT status, published_at, review_reason FROM news_articles WHERE id = ?', [$id]);
+        foreach ([$soon, $later] as $id) {
+            self::assertSame(['draft', null, 'Held when the desk was paused'], array_values($row($id)), 'held: a draft with no time');
+        }
+        self::assertSame('published', $row($live)['status'], 'a live article is never taken down');
+        self::assertSame('published', $row($manual)['status'], 'only the desk\'s own articles');
+        self::assertSame([(string) $soon, (string) $later], array_column($this->auditRows('news.unpublished'), 'subject'));
+        self::assertSame(['was' => 'scheduled', 'by' => 'desk.paused'], json_decode((string) $this->auditRows('news.unpublished')[0]['meta'], true));
+        self::assertSame($admin, (int) $this->auditRows('news.unpublished')[0]['user_id']);
+        self::assertSame(['held' => 2], json_decode((string) $this->auditRows('desk.paused')[0]['meta'], true));
+        self::assertSame('success', self::lastFlash()['type']);
+        self::assertStringContainsString('2 articles it had scheduled are drafts again, under Held for review.', self::lastFlash()['message']);
+        self::assertStringContainsString('Held when the desk was paused', $this->request('GET', '/portal/admin/news/?tab=held')->body);
+
+        // Not ticked, the schedule stands and the flash and the page say so.
+        $this->post(self::DESK, ['action' => 'resume']);
+        $next = $this->makeArticle(['origin' => 'ai', 'published_at' => time() + 1200]);
+        $this->post(self::DESK, ['action' => 'pause']);
+        self::assertFalse($this->settings()->get('enabled'));
+        self::assertSame('published', $row($next)['status']);
+        self::assertCount(2, $this->auditRows('news.unpublished'));
+        self::assertNull($this->auditRows('desk.paused')[1]['meta']);
+        self::assertStringContainsString('1 article it scheduled still goes live at its time; unpublish any you want to stop from the Scheduled tab.', self::lastFlash()['message']);
+        $page = $this->request('GET', self::DESK)->body;
+        self::assertStringContainsString('1 article the desk has scheduled still goes live at its time.', $page);
+        self::assertStringContainsString('href="/portal/admin/news/?tab=scheduled"', $page);
+        self::assertStringNotContainsString('name="hold"', $page, 'a paused desk has nothing to pause');
+    }
+
     public function testRunNowQueuesOneSessionAndIsRefusedWhileOneIsQueued(): void
     {
         $admin = $this->signInAdmin();
+        $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
         self::assertRedirect($this->post(self::DESK, ['action' => 'run_now']), self::DESK);
         self::assertSame('success', self::lastFlash()['type']);
         $runs = $this->db->all('SELECT * FROM news_runs');
@@ -271,6 +376,12 @@ final class AdminNewsDeskTest extends TestCase
     public function testRunNowIsRefusedWhilePausedOrWithoutAKey(): void
     {
         $this->signInAdmin();
+        $this->post(self::DESK, ['action' => 'run_now']);
+        self::assertSame('danger', self::lastFlash()['type']);
+        self::assertStringContainsString('A session cannot start: the cron job has not ticked yet', self::lastFlash()['message']);
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_runs'), 'no tick, no session');
+
+        $this->settings()->heartbeat(['run' => null, 'status' => 'idle']);
         $this->settings()->save(['enabled' => false], null);
         $this->post(self::DESK, ['action' => 'run_now']);
         self::assertSame(['danger', 'The desk is paused. Continue the desk first, then run a session.'], array_values(self::lastFlash()));
@@ -350,6 +461,39 @@ final class AdminNewsDeskTest extends TestCase
         self::assertStringContainsString('value="3"', $again);
     }
 
+    /** A tab opened before another admin saved would put their values back: it is refused, and comes back as typed. */
+    public function testASettingsFormOpenedBeforeSomeoneElsesSaveIsRefused(): void
+    {
+        $this->signInAdmin();
+        $stale = $this->settingsForm(['max_per_session' => '2']);
+        $other = $this->makeUser('other@example.test', 'correct horse battery', 'admin');
+        self::assertSame(['banned_domains'], $this->settings()->save(['banned_domains' => 'spam.example'], $other)['changed']);
+
+        $r = $this->post(self::DESK . 'settings/', $stale);
+        self::assertRedirect($r, self::DESK . 'settings/');
+        self::assertSame('danger', self::lastFlash()['type']);
+        self::assertStringContainsString('changed by someone else after you opened this page, so nothing was saved', self::lastFlash()['message']);
+        self::assertSame(['banned_domains'], array_keys($_SESSION['_errors'] ?? []), 'only the setting someone else changed');
+        self::assertSame(['spam.example'], $this->settings()->get('banned_domains'), 'their change stands');
+        self::assertSame(3, $this->settings()->get('max_per_session'), 'nothing of the stale form was stored');
+        self::assertSame([], $this->auditRows('desk.settings'));
+
+        $page = $this->request('GET', self::DESK . 'settings/')->body;
+        self::assertStringContainsString('<a href="#f-banned-domains">Banned websites: someone else changed this after you opened the page. Check it, then save again.</a>', $page);
+        self::assertMatchesRegularExpression('#id="f-max-per-session" name="max_per_session"[^>]*value="2"#', $page, 'the form comes back as typed');
+
+        // Saved again from the page that showed the refusal, it goes through: its fingerprints are the stored values'.
+        preg_match_all('#name="loaded\[([a-z_]+)\]" value="([0-9a-f]{16})"#', $page, $m);
+        $this->post(self::DESK . 'settings/', $this->settingsForm(['max_per_session' => '2'], array_combine($m[1], $m[2])));
+        self::assertSame('success', self::lastFlash()['type']);
+        self::assertSame([2, ['spam.example']], [$this->settings()->get('max_per_session'), $this->settings()->get('banned_domains')]);
+
+        // A form that carries no fingerprints at all is refused for every setting.
+        $this->post(self::DESK . 'settings/', ['loaded' => null] + $this->settingsForm(['max_per_session' => '4']));
+        self::assertCount(15, $_SESSION['_errors'] ?? []);
+        self::assertSame(2, $this->settings()->get('max_per_session'));
+    }
+
     public function testTheSettingsShowTheEstimatedCostOfEachModel(): void
     {
         $this->signInAdmin();
@@ -386,7 +530,8 @@ final class AdminNewsDeskTest extends TestCase
         }
         $days = array_values(array_diff($weekly, [$monday]));
         $days[] = $saturday;
-        $r = $this->post(self::DESK . 'calendar/', ['from' => $month, 'days' => $days]);
+        $months = self::monthKeys($first);
+        $r = $this->post(self::DESK . 'calendar/', ['from' => $month, 'months' => $months, 'days' => $days]);
         self::assertRedirect($r, self::DESK . 'calendar/?from=' . $month);
         self::assertSame('success', self::lastFlash()['type']);
         $overrides = $this->settings()->get('date_overrides');
@@ -406,12 +551,74 @@ final class AdminNewsDeskTest extends TestCase
         self::assertStringContainsString('<caption id="desk-month-' . $month . '">' . $first->format('F Y') . '</caption>', $page);
 
         // Reset the month: back to the weekly pattern, whatever was ticked in it.
-        $this->post(self::DESK . 'calendar/', ['from' => $month, 'days' => $days, 'reset' => $month]);
+        $this->post(self::DESK . 'calendar/', ['from' => $month, 'months' => $months, 'days' => $days, 'reset' => $month]);
         self::assertStringContainsString($first->format('F Y') . ' is back to the weekly sessions.', self::lastFlash()['message']);
         self::assertSame([$later => 'off'], $this->settings()->get('date_overrides'));
 
-        $this->post(self::DESK . 'calendar/', ['from' => $month, 'days' => $weekly]);
+        $this->post(self::DESK . 'calendar/', ['from' => $month, 'months' => $months, 'days' => $weekly]);
         self::assertSame(['info', 'Nothing changed, so nothing was saved.'], array_values(self::lastFlash()));
+    }
+
+    /** The three month keys the calendar draws from $first, as its form posts them. */
+    private static function monthKeys(\DateTimeImmutable $first): array
+    {
+        return [$first->format('Y-m'), $first->modify('first day of +1 month')->format('Y-m'), $first->modify('first day of +2 months')->format('Y-m')];
+    }
+
+    /** Every date of the months given that runs sessions by its weekday: a calendar form ticked as it was drawn. */
+    private function onDays(array $months): array
+    {
+        $days = [];
+        foreach ($months as $key) {
+            for ($d = new \DateTimeImmutable($key . '-01'); $d->format('Y-m') === $key; $d = $d->modify('+1 day')) {
+                if (\Psc\News\Schedule::isOnByWeekday($d->format('Y-m-d'), $this->settings())) {
+                    $days[] = $d->format('Y-m-d');
+                }
+            }
+        }
+        return $days;
+    }
+
+    /**
+     * A tab drawn last month (last month, this one and the next) and saved now changes only the days it showed: the
+     * month after next, which it never drew, keeps the weekly sessions.
+     */
+    public function testACalendarDrawnBeforeTheMonthTurnedChangesOnlyTheMonthsItShowed(): void
+    {
+        $this->signInAdmin();
+        $last = new \DateTimeImmutable('first day of last month', new \DateTimeZone('Europe/London'));
+        $drawn = self::monthKeys($last);
+        self::assertSame((new \DateTimeImmutable('first day of next month', new \DateTimeZone('Europe/London')))->format('Y-m'), $drawn[2]);
+        $form = ['from' => $drawn[0], 'months' => $drawn, 'days' => $this->onDays($drawn)];
+
+        $this->post(self::DESK . 'calendar/', $form);
+        self::assertSame(['info', 'Nothing changed, so nothing was saved.'], array_values(self::lastFlash()));
+        self::assertSame([], $this->settings()->get('date_overrides'), 'no day of a month the form never drew is turned off');
+        self::assertSame([], $this->auditRows('desk.calendar'));
+
+        // A day it showed and the admin unticked is saved; the month it never drew is still untouched.
+        $off = $drawn[2] . '-15';
+        $r = $this->post(self::DESK . 'calendar/', ['days' => array_values(array_diff($form['days'], [$off]))] + $form);
+        self::assertRedirect($r, self::DESK . 'calendar/');
+        self::assertSame('success', self::lastFlash()['type']);
+        self::assertSame([$off => 'off'], $this->settings()->get('date_overrides'));
+        self::assertSame(['on' => 0, 'off' => 1], json_decode((string) $this->auditRows('desk.calendar')[0]['meta'], true));
+    }
+
+    /** A form that does not say which months it drew (one from before the months were posted) saves nothing. */
+    public function testACalendarFormWithoutItsMonthsIsRefused(): void
+    {
+        $this->signInAdmin();
+        $this->settings()->save(['date_overrides' => [(new \DateTimeImmutable('tomorrow', new \DateTimeZone('Europe/London')))->format('Y-m-d') => 'off']], null);
+        $before = $this->settings()->get('date_overrides');
+        foreach ([[], ['months' => ['nonsense', '2999-01']]] as $months) {
+            $r = $this->post(self::DESK . 'calendar/', ['from' => date('Y-m'), 'days' => []] + $months);
+            self::assertRedirect($r, self::DESK . 'calendar/');
+            self::assertSame(['warning', 'The calendar has changed since this page was opened, so nothing was saved. Make your changes again below.'], array_values(self::lastFlash()));
+            self::assertSame($before, $this->settings()->get('date_overrides'));
+        }
+        self::assertSame([], $this->auditRows('desk.calendar'));
+        self::assertSame(3, substr_count($this->request('GET', self::DESK . 'calendar/')->body, '<input type="hidden" name="months[]" value="'), 'the form posts the three months it draws');
     }
 
     public function testTheCalendarShowsThreeMonthsFromThisMonthOnly(): void
