@@ -47,7 +47,7 @@ $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages
 <div class="l-section l-section--flush support-legal-body">
     <div class="l-wrap l-wrap--prose">
         <div class="c-prose"><?= md($markdown) ?></div>
-        <?php if ($name === 'cookies' && \Psc\View\Analytics::forPage($app ?? \Psc\App::get()) !== ''): ?>
+        <?php if ($name === 'cookies' && \Psc\View\Analytics::forPage($app ?? \Psc\App::get()) !== '' && \Psc\View\Analytics::asksFirst($app ?? \Psc\App::get())): ?>
             <p class="support-legal-consent"><button type="button" class="c-btn c-btn--secondary" data-consent-open hidden>Change your cookie choice</button></p>
         <?php endif; ?>
     </div>

@@ -693,6 +693,20 @@ final class AdminTest extends TestCase
 
     // ------------------------------------------------------------ messages
 
+    /** The inbox names the country a visitor chose and says when none was. */
+    public function testTheInboxNamesTheCountry(): void
+    {
+        $this->signInAsAdmin();
+        $chosen = $this->contactMessage();
+        $this->db->run('UPDATE contact_messages SET country = ? WHERE id = ?', ['GB', $chosen]);
+        $none = $this->contactMessage();
+        $page = $this->request('GET', '/portal/admin/messages/')->body;
+        self::assertSame(1, preg_match('#id="message-' . $chosen . '".*?<dt>Country</dt>\s*<dd>([^\n]*)</dd>#s', $page, $m));
+        self::assertSame('United Kingdom', $m[1]);
+        self::assertSame(1, preg_match('#id="message-' . $none . '".*?<dt>Country</dt>\s*<dd>([^\n]*)</dd>#s', $page, $m));
+        self::assertSame('<span class="pt-muted">Not given</span>', $m[1]);
+    }
+
     public function testMessageStatusChanges(): void
     {
         $adminId = $this->signInAsAdmin();

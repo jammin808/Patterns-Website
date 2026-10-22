@@ -95,9 +95,11 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 ## 4. Settings worth knowing (`config/defaults.php`)
 
 - `analytics.ga_id`: the Google Analytics 4 measurement ID tagged on every page right after `<head>` (default
-  `G-0C7QKZTNF7`; `''` turns it off, banner and all). The CSP allows the tag's inline part by its hash and Google's
-  hosts only. gtag.js loads only after a visitor accepts statistics cookies in the cookie banner. Pages whose address
-  carries a one-time token (password reset, email confirmation, invitations) never load it.
+  `G-0C7QKZTNF7`; `''` turns it off). The CSP allows the tag's inline part by its hash and Google's hosts only. Pages
+  whose address carries a one-time token (password reset, email confirmation, invitations) never load it.
+- `analytics.consent`: `false` (default) tracks every visit with Google's own snippet and shows no cookie banner;
+  `true` makes the tag wait for consent (Google Consent Mode, basic) behind the cookie banner (DESIGN.md 8.35). The
+  cookie notice and privacy policy describe the default; switching consent on means restoring their consent wording.
 - `security.registration`: `open` (default), `approval` (you approve each account) or `invite` (no public sign-up).
 - `licensing.payment_mode`: `invoice` (default: you email payment details) or `links` with
   `licensing.payment_links` such as `'stagewatch.pro' => 'https://…'`.

@@ -52,6 +52,20 @@ final class Content
         return $p === [] ? null : $p;
     }
 
+    /** @return array<string, string> ISO 3166-1 alpha-2 code => name, alphabetical */
+    public static function countries(): array
+    {
+        $all = self::get('countries')['all'] ?? [];
+        return is_array($all) ? $all : [];
+    }
+
+    /** @return list<string> the codes the contact form lists first */
+    public static function topCountries(): array
+    {
+        $top = self::get('countries')['top'] ?? [];
+        return array_values(array_filter(is_array($top) ? $top : [], static fn ($c): bool => isset(self::countries()[$c])));
+    }
+
     /** @return array<string, array<string, mixed>> key => product, in ecosystem order */
     public static function products(): array
     {

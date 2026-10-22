@@ -64,6 +64,9 @@ $tabTitle = ['new' => 'New messages', 'read' => 'Read messages', 'archived' => '
                     <dd><?php if ($mailto !== null): ?><a href="<?= e($mailto) ?>"><?= e($m['email']) ?></a><?php else: ?><?= e($m['email']) ?><?php endif; ?></dd>
                     <dt>Company</dt>
                     <dd><?= $company !== '' ? e($company) : '<span class="pt-muted">Not given</span>' ?></dd>
+                    <?php $country = (string) ($m['country'] ?? ''); ?>
+                    <dt>Country</dt>
+                    <dd><?= $country !== '' ? e(\Psc\Content\Content::countries()[$country] ?? $country) : '<span class="pt-muted">Not given</span>' ?></dd>
                     <dt>About</dt>
                     <dd><?= e($topics[$topic] ?? $topic) ?></dd>
                     <dt>Product</dt>

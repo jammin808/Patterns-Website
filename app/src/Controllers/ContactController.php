@@ -117,6 +117,7 @@ final class ContactController extends Controller
             'name' => trim($request->input('name')),
             'email' => trim($request->input('email')),
             'company' => trim($request->input('company')),
+            'country' => $request->input('country'),
             'topic' => $request->input('topic'),
             'product' => $request->input('product'),
             'message' => trim(str_replace("\r\n", "\n", $request->input('message'))),
@@ -136,6 +137,9 @@ final class ContactController extends Controller
         }
         if (mb_strlen($data['company']) > 160) {
             $errors['company'] = 'Keep this under 160 characters.';
+        }
+        if ($data['country'] !== '' && !array_key_exists($data['country'], Content::countries())) {
+            $errors['country'] = 'Choose a country from the list.';
         }
         if (!array_key_exists($data['topic'], self::TOPICS)) {
             $errors['topic'] = 'Choose what your message is about.';
@@ -180,6 +184,7 @@ final class ContactController extends Controller
             'name' => $data['name'],
             'email' => $email,
             'company' => $data['company'] !== '' ? $data['company'] : null,
+            'country' => $data['country'] !== '' ? $data['country'] : null,
             'topic' => $data['topic'],
             'product' => $data['product'] !== '' ? $data['product'] : null,
             'message' => $data['message'],
@@ -190,7 +195,7 @@ final class ContactController extends Controller
         $to = $this->app->config->string('mail.admin_to');
         $recipients = $to !== '' ? [$to] : array_filter($this->app->config->list('app.admin_emails'), 'is_string');
         foreach ($recipients as $r) {
-            $this->app->mailer()->send($r, 'Website message: ' . self::TOPICS[$data['topic']], 'contact-admin', $data + ['id' => $id, 'topicLabel' => self::TOPICS[$data['topic']]], $data['email']);
+            $this->app->mailer()->send($r, 'Website message: ' . self::TOPICS[$data['topic']], 'contact-admin', $data + ['id' => $id, 'topicLabel' => self::TOPICS[$data['topic']], 'countryName' => Content::countries()[$data['country']] ?? ''], $data['email']);
         }
         // The receipt goes to an address nobody has proven, so it carries only the site's own words (the topic comes
         // from the fixed list), never the name or message typed into the form, and each address gets at most

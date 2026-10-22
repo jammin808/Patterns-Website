@@ -6,7 +6,11 @@ namespace Psc\Tests\Feature;
 
 use Psc\Tests\TestCase;
 
-/** The Google tag: first in <head> on every page, allowed by the CSP through its hash, never on token pages. */
+/**
+ * The Google tag: first in <head> on every page, allowed by the CSP through its hash, never on token pages. Most tests
+ * here run it in consent mode (analytics.consent on, the cookie banner); the default, every visit tracked with the tag
+ * exactly as Google gives it and no banner, has tests of its own.
+ */
 final class AnalyticsTest extends TestCase
 {
     private const ID = 'G-0C7QKZTNF7';
@@ -14,7 +18,24 @@ final class AnalyticsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->bootApp(['analytics' => ['ga_id' => self::ID, 'consent' => true]]);
+    }
+
+    /** By default every visit is tracked: Google's own snippet, gtag.js loading at once, and no cookie banner. */
+    public function testByDefaultTheTagIsGooglesOwnAndThereIsNoBanner(): void
+    {
         $this->bootApp(['analytics' => ['ga_id' => self::ID]]);
+        $expected = "<head>\n<!-- Google tag (gtag.js) -->\n<script async src=\"https://www.googletagmanager.com/gtag/js?id=" . self::ID . "\"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n\n  gtag('config', '" . self::ID . "');\n</script>\n";
+        foreach (['/', '/contact/', '/portal/login/', '/legal/cookies/', '/no-such-page/'] as $path) {
+            $body = $this->request('GET', $path)->body;
+            self::assertStringContainsString($expected, $body, $path);
+            self::assertStringNotContainsString("gtag('consent'", $body, $path);
+            self::assertStringNotContainsString('data-consent', $body, $path . ': no banner and no Cookie settings');
+        }
+        $r = $this->request('GET', '/');
+        self::assertSame(1, preg_match('#<script async [^>]*></script>\n<script>(.*?)</script>#s', $r->body, $m));
+        $hash = "'sha256-" . base64_encode(hash('sha256', $m[1], true)) . "'";
+        self::assertStringContainsString("script-src 'self' " . $hash . ' https://*.googletagmanager.com;', (string) $r->getHeader('Content-Security-Policy'));
     }
 
     public function testTheTagIsFirstInTheHeadOfPublicPortalAndErrorPages(): void
@@ -85,7 +106,7 @@ final class AnalyticsTest extends TestCase
     /** With Turnstile switched on, the contact page adds Cloudflare's host to the one policy instead of replacing it. */
     public function testTheContactPageKeepsTheTagWhenTurnstileIsOn(): void
     {
-        $this->bootApp(['analytics' => ['ga_id' => self::ID], 'security' => ['turnstile_site_key' => 'site-key', 'turnstile_secret' => 'secret']]);
+        $this->bootApp(['analytics' => ['ga_id' => self::ID, 'consent' => true], 'security' => ['turnstile_site_key' => 'site-key', 'turnstile_secret' => 'secret']]);
         $r = $this->request('GET', '/contact/');
         $directives = [];
         foreach (explode(';', (string) $r->getHeader('Content-Security-Policy')) as $part) {

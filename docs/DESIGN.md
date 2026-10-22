@@ -1098,6 +1098,9 @@ under 150 KB (25–90 KB today).
 
 ### 8.35 Cookie choice (`templates/partials/consent.php`, `site.js` initConsent)
 
+**Off by default:** `analytics.consent` is `false`, so the tag tracks every visit and no banner renders. With it on,
+the banner works as below.
+
 ```html
 <section class="c-consent" data-consent data-ga="G-…" aria-labelledby="consent-title" hidden>   <!-- after the skip link -->
   <div class="c-consent-card">
