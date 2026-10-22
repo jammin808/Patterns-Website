@@ -1,0 +1,157 @@
+{
+  "key": "2026-10-22-ai-agents-on-air",
+  "title": "AI assistants can now take Tagboard graphics to air, if you let them",
+  "seo_title": "Tagboard MCP lets AI take graphics live, with confirmations",
+  "dek": "Tagboard's MCP, announced on 5 October, links ChatGPT, Claude or an open model to Tagboard Producer, and with the right permissions the assistant can take graphics live. Tagboard says you approve changes before anything goes on air; its support page makes that a recommended setting.",
+  "summary": "Tagboard's MCP lets ChatGPT, Claude or an open model take Producer graphics live, with permission. Where the approval sits, and how to test it.",
+  "body": "Tagboard has handed AI assistants the take button. Its post of 5 October, [A Co-Producer for Every Show: Introducing the Tagboard MCP](https://tagboard.com/product/introducing-the-tagboard-mcp/), describes an MCP server that connects ChatGPT, Claude or an open model to Tagboard Producer. You sign in with your Tagboard login, and the assistant can then answer questions about your productions and playlists. With the right permissions it can also preview a graphic, take it live, clear it, play or pause the playlist, loop it, or mute the output.\n\nAsking a chatbot what is in a playlist is a convenience. Letting it take a graphic to air changes who, or what, is operating the show.\n\n## Where the approval sits\n\nTagboard's answer is approval. The post says \"the assistant only gets the permissions you approve, and you approve changes before anything goes on air.\" The [support page](https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant) is a little more careful. Tagboard recommends starting with confirmations turned on, which in its words \"will require your assistant to ask before it changes anything or controls your output.\"\n\nSo the confirmation step is a setting, and the advice is to start with it on. That is our reading of the two pages; we have not seen Tagboard say what happens with it off, and we would like it to.\n\nCredit where it is due: the support page is clear about what touches air. Preview is \"Preview only, not on air\". Take live and the playback commands change on-air output, and playback \"can affect on-air output right away\". A command the assistant reports as accepted only means Tagboard received it: \"'Accepted' does not mean 'on screen.'\" Whether a graphic is on the programme feed is still something you find out by looking at the programme feed.\n\nThe page also warns that sending the same command twice \"can trigger the action twice\", which anyone who has double-tapped a GO button will recognise.\n\n## Getting connected\n\nYou need a Tagboard login, an assistant signed in to the workspace, and \"a plan or workspace setting that allows custom connections\". No API key or tunnel is needed, and the server address must include /mcp. \"Your open model\" comes with conditions: \"A client that only supports DCR, static API keys, or legacy SSE is not automatically compatible\", and direct Codex URL-only onboarding is \"not yet certified by Tagboard\". The suggested first check is read-only, along the lines of \"Show my Tagboard profile and available teams. Do not change any production.\" Start there.\n\nTagboard's post suggests a few uses, among them a pre-game show scheduled to run itself \"if your assistant can run scheduled tasks\" and an agent watching a score feed. It calls them \"a few ideas to get your creative wheels spinning\", which is fair. We would want reliability data before a show ran itself, and the page has none.\n\n## The buttons came first\n\nTagboard [launched its Producer API on 28 July](https://tagboard.com/blog/tagboard-launches-producer-api-with-support-for-elgatos-stream-deck/), with Elgato's Stream Deck as the first integration, through a plugin in the Elgato Marketplace. Any action on a Producer playlist can be mapped to any system with API access. Marty Roberts, Tagboard's chief executive, said at the time that \"Stream Deck is just the start.\" The MCP turned up a little over two months later.\n\n## Others draw the line elsewhere\n\nTiMax went the other way. [LSi reported on 26 August](https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/) that TiMax MCP is now in SoundHub: free, with no additional licence, in the standard release for Mac and PC. TiMax puts its scope at initial setup, outside the live cue path and the running of a show. \"Setup time, not show time,\" says TiMax's Dan Higgott. TiMax's own figure is that it cuts show-file setup from a typical four or five hours to around 30 minutes; we have not seen that checked independently. TiMax does not mention Tagboard, so the contrast is ours.\n\n[Bizzabo unveiled](https://www.bizzabo.com/blog/bizzabo-reveals-its-agentic-operating-system-for-events) its Agentic Operating System for Events on 12 October, with five named agents: Website Designer, Setup Reviewer, Content Manager, Audience Manager and Event Analyst. They operate within existing roles and permissions, and Bizzabo says nothing they change goes live until a person approves it. Existing customers can get early access to the first agents this autumn, and Bizzabo says the full system will be broadly available in early 2027.\n\nBizzabo previewed the agents at [IMEX America](https://imexevents.com/media/press-releases/imex-america-opening-day-ai-attention-and-putting-people-at-the-center) in Las Vegas (13-15 October, Mandalay Bay). [Event Marketer](https://www.eventmarketer.com/article/ai-agents-the-joy-factor-our-7-takeaways-from-imex-america-2026/) reports that \"AI agents were firmly in the limelight\", and quotes Jeanne Sheehy, CMO at Bostrom, on agents: \"You have to treat them like an intern.\"\n\n## Our view\n\nTagboard and Bizzabo both reach for the same safeguard, a person who approves. TiMax sidesteps the question on show day by keeping its agent in the prep day, well away from the cue path. So the real difference is how close to the audience each lets the agent stand, and Tagboard's, even with confirmations on, is a single yes away from programme.\n\nFor a streamed show with a graphics operator who has rehearsed it, Tagboard's version deserves a proper try. For a corporate keynote, where the wrong lower third goes out under the chief executive's name, we would leave the assistant on preview and keep the take with a person and a button. The Stream Deck plugin already does that job, and it has never once misread a prompt.",
+  "confirmed": [
+    {
+      "text": "Tagboard's post 'A Co-Producer for Every Show: Introducing the Tagboard MCP', dated 5 October 2026, describes an MCP that connects ChatGPT, Claude or an open model to Tagboard Producer, with sign-in by Tagboard login.",
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/"
+    },
+    {
+      "text": "The assistant can be asked about productions and playlists and, with the right permissions, can preview a graphic, take it live, clear it, play or pause the playlist, loop it, or mute the output.",
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/"
+    },
+    {
+      "text": "Tagboard says the assistant only gets the permissions the user approves, and that changes are approved before anything goes on air.",
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/"
+    },
+    {
+      "text": "Tagboard's support page says the connection needs a Tagboard login, an assistant signed in to the workspace, and a plan or workspace setting that allows custom connections.",
+      "url": "https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant"
+    },
+    {
+      "text": "Tagboard's support page recommends starting with confirmations turned on, so the assistant must ask before it changes anything or controls output.",
+      "url": "https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant"
+    },
+    {
+      "text": "The support page classes preview as not affecting air and take-live and playback commands as changing on-air output, and says a command reported as 'accepted' only means Tagboard received it.",
+      "url": "https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant"
+    },
+    {
+      "text": "Tagboard's Producer API post is dated 28 July 2026; its first integration is Elgato's Stream Deck, through a plugin in the Elgato Marketplace, and any action on a Producer playlist can be mapped to any system with API access.",
+      "url": "https://tagboard.com/blog/tagboard-launches-producer-api-with-support-for-elgatos-stream-deck/"
+    },
+    {
+      "text": "LSi reported TiMax MCP in SoundHub on 26 August 2026; it is free, needs no additional licence and is in the standard software release for Mac and PC.",
+      "url": "https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/"
+    },
+    {
+      "text": "TiMax says the scope of TiMax MCP is initial setup, outside the live cue path and the running of a show.",
+      "url": "https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/"
+    },
+    {
+      "text": "Bizzabo unveiled its Agentic Operating System for Events on 12 October 2026 with five named agents (Website Designer, Setup Reviewer, Content Manager, Audience Manager and Event Analyst), which operate within existing roles and permissions; nothing they change goes live until a person approves it.",
+      "url": "https://www.bizzabo.com/blog/bizzabo-reveals-its-agentic-operating-system-for-events"
+    },
+    {
+      "text": "Existing Bizzabo customers can get early access to the first agents this autumn, and Bizzabo says the full system will be broadly available in early 2027.",
+      "url": "https://www.bizzabo.com/blog/bizzabo-reveals-its-agentic-operating-system-for-events"
+    },
+    {
+      "text": "IMEX America 2026 took place on 13-15 October at Mandalay Bay, Las Vegas.",
+      "url": "https://imexevents.com/media/press-releases/imex-america-opening-day-ai-attention-and-putting-people-at-the-center"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "Tagboard's example uses, such as a pre-game show scheduled to run itself and an agent watching a score feed, are its own suggestions ('a few ideas to get your creative wheels spinning'), with no reliability data on the page.",
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/"
+    },
+    {
+      "text": "Our reading, not Tagboard's statement: because confirmations are a recommended setting, the approval gate depends on that setting being on. We have not seen Tagboard describe what happens with it off.",
+      "url": "https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant"
+    },
+    {
+      "text": "Tagboard's chief executive Marty Roberts said 'Stream Deck is just the start.' That is a forward-looking remark, not a published roadmap.",
+      "url": "https://tagboard.com/blog/tagboard-launches-producer-api-with-support-for-elgatos-stream-deck/"
+    },
+    {
+      "text": "TiMax says TiMax MCP cuts show-file setup from a typical four or five hours to around 30 minutes. That is TiMax's own figure and has not been checked independently.",
+      "url": "https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/"
+    },
+    {
+      "text": "The contrast between TiMax's setup-only scope and Tagboard's on-air controls is our analysis; TiMax's announcement does not mention Tagboard.",
+      "url": "https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/"
+    },
+    {
+      "text": "Broad availability of Bizzabo's full Agentic Operating System in early 2027 is a company roadmap date.",
+      "url": "https://www.bizzabo.com/blog/bizzabo-reveals-its-agentic-operating-system-for-events"
+    },
+    {
+      "text": "Jeanne Sheehy of Bostrom, as reported by Event Marketer, said of AI agents 'You have to treat them like an intern'. That is her opinion.",
+      "url": "https://www.eventmarketer.com/article/ai-agents-the-joy-factor-our-7-takeaways-from-imex-america-2026/"
+    },
+    {
+      "text": "Our view, not Tagboard's: on corporate keynotes the assistant should stay on preview, with the take left to a person and a button.",
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/"
+    }
+  ],
+  "impact": "**If you run Tagboard on corporate jobs.** The connection needs \"a plan or workspace setting that allows custom connections\", so ask whoever owns the client's Tagboard account before the job, not at the tech rehearsal.\n\n**Before it goes near a live show.** Tagboard's own advice is to test on a production that is not attached to a live broadcast. Start with read-only prompts, keep confirmations on, and set a default team (where the page says \"business unit\", it means team ID).\n\n**On the day.** Agree in the run-of-show who approves an assistant's change. In our view that is the graphics operator watching programme, not a producer typing on a phone in the green room. Treat \"accepted\" as received, and look at the output before you call anything done. If nothing seems to happen, do not send the command again: Tagboard says a repeat can trigger the action twice. Pausing a playlist also pauses the video in it, so warn whoever is relying on that video.\n\n**If you bring your own model.** Check the client first. Tagboard says one that only supports DCR, static API keys or legacy SSE is not automatically compatible, and direct Codex URL-only onboarding is not yet certified.\n\n**If you would rather have buttons.** Tagboard's Producer plugin for Stream Deck works on physical and virtual decks: install it, connect your Tagboard account and drag Producer commands onto keys.\n\n**If you mix on TiMax.** TiMax MCP is free in the standard SoundHub release. It needs SoundHub running with an AI assistant connected (TiMax gives Claude Desktop as the example), and it imports speaker layouts from Martin Audio DISPLAY 3, d&b ArrayCalc and EASE files. It is a prep-day tool by design, and that is where we would use it.\n\n**If your client runs its events on Bizzabo.** Changes to the event website and content may start to come from agents, with a person approving. If agenda changes reach your screens from there, find out who that person is.",
+  "verdict": "test",
+  "verdict_note": "Test the Tagboard MCP on a production that is not attached to a live broadcast, with confirmations on and read-only prompts first. On show day we would keep the assistant on preview and the take with a person.",
+  "categories": [
+    "ai",
+    "automation",
+    "streaming"
+  ],
+  "tags": [
+    "tagboard",
+    "mcp",
+    "ai assistants",
+    "live graphics",
+    "stream deck",
+    "timax",
+    "bizzabo",
+    "imex america"
+  ],
+  "sources": [
+    {
+      "url": "https://tagboard.com/product/introducing-the-tagboard-mcp/",
+      "title": "A Co-Producer for Every Show: Introducing the Tagboard MCP",
+      "publisher": "Tagboard",
+      "kind": "primary"
+    },
+    {
+      "url": "https://support.tagboard.com/knowledge-base/connect-tagboard-mcp-to-your-ai-assistant",
+      "title": "Connect Tagboard MCP to your AI Assistant",
+      "publisher": "Tagboard Knowledge Base",
+      "kind": "primary"
+    },
+    {
+      "url": "https://tagboard.com/blog/tagboard-launches-producer-api-with-support-for-elgatos-stream-deck/",
+      "title": "Tagboard Launches Producer API with Support for Elgato's Stream Deck",
+      "publisher": "Tagboard",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.lsionline.com/news/timax-launches-soundhub-ai-assistant-support/",
+      "title": "TiMax launches SoundHub AI assistant support",
+      "publisher": "LSi Online",
+      "kind": "press"
+    },
+    {
+      "url": "https://www.bizzabo.com/blog/bizzabo-reveals-its-agentic-operating-system-for-events",
+      "title": "Bizzabo Reveals Its Agentic Operating System for Events",
+      "publisher": "Bizzabo",
+      "kind": "primary"
+    },
+    {
+      "url": "https://imexevents.com/media/press-releases/imex-america-opening-day-ai-attention-and-putting-people-at-the-center",
+      "title": "IMEX America opening day: AI, attention and putting people at the center",
+      "publisher": "IMEX Group",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.eventmarketer.com/article/ai-agents-the-joy-factor-our-7-takeaways-from-imex-america-2026/",
+      "title": "AI Agents, the Joy Factor: Our 7 Takeaways From IMEX America 2026",
+      "publisher": "Event Marketer",
+      "kind": "press"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "tagboard-mcp-ai-assistants-on-air",
+  "ai_written": true
+}

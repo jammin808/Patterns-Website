@@ -1,0 +1,111 @@
+{
+  "key": "2026-10-22-late-payments",
+  "title": "Late payment bill would cap terms at 60 days and make base rate plus 8% interest compulsory, but the cheque is not in the post yet",
+  "seo_title": "Late payment bill: 60-day cap and 8% interest, not law yet",
+  "dek": "The Commercial Payments Bill, branded the Small Business Protections Bill, would cap payment terms at 60 days and make interest at 8% above base rate mandatory on late payments. It is not law yet, and the government plans to start the cap no earlier than 2027.",
+  "summary": "The UK late payment bill would cap payment terms at 60 days and make 8% over base rate interest mandatory. Not law yet; no cap before 2027.",
+  "body": "The government's late payment bill would cap payment terms at 60 days and make interest on late payments mandatory, at 8% above the Bank of England base rate. It would also give the Small Business Commissioner new powers to investigate and adjudicate disputes, and to fine persistent late payers. None of it is law yet, and on the government's own plan the cap would not start before 2027.\n\nIts formal name is the Commercial Payments Bill. The [Department for Business and Trade's press release](https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament) of 19 May 2026 branded it the Small Business Protections Bill, which is the name you are more likely to have heard, and said it was due to be introduced in the House of Lords on Tuesday 19 May. According to a [BCLP briefing](https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html) from August, it completed its Committee stage on 21 July 2026 and a new version was published.\n\nWhere it stands in the Lords today we cannot say for certain. Parliament's own pages would not open for us before publishing, so the later stages are not in our facts. The Commons, either way, is still to come.\n\n## What the bill would change\n\n**The cap.** The press release pitches it as a 60-day cap \"on all large firms paying smaller suppliers\". The government's [consultation response](https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version), updated 24 July 2026, puts it more broadly: \"We intend to introduce a maximum payment term of 60 days between businesses, with limited exemptions.\" The exemptions it intends are where both parties are large companies, where the purchaser is the smaller party, and where the goods or services are imported or exported.\n\nA tighter 45-day limit is parked rather than dropped: \"We do not intend to take this forward now but may revisit it in the future.\" On timing, the response describes \"a gradual change with an appropriate transition period, starting with 60 days, no earlier than 2027.\" That is the first step of a phase-in, not a commencement date.\n\n**Public bodies.** BCLP reads the 21 July version as setting a maximum of 30 days for public authorities, where the contract is not covered by the Procurement Act 2023, and 60 days for everyone else, subject to the limited exemptions.\n\n**Interest.** The rate is not the new part. The consultation response notes that statutory interest is already a right under the Late Payment of Commercial Debts (Interest) Act 1998. What changes is that the government intends to \"remove the ability for parties to agree an alternative remedy to statutory interest\", so the right could no longer be written out of a contract. BCLP reads the bill the same way: \"Paying parties will now be subject to the full statutory rate.\"\n\n**The commissioner.** The press release puts the potential penalties for persistent late payers in the tens of millions.\n\n**Retentions.** The press release lists a ban on withholding retention payments under construction contracts. The consultation response is more careful: \"we propose to ban\" the practice, and the government is consulting on its implementation. BCLP reads the 21 July text as phasing it in: parties can still agree or vary retention clauses during years one and two, and those clauses stop working \"at the end of year three\". Whether your set build counts as a construction contract is a question for whoever writes your contracts.\n\nThe government's own estimate of what late payment costs the UK economy is almost £11 billion a year.\n\n## What we make of it\n\nThe interest change is the one that matters most to freelancers, and it is not the one in the headlines. Plenty of crew know they can charge statutory interest and never do, because billing a regular client for it feels like resigning by invoice. The bill will not cure that. What it would do is stop the right being written out of the contract before you have even seen the job sheet.\n\nWe would take a commissioner who can fine over another code of practice. Whether it changes behaviour depends on the fines actually landing, and on whether anyone at the bottom of a chain is willing to complain about the client at the top of it.\n\nSixty days is still two months, which is a long wait for a day rate earned in a loading bay at 5am. It beats the 90-day terms some of us have learnt to live with from big agencies.\n\nThe exemptions are where the detail will bite. The both-parties-large exemption leaves the middle of a supply chain exposed: on the intended wording, a large AV supplier could be capped when it pays crew but not when its large client pays it. The export exemption may matter for touring and cross-border kit hire. We would not plan around either until the bill's definitions are pinned down, and we have not been able to check its text for this piece.\n\nWhat happens next is forecasting, and BCLP's dates from August. It thinks amendment is more likely in the Commons than it was in the Lords. It also thought it unlikely the bill would reach the Commons before early 2027, and expected it to become law \"if all goes to plan, at some point during 2027\".\n\nUntil it is law, the invoice is still yours to chase.",
+  "confirmed": [
+    {
+      "text": "The Small Business Protections Bill is formally the Commercial Payments Bill; the government's press release of 19 May 2026 said it was due to be introduced in the House of Lords on Tuesday 19 May.",
+      "url": "https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament"
+    },
+    {
+      "text": "The press release lists a 60-day cap on payment terms for all large firms paying smaller suppliers.",
+      "url": "https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament"
+    },
+    {
+      "text": "The press release lists mandatory interest on late payments, set at 8% above the Bank of England base rate.",
+      "url": "https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament"
+    },
+    {
+      "text": "The press release promises the Small Business Commissioner powers to investigate, adjudicate disputes and fine persistent late payers, with potential penalties worth tens of millions.",
+      "url": "https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament"
+    },
+    {
+      "text": "The government's consultation response (updated 24 July 2026) intends a maximum payment term of 60 days between businesses, with exemptions where both parties are large companies, where the purchaser is the smaller party, or where the goods or services are imported or exported.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "The consultation response describes a gradual change with a transition period, starting with 60 days, no earlier than 2027.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "The consultation response says a reduction to 45 days is not being taken forward now but may be revisited in the future.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "The consultation response intends to remove the ability for parties to agree an alternative remedy to statutory interest.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "The consultation response frames the retention ban as a proposal, with the government consulting on its implementation.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "The consultation response estimates that late payments cost the UK economy almost £11 billion a year.",
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version"
+    },
+    {
+      "text": "BCLP reports that the bill completed its Committee stage on 21 July 2026 and that a new version was published.",
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html"
+    },
+    {
+      "text": "BCLP reads the bill as setting a maximum of 30 days for public authorities where the contract is not covered by the Procurement Act 2023, and 60 days for non-public authorities, subject to limited exemptions.",
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "BCLP's authors think amendment of the bill is more likely in the Commons than it was in the Lords.",
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html"
+    },
+    {
+      "text": "BCLP's authors, writing in August 2026, thought it unlikely the bill would move to the House of Commons before early 2027.",
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html"
+    },
+    {
+      "text": "BCLP's authors expect the bill to become law, if all goes to plan, at some point during 2027.",
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html"
+    }
+  ],
+  "impact": "**Freelance crew.** Nothing changes on today's invoices: the terms you have agreed still apply, and the cap would start no earlier than 2027. Our advice in the meantime, which is ours and not the bill's: put your payment terms on every quote and invoice instead of leaving them to the client's purchase order, and add a line reserving your right to statutory interest under the 1998 Act, which you have now. Keep a simple log of who paid late and by how long. If the commissioner gets its new powers, a record with dates in it will be worth more than a grievance in the group chat.\n\n**Crew chiefs and small suppliers who book other freelancers.** The press release talks about large firms paying smaller suppliers; the consultation response talks about businesses in general, with an exemption where the buyer is the smaller party. If the bill follows the response, you could be inside the cap when you pay your own crew. The bill text decides, and we have not checked it.\n\n**Production companies and AV suppliers.** Watch the middle of the chain. If you and your client both count as large, the intended exemption means the client's terms to you may not be capped, while your terms to smaller crew and suppliers would be. Look at cash flow before 2027 rather than during it.\n\n**Corporate event teams.** If your organisation counts as large, standard terms longer than 60 days for small suppliers look to be on borrowed time, so procurement may as well start the conversation now. On BCLP's reading, public authorities face a 30-day maximum where the contract is not covered by the Procurement Act 2023, so a council or other public-sector event client may be on the shorter limit.\n\n**Touring and overseas work.** The import and export exemption could take cross-border jobs outside the cap. That depends on definitions we have not seen, so do not count on it either way.\n\n**The build side.** If your contracts carry retentions and count as construction contracts, BCLP reads the bill as banning retentions after a transition, with retention clauses still possible in years one and two.\n\nBefore relying on any detail here, read the bill as it now stands on parliament.uk.",
+  "verdict": "watch",
+  "verdict_note": "Not law yet, and the government's plan has the cap starting no earlier than 2027. Watch the Commons stages, and meanwhile put your terms and a statutory interest line on every invoice, since that right already exists.",
+  "categories": [
+    "freelance",
+    "legal"
+  ],
+  "tags": [
+    "late payment",
+    "payment terms",
+    "statutory interest",
+    "small business commissioner",
+    "commercial payments bill",
+    "invoicing",
+    "retentions"
+  ],
+  "sources": [
+    {
+      "url": "https://www.gov.uk/government/news/largest-crackdown-on-late-payments-in-over-25-years-as-landmark-bill-enters-parliament",
+      "title": "Largest crackdown on late payments in over 25 years as landmark Bill enters Parliament (19 May 2026)",
+      "publisher": "GOV.UK (Department for Business and Trade)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.gov.uk/government/consultations/late-payments-tackling-poor-payment-practices/outcome/late-payment-consultation-time-to-pay-up-government-response-web-version",
+      "title": "Late payment consultation: time to pay up, government response (web version), updated 24 July 2026",
+      "publisher": "GOV.UK",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.bclplaw.com/en-US/events-insights-news/commercial-payments-bill-and-its-impact-on-construction-contracts.html",
+      "title": "Commercial Payments Bill and its impact on construction contracts (19 August 2026)",
+      "publisher": "BCLP (Bryan Cave Leighton Paisner)",
+      "kind": "other"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "uk-commercial-payments-bill-late-payment",
+  "ai_written": true
+}

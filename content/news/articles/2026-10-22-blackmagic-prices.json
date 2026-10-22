@@ -1,0 +1,111 @@
+{
+  "key": "2026-10-22-blackmagic-prices",
+  "title": "Blackmagic puts prices up on 36 products and blames the cost of memory",
+  "seo_title": "Blackmagic raises prices on 36 products, citing memory",
+  "dek": "Blackmagic Design has raised prices on 36 products, from ATEM switchers to its 2110 IP converters, and blames the cost of DRAM, flash and SSD storage. Cameras are spared and current backorders keep their price. The only full list so far is a press report, so check before you quote.",
+  "summary": "Blackmagic has raised prices on 36 products, including ATEM switchers, HyperDecks and 2110 converters, citing memory costs. Cameras are spared.",
+  "body": "Blackmagic Design has raised prices on 36 of its products, effective immediately for its resellers worldwide. The list, [published by Newsshooter](https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/) on 20 October and updated the next day, runs through ATEM switchers, HyperDeck recorders, Videohub routers and the new SMPTE 2110 IP range. Cameras and accessories are not affected.\n\nThe reason given is memory. Blackmagic says the cost of the DRAM, flash and SSD storage that goes into almost everything it makes \"has risen several times over\", and it puts the cause down to memory makers shifting production to supply AI data centres. The 2110 products get a mention of their own because, in the company's words, they \"use a lot more memory\".\n\n## Where it bites\n\nThe rises are not even. On Newsshooter's list (the sums are ours):\n\n- **Biggest in cash:** ATEM 4 M/E Constellation IP Plus, from $12,995 to $19,960. That is $6,965 more, or 53.6%.\n- **Steepest in percentage:** Blackmagic 2110 IP SDI to HDMI 12G, from $515 to $925, up 79.6%. The 2110 IP UpDownCross 12G is next at 69.0%.\n- **ATEM 4 M/E Constellation IP:** $7,995 to $10,845, up 35.6%.\n- **ATEM Mini Extreme ISO G2:** $1,995 to $3,090, up $1,095 or 54.9%.\n- **ATEM 2 M/E Constellation 4K:** $4,415 to $5,025, a comparatively gentle 13.8%.\n\nThe ATEM Mini Pro, the ATEM Television Studio HD8 ISO and 4K8, the HyperDeck Studio HD Pro and 4K Pro and the Videohub Mini 4x2 12G are on the list too, along with more of the 2110 converters.\n\n## Orders already placed\n\nThe new prices apply to new orders. Blackmagic says current customer backorders will be fulfilled at the original order price. That is narrower than a promise that everything already ordered keeps its price, so if you have kit on backorder, ask your reseller to confirm in writing that yours counts.\n\nIf a shop is still showing an old price, do not assume it will stick. Nothing we have read says a new order placed at an old price will be honoured.\n\n## Check the figure before you quote it\n\nEvery price here is in US dollars, and the footer of Blackmagic's website says its MSRP includes duties but excludes sales tax and shipping. None of the sources we read gave sterling prices, so a UK figure is a separate conversation with your reseller.\n\nThere is also a wrinkle. The full table rests on one press report, and we could not find Blackmagic's own announcement on its homepage or its media page. [Blackmagic's homepage](https://www.blackmagicdesign.com/), when we looked, showed \"From $11,935\" for the new ATEM 4 M/E Constellation IP and \"From $6,639\" for the new HyperDeck ISO Recorder 100G. Newsshooter gives $10,845 and $6,035. We cannot tell from what we read which figure is current or why they differ, so treat the table as a guide and the reseller's quote as the price.\n\n## Not the first round this year\n\nIn May, [AV Magazine reported](https://www.avinteractive.com/news/products/blackmagic-raises-prices-and-adds-no-storage-atem-models-07-05-2026/) that Blackmagic had put up prices on nearly two dozen products and introduced ATEM Television Studio models without the 2TB built-in storage. The HD8 ISO came in around 32% cheaper without it. None of the sources says whether this round touches those no-storage models.\n\n## What Blackmagic says happens next\n\nHope, mostly. \"Hopefully we will get back to lowering prices as soon as parts prices come back down. We think they will,\" the company says, and it offers to pass savings on through special deals if it can find lower-cost parts. It also relays its suppliers' account of memory demand running 30% above what they can deliver. That is Blackmagic's claim rather than a measured figure, and a price cut is an expectation with no date on it.\n\nData centres, it seems, pay better than we do.",
+  "confirmed": [
+    {
+      "text": "Blackmagic Design has raised prices on 36 of its products, citing the rising cost of memory. Newsshooter's report is dated 20 October 2026 and was updated on 21 October 2026.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "The price rises do not affect any Blackmagic cameras or accessories.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Blackmagic says the cost of the DRAM, flash and SSD storage that goes into almost everything it makes has risen several times over.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Blackmagic attributes the rise in memory costs to memory manufacturers shifting production to supply AI data centres.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Blackmagic singles out its new SMPTE 2110 products, which use a lot more memory.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "The new prices are effective immediately for Blackmagic Design resellers worldwide and apply only to new orders.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Current customer backorders will be fulfilled at the original order price.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "The largest rise in cash terms is the ATEM 4 M/E Constellation IP Plus, from $12,995 to $19,960, an increase of $6,965.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "The steepest rise in percentage terms is the Blackmagic 2110 IP SDI to HDMI 12G, from $515 to $925 (up 79.6%), with the 2110 IP UpDownCross 12G next at 69.0%.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "The ATEM 4 M/E Constellation IP goes from $7,995 to $10,845 on the published list.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "In May 2026 Blackmagic raised the price of nearly two dozen products and introduced ATEM Television Studio models without the 2TB built-in storage.",
+      "url": "https://www.avinteractive.com/news/products/blackmagic-raises-prices-and-adds-no-storage-atem-models-07-05-2026/"
+    },
+    {
+      "text": "At the May 2026 round, the ATEM Television Studio HD8 ISO was around 32% cheaper without its 2TB storage.",
+      "url": "https://www.avinteractive.com/news/products/blackmagic-raises-prices-and-adds-no-storage-atem-models-07-05-2026/"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "Blackmagic says it hopes to lower prices once parts prices come back down and thinks they will. This is an expectation, not a dated commitment, and its offer to pass on savings through special deals depends on it finding lower-cost parts.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Blackmagic relays its suppliers' account that demand for memory is running 30% above what they can deliver. This is the company's claim and has not been independently measured.",
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/"
+    },
+    {
+      "text": "Blackmagic's homepage shows 'From $11,935' for the new ATEM 4 M/E Constellation IP and 'From $6,639' for the new HyperDeck ISO Recorder 100G, against Newsshooter's $10,845 and $6,035. Why the figures differ is not known.",
+      "url": "https://www.blackmagicdesign.com/"
+    }
+  ],
+  "impact": "**If you own your kit.** The ATEM Mini Extreme ISO G2 is $1,095 dearer and the HyperDeck Studio HD Pro and 4K Pro are on the list too, so redo the sums on that next purchase. If the other thing on the wish list was a camera, carry on: cameras and accessories are not affected.\n\n**If you quote kit into a job.** Anything priced before 20 October wants a fresh sterling quote from the reseller, in writing, before the client signs. That includes the switcher quietly folded into last month's studio refit proposal.\n\n**If you are moving to IP.** The 2110 converters are where it stings. The SDI to HDMI 12G is up $410 a unit, so a flypack that needs four of them is $1,640 dearer before you have bought anything else.\n\n**If you hire.** Rental stock on this list now costs more to replace than it did last week. In our view that reaches day rates sooner or later, though nothing we have read says it has yet. Meanwhile, for the odd job, hiring looks better value against buying than it did a week ago.\n\n**If you are already waiting on an order.** Current customer backorders keep the original price. Confirm with your reseller that yours is one.\n\n**If you are buying an ATEM Television Studio.** Ask about the no-storage versions from May and bring your own media, but check what they cost now: the sources do not say whether this round changed them.",
+  "verdict": "note",
+  "verdict_note": "Budget at the new prices and get a written sterling quote before you commit: the only full price list so far comes from one press report, and Blackmagic's own site disagrees with it in places.",
+  "categories": [
+    "video",
+    "production"
+  ],
+  "tags": [
+    "blackmagic design",
+    "atem",
+    "hyperdeck",
+    "videohub",
+    "smpte 2110",
+    "price rise",
+    "memory"
+  ],
+  "sources": [
+    {
+      "url": "https://www.newsshooter.com/2026/10/20/blackmagic-design-raises-prices-on-36-products/",
+      "title": "Blackmagic Design raises prices on 36 Products",
+      "publisher": "Newsshooter",
+      "kind": "press"
+    },
+    {
+      "url": "https://www.avinteractive.com/news/products/blackmagic-raises-prices-and-adds-no-storage-atem-models-07-05-2026/",
+      "title": "Blackmagic raises prices and adds no-storage ATEM models",
+      "publisher": "AV Magazine",
+      "kind": "press"
+    },
+    {
+      "url": "https://www.blackmagicdesign.com/",
+      "title": "Blackmagic Design (homepage)",
+      "publisher": "Blackmagic Design",
+      "kind": "primary"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "blackmagic-price-rise-36-products-oct-2026",
+  "ai_written": true
+}
