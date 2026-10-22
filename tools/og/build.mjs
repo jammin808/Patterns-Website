@@ -6,7 +6,9 @@
 // A small static server (any free port on 127.0.0.1) serves public/ and this folder, so the cards use the site's own
 // CSS, fonts and icon sprite. The words come from content/ (read through PHP), and every 'og' image named in
 // content/pages.php must have a card here: a new one fails the build until it is added. Cards are optimised by
-// tools/og/optimise.py (Pillow) and should stay under 150 KB.
+// tools/og/optimise.py (Pillow) and should stay under 150 KB. Each Industry Updates category has a card of its own
+// (news-{key}: its headline and its artwork from public/assets/img/news-art.svg), its hub's and its articles' without a
+// picture; a category in content/news.php without one fails the build too.
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import http from 'node:http';
@@ -43,13 +45,24 @@ foreach ($wf as $path => $p) { if (($p['type'] ?? '') === 'workflow') { $workflo
 $flows = require $root . '/content/workflows.php';
 $wfProducts = [];
 foreach ($flows as $key => $f) { $wfProducts[$f['slug'] ?? $key] = $f['products'] ?? []; }
-echo json_encode(['og' => $og, 'products' => $products, 'lines' => $lines, 'tiers' => $tiers, 'workflows' => $workflows, 'wfProducts' => $wfProducts], JSON_UNESCAPED_UNICODE);
+$newsCopy = require $root . '/content/news.php';
+$news = ['name' => $newsCopy['name'], 'eyebrow' => $newsCopy['index']['eyebrow'], 'title' => $newsCopy['index']['title'], 'confirmed' => $newsCopy['sections']['confirmed'], 'speculation' => $newsCopy['sections']['speculation']];
+$newsCategories = [];
+foreach ($newsCopy['categories'] as $key => $c) { $newsCategories[$key] = ['name' => $c['name'], 'headline' => trim((string) preg_replace('/\\s*\\|[^|]*$/u', '', $c['title']))]; }
+echo json_encode(['og' => $og, 'products' => $products, 'lines' => $lines, 'tiers' => $tiers, 'workflows' => $workflows, 'wfProducts' => $wfProducts, 'news' => $news, 'newsCategories' => $newsCategories], JSON_UNESCAPED_UNICODE);
 `;
 const data = JSON.parse(execFileSync('php', ['-r', php, root], { encoding: 'utf8' }));
 const P = data.products;
 const order = ['patterns', 'stagewatch', 'agmessage', 'playmap'];
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const icon = (n) => `<svg class="c-icon" aria-hidden="true"><use href="/assets/img/icons.svg#i-${n}"/></svg>`;
+// A category's artwork, drawn inline from its symbol with the hairlines doubled, so they still read at a thumbnail.
+const artSprite = fs.readFileSync(path.join(root, 'public/assets/img/news-art.svg'), 'utf8');
+const art = (key) => {
+  const m = new RegExp(`<symbol id="art-${key}" viewBox="0 0 160 90">([\\s\\S]*?)</symbol>`).exec(artSprite);
+  if (!m) throw new Error(`No artwork for the category ${key} in news-art.svg.`);
+  return `<svg viewBox="0 0 160 90" aria-hidden="true">${m[1].replace(/stroke-width="1\.5"/g, 'stroke-width="3"')}</svg>`;
+};
 
 // ---------------------------------------------------------------------------------------------- the visuals
 const V = {
@@ -108,6 +121,12 @@ const V = {
     <div class="og-chat-chips"><span>Which licence do I need?</span><span>Which app is for an AGM?</span><span>How do I report a bug?</span></div></div>`,
   topics: () => `<div class="og-radios">${['Buying a licence or pricing', 'Help with the software', 'A licence I already have', 'Rental, reseller or partnership']
     .map((t, i) => `<div class="og-radio${i === 0 ? ' is-on' : ''}">${t}</div>`).join('')}</div>`,
+  // Industry Updates: what every article carries, in its own section names (content/news.php), not a headline.
+  // An Industry Updates category: its artwork on the hairline grid of the site's tiles, under its name.
+  category: (key) => `<div class="og-art">${art(key)}</div><div class="og-art-label"><b>${esc(data.newsCategories[key].name)}</b></div>`,
+  digest: () => `<div class="og-sheet"><div class="og-sheet-head">${icon('doc')}In every article</div><ul class="og-list">${[
+    ['check', data.news.confirmed], ['eye', data.news.speculation], ['users', 'What it means for your shows'], ['idea', 'Whether it is worth testing'],
+  ].map(([i, t]) => `<li>${icon(i)}${esc(t)}</li>`).join('')}</ul></div>`,
 };
 
 // ---------------------------------------------------------------------------------------------- the cards
@@ -131,7 +150,12 @@ const cards = {
   support: { title: 'Support', sub: 'Getting-started guides, troubleshooting, licence help and the support assistant.', visual: V.assistant(), size: 80 },
   contact: { eyebrow: 'Contact', title: 'Get in touch', sub: 'Licences, an AGM, rental packs or a show next week. Based in the UK.', visual: V.topics(), size: 80 },
   about: { eyebrow: 'About', title: 'Made in the UK by Ben Rohleder', sub: 'Built at real show desks for the crews who run conferences, AGMs and live events.', visual: V.habits() },
+  news: { eyebrow: data.news.eyebrow, title: data.news.title, sub: 'What changed, what it means for freelancers and event teams, and whether to test it.', visual: V.digest(), size: 80 },
 };
+// Each Industry Updates category's hub, and every article of it without a picture: its headline beside its artwork.
+for (const [key, c] of Object.entries(data.newsCategories)) {
+  cards[`news-${key}`] = { eyebrow: data.news.name, title: c.headline, visual: V.category(key) };
+}
 
 const missing = Object.keys(data.og).filter((k) => !cards[k]);
 if (missing.length) {

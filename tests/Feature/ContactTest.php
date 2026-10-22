@@ -105,7 +105,7 @@ final class ContactTest extends TestCase
                 self::assertStringNotContainsString($word, $r['html']);
                 self::assertStringNotContainsString($word, $r['subject']);
             }
-            self::assertStringContainsString('Thanks — we have your message', $r['html']);
+            self::assertStringContainsString('Thanks, we have your message', $r['html']);
             self::assertStringContainsString('help with the software', $r['html'], 'the topic from the fixed list');
         }
     }

@@ -22,6 +22,8 @@ final class Seo
     public ?string $image = null;
     public ?string $imageAlt = null;
     public ?int $modified = null;
+    /** The headline share cards show (og:title, twitter:title) when it differs from the <title>; null: the title. */
+    public ?string $ogTitle = null;
 
     public function __construct(
         public string $title,
@@ -36,6 +38,16 @@ final class Seo
     public function noindex(): self
     {
         $this->robots = 'noindex, nofollow';
+        return $this;
+    }
+
+    /**
+     * Kept out of the index while its links are still followed (page 2 and on of a list, a search, an empty
+     * category): like noindex(), it carries no canonical and no structured data.
+     */
+    public function noindexFollow(): self
+    {
+        $this->robots = 'noindex, follow';
         return $this;
     }
 
@@ -88,7 +100,7 @@ final class Seo
         $out[] = '<meta property="og:site_name" content="' . $e($this->siteName) . '">';
         $out[] = '<meta property="og:locale" content="' . $e($this->locale) . '">';
         $out[] = '<meta property="og:type" content="' . $e($this->ogType) . '">';
-        $out[] = '<meta property="og:title" content="' . $e($this->title) . '">';
+        $out[] = '<meta property="og:title" content="' . $e($this->ogTitle ?? $this->title) . '">';
         $out[] = '<meta property="og:description" content="' . $e($this->description) . '">';
         $out[] = '<meta property="og:url" content="' . $e($this->canonical()) . '">';
         $out[] = '<meta property="og:image" content="' . $e($image) . '">';
@@ -96,7 +108,7 @@ final class Seo
         $out[] = '<meta property="og:image:height" content="630">';
         $out[] = '<meta property="og:image:alt" content="' . $e($alt) . '">';
         $out[] = '<meta name="twitter:card" content="summary_large_image">';
-        $out[] = '<meta name="twitter:title" content="' . $e($this->title) . '">';
+        $out[] = '<meta name="twitter:title" content="' . $e($this->ogTitle ?? $this->title) . '">';
         $out[] = '<meta name="twitter:description" content="' . $e($this->description) . '">';
         $out[] = '<meta name="twitter:image" content="' . $e($image) . '">';
         if ($this->isIndexable()) {

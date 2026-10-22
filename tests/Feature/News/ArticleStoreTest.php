@@ -1,0 +1,500 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Psc\Tests\Feature\News;
+
+use Psc\News\ArticleStore;
+use Psc\News\Draft;
+use Psc\News\Markdown;
+use Psc\News\Paths;
+use Psc\News\Prose;
+use Psc\News\Urls;
+use Psc\Tests\TestCase;
+
+/** The one writer of the article tables: what a save stores, what the readers get back. Rows first, words second. */
+final class ArticleStoreTest extends TestCase
+{
+    private const EM = "\u{2014}";
+
+    private function store(): ArticleStore
+    {
+        return new ArticleStore($this->app);
+    }
+
+    /** @param array<string, mixed> $over */
+    private static function draft(array $over = [], string $origin = 'manual'): Draft
+    {
+        return Draft::fromArray($over + [
+            'title' => 'Wireless mic licences change for the spring season',
+            'dek' => 'The regulator has changed how shared channels are booked for events, and the deadline is earlier than last year.',
+            'body' => "The change lands in March.\n\n## What it means\n\nBook early. See [the guidance](https://www.regulator.example/guidance/?utm_source=x) and [our timer guide](/workflows/conference-timing/) and [a review](https://press.example/review).",
+            'impact' => 'Freelancers who book their own channels should check [the form](https://regulator.example/form).',
+            'verdict' => 'note',
+            'categories' => ['audio', 'legal'],
+            'tags' => ['Radio Mics', 'Spectrum'],
+            'sources' => [
+                ['url' => 'https://regulator.example/guidance', 'title' => 'Guidance for events', 'publisher' => 'The regulator', 'kind' => 'primary'],
+                ['url' => 'https://press.example/report', 'title' => 'Trade report', 'publisher' => 'Trade press', 'kind' => 'press'],
+            ],
+            'confirmed' => [['text' => 'Bookings open on 1 March.', 'url' => 'https://regulator.example/guidance']],
+            'speculation' => [['text' => 'Prices may rise.', 'url' => 'https://press.example/report']],
+            'status' => 'published',
+        ], $origin);
+    }
+
+    public function testCreateStoresTheArticleItsCategoriesAndItsLinks(): void
+    {
+        $before = time();
+        $id = $this->store()->create(self::draft(), 5, null);
+        $row = $this->db->one('SELECT * FROM news_articles WHERE id = ?', [$id]);
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season', $row['slug']);
+        self::assertSame('Wireless mic licences change for the spring season', $row['seo_title'], 'filled in from the headline');
+        self::assertSame(self::draft()->dek, $row['summary'], 'filled in from the standfirst');
+        self::assertSame('radio mics,spectrum', $row['tags']);
+        self::assertSame('published', $row['status']);
+        self::assertGreaterThanOrEqual($before, (int) $row['published_at']);
+        self::assertSame('manual', $row['origin']);
+        self::assertSame(5, (int) $row['author_id']);
+        self::assertSame(0, (int) $row['ai_written']);
+        self::assertGreaterThan(20, (int) $row['word_count']);
+        self::assertSame([['text' => 'Bookings open on 1 March.', 'url' => 'https://regulator.example/guidance']], json_decode((string) $row['confirmed'], true));
+        self::assertSame(
+            [['article_id' => $id, 'category' => 'audio', 'position' => 0], ['article_id' => $id, 'category' => 'legal', 'position' => 1]],
+            self::categoryRows($this->db->all('SELECT * FROM news_article_categories WHERE article_id = ? ORDER BY position', [$id]))
+        );
+
+        $links = $this->db->all('SELECT url, url_key, host, title, publisher, kind, is_source, position FROM news_links WHERE article_id = ? ORDER BY position', [$id]);
+        self::assertSame(
+            [
+                ['https://regulator.example/guidance', 'regulator.example', 'Guidance for events', 'primary', 1],
+                ['https://press.example/report', 'press.example', 'Trade report', 'press', 1],
+                ['https://press.example/review', 'press.example', null, 'other', 0],
+                ['https://regulator.example/form', 'regulator.example', null, 'other', 0],
+            ],
+            array_map(static fn (array $l): array => [$l['url'], $l['host'], $l['title'], $l['kind'], (int) $l['is_source']], $links),
+            'the sources, then the other external links once each by canonical key; the site\'s own links are not registered'
+        );
+        self::assertSame(hash('sha256', 'https://regulator.example/guidance'), $links[0]['url_key']);
+
+        $html = Markdown::render((string) $row['body'], $this->store()->linkIds($id), $this->app->baseUrl());
+        self::assertStringContainsString('href="https://www.regulator.example/guidance/?utm_source=x" rel="nofollow noopener" target="_blank" data-news-link="' . (int) $this->db->value('SELECT id FROM news_links WHERE url_key = ?', [$links[0]['url_key']]) . '"', $html);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array{article_id: int, category: string, position: int}>
+     */
+    private static function categoryRows(array $rows): array
+    {
+        return array_map(static fn (array $r): array => ['article_id' => (int) $r['article_id'], 'category' => (string) $r['category'], 'position' => (int) $r['position']], $rows);
+    }
+
+    public function testNoStoredTextHoldsAnEmDash(): void
+    {
+        $dash = self::EM;
+        $id = $this->store()->create(Draft::fromArray([
+            'title' => "Comms {$dash} the new belt packs",
+            'dek' => "A standfirst {$dash} with a dash in it, long enough to be a standfirst on the site.",
+            'body' => "Body {$dash} text.\n\n- item {$dash} one",
+            'impact' => "Impact {$dash} here.",
+            'verdict_note' => "Note {$dash} here.",
+            'tags' => ["tag {$dash} one"],
+            'byline' => "Ben {$dash} R",
+            'sources' => [['url' => 'https://example.com/a', 'title' => "Title {$dash} x", 'publisher' => "Pub {$dash} y"]],
+            'confirmed' => [['text' => "Fact {$dash} one.", 'url' => 'https://example.com/a']],
+            'speculation' => [['text' => "Guess {$dash} two.", 'url' => 'https://example.com/a']],
+        ], 'manual'), null);
+        foreach ([$this->db->one('SELECT * FROM news_articles WHERE id = ?', [$id]), ...$this->db->all('SELECT * FROM news_links WHERE article_id = ?', [$id])] as $row) {
+            foreach ($row as $column => $value) {
+                self::assertStringNotContainsString($dash, (string) $value, $column);
+                self::assertStringNotContainsString("\u{2013}", (string) $value, $column);
+            }
+        }
+        self::assertSame('Comms, the new belt packs', $this->store()->find($id)['title']);
+    }
+
+    public function testSlugsAreUnique(): void
+    {
+        $store = $this->store();
+        $a = $store->create(self::draft(), null);
+        $b = $store->create(self::draft(), null);
+        $c = $store->create(self::draft(), null);
+        $d = $store->create(self::draft(['slug' => 'Mic Licences!']), null);
+        self::assertSame(
+            ['wireless-mic-licences-change-for-the-spring-season', 'wireless-mic-licences-change-for-the-spring-season-2', 'wireless-mic-licences-change-for-the-spring-season-3', 'mic-licences'],
+            array_map(static fn (int $id): string => (string) $store->find($id)['slug'], [$a, $b, $c, $d])
+        );
+        // A draft that has never been live may change its address, never to another article's.
+        $e = $store->create(self::draft(['status' => 'draft', 'slug' => 'a-working-address']), null);
+        self::assertSame('working-address', $store->find($e)['slug'], 'a typed slug keeps the rules too');
+        self::assertSame(['slug'], $store->update($e, self::draft(['status' => 'draft', 'slug' => 'mic-licences']), null));
+        self::assertSame('mic-licences-2', $store->find($e)['slug'], 'an update never takes another article\'s slug');
+        // A live one keeps the address it went live at, whatever a draft names.
+        self::assertSame([], $store->update($b, self::draft(['slug' => 'mic-licences-new']), null));
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season-2', $store->find($b)['slug']);
+    }
+
+    /**
+     * No slug is a word the routes use or a category key (each gets a number), and a numbered slug still keeps within
+     * 60 characters, cut at a word with no stop word left at its end.
+     */
+    public function testSlugsKeepClearOfTheRoutesAndWithinTheirLength(): void
+    {
+        $store = $this->store();
+        foreach (['Video' => 'video-2', 'Page' => 'page-2', 'Comment' => 'comment-2', 'The Category' => 'category-2', 'Go!' => 'go-2', 'Media' => 'media-2', 'Feed' => 'feed-2', 'Sitemap' => 'sitemap-2', 'AI' => 'ai-2'] as $slug => $expected) {
+            $id = $store->create(self::draft(['slug' => $slug]), null);
+            self::assertSame($expected, $store->find($id)['slug'], $slug);
+        }
+        $title = 'Wireless microphone licences change for the spring season and the';
+        $first = $store->create(self::draft(['title' => $title]), null);
+        $second = $store->create(self::draft(['title' => $title]), null);
+        self::assertSame('wireless-microphone-licences-change-for-the-spring-season', $store->find($first)['slug'], 'cut at 60 with its stop words trimmed');
+        $numbered = (string) $store->find($second)['slug'];
+        self::assertSame('wireless-microphone-licences-change-for-the-spring-season-2', $numbered);
+        self::assertLessThanOrEqual(Paths::SLUG_MAX, strlen($numbered));
+        $long = $store->create(self::draft(['slug' => str_repeat('abcdefghi-', 6)]), null);
+        $again = $store->create(self::draft(['slug' => str_repeat('abcdefghi-', 6)]), null);
+        self::assertSame(rtrim(str_repeat('abcdefghi-', 6), '-'), $store->find($long)['slug']);
+        self::assertSame(rtrim(str_repeat('abcdefghi-', 5), '-') . '-2', $store->find($again)['slug'], 'its number fits: a word goes');
+    }
+
+    /**
+     * Publishing and unpublishing move updated_at on like a save (one second past where a save put it), so a form
+     * opened before either is stale; and the time an article first went live outlives a reschedule and a takedown,
+     * so its slug never changes after it has been live.
+     */
+    public function testPublishAndUnpublishMoveTheVersionAndKeepTheTimeItWentLive(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(['status' => 'draft']), null);
+        $ahead = time() + 50;
+        $this->db->update('news_articles', ['updated_at' => $ahead], ['id' => $id]);
+        self::assertTrue($store->publish($id));
+        self::assertSame($ahead + 1, (int) $store->find($id)['updated_at'], 'never back to now, under a save made this second');
+        self::assertNull($store->find($id)['first_live_at'], 'published_at says when it went live while it stands');
+        self::assertNull($store->update($id, self::draft(['title' => 'A stale form']), null, $ahead), 'a form from before the publish is stale');
+        self::assertTrue($store->unpublish($id));
+        self::assertSame($ahead + 2, (int) $store->find($id)['updated_at']);
+        self::assertNull($store->update($id, self::draft(['title' => 'A stale form']), null, $ahead + 1));
+        $this->db->update('news_articles', ['updated_at' => time() - 600], ['id' => $id]);
+        self::assertTrue($store->publish($id));
+        self::assertSame(time(), (int) $store->find($id)['updated_at'], 'now, when that is later');
+
+        $row = $store->find($id);
+        $wentLive = (int) $row['first_live_at'];
+        self::assertSame($wentLive, (int) $row['published_at'], 'the takedown kept the time it first went live, and publishing again went live then');
+        self::assertTrue(ArticleStore::hasBeenLive($row));
+        self::assertTrue($store->unpublish($id));
+        self::assertTrue($store->publish($id, time() + 86400), 'scheduled again');
+        $row = $store->find($id);
+        self::assertSame($wentLive, (int) $row['first_live_at'], 'kept before the new time replaced it');
+        self::assertTrue($store->unpublish($id));
+        $row = $store->find($id);
+        self::assertNull($row['published_at'], 'the schedule it never reached is dropped');
+        self::assertSame($wentLive, (int) $row['first_live_at']);
+        self::assertTrue(ArticleStore::hasBeenLive($row));
+        $slug = (string) $row['slug'];
+        self::assertSame([], $store->update($id, self::draft(['status' => 'draft', 'slug' => 'a-brand-new-address']), null));
+        self::assertSame($slug, $store->find($id)['slug'], 'it has been live: its address never changes');
+
+        $never = $store->create(self::draft(['status' => 'draft']), null);
+        self::assertFalse(ArticleStore::hasBeenLive((array) $store->find($never)));
+        self::assertTrue($store->publish($never, time() + 3600));
+        self::assertFalse(ArticleStore::hasBeenLive((array) $store->find($never)), 'scheduled is not live');
+        self::assertTrue(ArticleStore::hasBeenLive((array) $store->find($never), time() + 7200), 'once its time has passed it is');
+    }
+
+    public function testUpdateSaysWhatChangedAndKeepsTheClicksOfLinksThatStay(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(), null);
+        $guidance = (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ? AND url = ?', [$id, 'https://regulator.example/guidance']);
+        $this->db->update('news_links', ['clicks' => 5], ['id' => $guidance]);
+        $this->db->insert('news_link_clicks', ['link_id' => $guidance, 'day' => '2026-10-21', 'clicks' => 5]);
+        $this->db->update('news_articles', ['updated_at' => 1000], ['id' => $id]);
+
+        self::assertSame([], $store->update($id, self::draft(), null), 'the same draft changes nothing');
+        self::assertSame(1000, (int) $this->db->value('SELECT updated_at FROM news_articles WHERE id = ?', [$id]));
+
+        $changed = $store->update($id, self::draft([
+            'title' => 'Wireless mic licences change, and sooner than expected',
+            'impact' => 'Nothing to click now.',
+            'categories' => ['legal', 'audio'],
+            'sources' => [['url' => 'https://regulator.example/guidance/', 'title' => 'Guidance for events', 'publisher' => 'The regulator', 'kind' => 'primary']],
+            'speculation' => [],
+            'status' => 'draft',
+        ]), null);
+        self::assertSame(['title', 'seo_title', 'speculation', 'impact', 'categories', 'sources'], $changed);
+        $row = $this->db->one('SELECT * FROM news_articles WHERE id = ?', [$id]);
+        self::assertSame('published', $row['status'], 'only publish() and unpublish() change the status');
+        self::assertGreaterThan(1000, (int) $row['updated_at']);
+        self::assertSame(['legal', 'audio'], $store->categories($id));
+        self::assertSame(5, (int) $this->db->value('SELECT clicks FROM news_links WHERE id = ?', [$guidance]), 'the link stayed, with its count');
+        self::assertSame(1, (int) $this->db->value('SELECT COUNT(*) FROM news_link_clicks WHERE link_id = ?', [$guidance]));
+        self::assertSame(
+            ['https://regulator.example/guidance/', 'https://press.example/review'],
+            array_column($store->links($id), 'url'),
+            'the report and the form went'
+        );
+        $this->expectException(\InvalidArgumentException::class);
+        $store->update(999, self::draft(), null);
+    }
+
+    public function testPublishScheduleAndUnpublish(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(['status' => 'draft']), null);
+        self::assertNull($store->find($id)['published_at']);
+        self::assertFalse($store->isLive($store->find($id)));
+        self::assertTrue($store->publish($id));
+        $first = (int) $store->find($id)['published_at'];
+        self::assertTrue($store->isLive($store->find($id)));
+        self::assertFalse($store->publish($id), 'already published at that time');
+        self::assertTrue($store->unpublish($id));
+        self::assertFalse($store->unpublish($id), 'already a draft');
+        self::assertSame($first, (int) $store->find($id)['published_at'], 'a draft keeps its time');
+        self::assertNull($store->findBySlug((string) $store->find($id)['slug']), 'not live');
+        self::assertNotNull($store->findBySlug((string) $store->find($id)['slug'], false));
+        self::assertTrue($store->publish($id));
+        self::assertSame($first, (int) $store->find($id)['published_at'], 'published again at its first time');
+
+        $later = time() + 3600;
+        self::assertTrue($store->publish($id, $later));
+        $row = $store->find($id);
+        self::assertSame(['published', $later], [$row['status'], (int) $row['published_at']]);
+        self::assertFalse($store->isLive($row), 'scheduled');
+        self::assertTrue($store->isLive($row, $later));
+        self::assertSame(0, $store->live(null, null)['total']);
+        self::assertFalse($store->publish(999));
+    }
+
+    public function testTheLiveListFiltersSearchesAndPages(): void
+    {
+        $store = $this->store();
+        $ids = [];
+        foreach (range(1, 5) as $n) {
+            $ids[$n] = $this->makeArticle(['title' => 'Story ' . $n . ' about LED walls and more', 'categories' => $n % 2 === 0 ? ['audio'] : ['video', 'audio'], 'published_at' => time() - 1000 + $n]);
+        }
+        $this->makeArticle(['title' => 'A draft that is not live yet', 'status' => 'draft']);
+        $this->makeArticle(['title' => 'A scheduled story for tomorrow', 'published_at' => time() + 86400]);
+        $this->db->insert('news_images', ['article_id' => $ids[5], 'position' => 0, 'base' => str_repeat('a', 32), 'widths' => '480,960', 'width' => 960, 'height' => 540, 'alt' => 'A wall', 'original_name' => 'wall.png', 'bytes' => 10, 'created_at' => time()]);
+
+        $all = $store->live(null, null, 1, 2);
+        self::assertSame(5, $all['total']);
+        self::assertSame(3, $all['pages']);
+        self::assertSame([$ids[5], $ids[4]], array_map(static fn (array $a): int => (int) $a['id'], $all['items']), 'the newest first');
+        self::assertSame('A wall', $all['items'][0]['image']['alt'] ?? null, 'each item has its lead image');
+        self::assertNull($all['items'][1]['image']);
+        self::assertSame(['video', 'audio'], $all['items'][0]['categories']);
+        self::assertArrayNotHasKey('body', $all['items'][0]);
+        self::assertSame([], $store->live(null, null, 4, 2)['items'], 'a page past the end is empty, for a 404');
+
+        $video = $store->live('video', null, 1, 12);
+        self::assertSame([$ids[5], $ids[3], $ids[1]], array_map(static fn (array $a): int => (int) $a['id'], $video['items']));
+        self::assertSame([$ids[3]], array_map(static fn (array $a): int => (int) $a['id'], $store->live(null, 'STORY 3', 1, 12)['items']), 'the headline searched');
+        self::assertSame(0, $store->live(null, '100%_', 1, 12)['total'], 'LIKE wildcards are matched literally');
+        self::assertSame(['video' => 3, 'audio' => 5], $store->categoryCounts(), 'live articles only, in category order');
+    }
+
+    public function testRecentListsEveryStatusWithSourceKeys(): void
+    {
+        $live = $this->makeArticle(['story_key' => 'a-story']);
+        $draft = $this->makeArticle(['status' => 'draft']);
+        $scheduled = $this->makeArticle(['published_at' => time() + 3600]);
+        $old = $this->makeArticle(['published_at' => time() - 200 * 86400]);
+        $recent = $this->store()->recent(120, 150);
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $recent);
+        self::assertSame([$scheduled, $draft, $live], $ids, 'scheduled first, the old one left out');
+        self::assertNotContains($old, $ids);
+        $byId = array_column($recent, null, 'id');
+        self::assertSame('a-story', $byId[$live]['story_key']);
+        self::assertSame([hash('sha256', 'https://example.com/news/story-1')], $byId[$live]['source_keys']);
+        self::assertSame(['video'], $byId[$live]['categories']);
+        self::assertIsInt($byId[$live]['date']);
+    }
+
+    public function testFollowUpsAreStoredBothWays(): void
+    {
+        $store = $this->store();
+        $first = $this->makeArticle(['slug' => 'first-story']);
+        $hidden = $this->makeArticle(['slug' => 'hidden-story', 'status' => 'draft']);
+        $second = $store->create(self::draft(['follow_up_of' => ['first-story', 'hidden-story', 'no-such-story']], 'import'), null);
+        self::assertSame([[(string) $first], [(string) $hidden]], array_map(static fn (array $r): array => [(string) $r['related_id']], $this->db->all('SELECT related_id FROM news_related WHERE article_id = ? ORDER BY related_id', [$second])));
+        self::assertSame([$first], array_map(static fn (array $r): int => (int) $r['id'], $store->related($second)['earlier']), 'live ones only');
+        self::assertSame([$first, $hidden], array_map(static fn (array $r): int => (int) $r['id'], $store->related($second, false)['earlier']));
+        self::assertSame([$second], array_map(static fn (array $r): int => (int) $r['id'], $store->related($first)['later']));
+        self::assertSame(['follow_up_of'], $store->update($second, self::draft(['follow_up_of' => [$first]], 'import'), null));
+        self::assertSame([], $store->related($first, false)['earlier']);
+    }
+
+    public function testDeleteRemovesEverythingButTheImportRecordAndTheFiles(): void
+    {
+        $store = $this->store();
+        $id = $this->makeArticle();
+        $user = $this->makeUser();
+        $base = str_repeat('b', 32);
+        $other = str_repeat('c', 32);
+        $dir = $this->app->storage->dir(ArticleStore::IMAGE_DIR);
+        foreach (ArticleStore::imageFiles(['base' => $base]) as $name) {
+            file_put_contents($dir . '/' . $name, 'x');
+        }
+        file_put_contents($dir . '/' . $other . '-480.webp', 'x');
+        $this->db->insert('news_images', ['article_id' => $id, 'position' => 0, 'base' => $base, 'widths' => '480,960,1600', 'width' => 1600, 'height' => 900, 'alt' => 'A', 'original_name' => 'a.png', 'bytes' => 1, 'created_at' => time()]);
+        $comment = $this->db->insert('news_comments', ['article_id' => $id, 'user_id' => $user, 'body' => 'Nice', 'status' => 'visible', 'reports' => 0, 'created_at' => time(), 'updated_at' => time()]);
+        $this->db->insert('news_comment_reports', ['comment_id' => $comment, 'user_id' => $user, 'created_at' => time()]);
+        $link = (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ?', [$id]);
+        $this->db->insert('news_link_clicks', ['link_id' => $link, 'day' => '2026-10-22', 'clicks' => 1]);
+        $later = $this->makeArticle(['follow_up_of' => [$id]]);
+        $this->db->insert('news_imports', ['import_key' => 'launch-1', 'article_id' => $id, 'imported_at' => time()]);
+
+        $row = $store->delete($id);
+        self::assertSame($id, (int) ($row['id'] ?? 0), 'the row as it was, for the audit');
+        foreach (['news_articles WHERE id', 'news_article_categories WHERE article_id', 'news_links WHERE article_id', 'news_images WHERE article_id', 'news_comments WHERE article_id', 'news_related WHERE related_id'] as $where) {
+            self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM ' . $where . ' = ?', [$id]), $where);
+        }
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_link_clicks'));
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_comment_reports'));
+        self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM news_imports WHERE import_key = 'launch-1'"), 'the file is never brought back');
+        self::assertNotNull($store->find($later));
+        foreach (ArticleStore::imageFiles(['base' => $base]) as $name) {
+            self::assertFileDoesNotExist($dir . '/' . $name);
+        }
+        self::assertFileExists($dir . '/' . $other . '-480.webp', 'another image is untouched');
+        self::assertNull($store->delete($id));
+        self::assertSame([], ArticleStore::imageFiles(['base' => '../../etc']));
+    }
+
+    public function testAStoredArticleComesBackAsTheSameDraft(): void
+    {
+        $store = $this->store();
+        $first = $this->makeArticle();
+        $id = $store->create(self::draft(['follow_up_of' => [$first], 'byline' => 'Ben R', 'comments_open' => false, 'ai_written' => true]), 7);
+        $draft = $store->draft($id);
+        self::assertNotNull($draft);
+        self::assertSame([$first], $draft->followUps);
+        self::assertSame(['https://regulator.example/guidance', 'https://press.example/report'], array_column($draft->sources, 'url'));
+        self::assertFalse($draft->commentsOpen);
+        self::assertTrue($draft->aiWritten);
+        self::assertSame('Ben R', $draft->byline);
+        self::assertSame([], $store->update($id, $draft, 7), 'nothing changed');
+        self::assertSame([], $store->update($id, Draft::fromArray($draft->toArray(), 'manual'), 7), 'nor through the editor\'s copy');
+        self::assertNull($store->draft(999));
+    }
+
+    /** A link inside an item is registered like the body's, so a click on it is counted. */
+    public function testLinksInsideItemsAreRegistered(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft([
+            'confirmed' => [['text' => 'Bookings open on 1 March, says [the booking page](https://bookings.example/open?utm_source=x).', 'url' => 'https://regulator.example/guidance']],
+            'speculation' => [['text' => 'Prices may rise, [one report](https://press.example/report) says.', 'url' => 'https://press.example/report']],
+        ]), null);
+        $links = array_map(static fn (array $l): array => [$l['url'], (int) $l['is_source']], $store->links($id));
+        self::assertContains(['https://bookings.example/open?utm_source=x', 0], $links, 'an item\'s link, once');
+        self::assertSame(1, count(array_filter($links, static fn (array $l): bool => $l[0] === 'https://press.example/report')), 'a source linked from an item is still one row');
+        $item = $store->find($id)['confirmed'][0]['text'];
+        $linkId = (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ? AND url_key = ?', [$id, Urls::key('https://bookings.example/open')]);
+        self::assertGreaterThan(0, $linkId);
+        self::assertStringContainsString('data-news-link="' . $linkId . '"', Markdown::inline($item, $store->linkIds($id), $this->app->baseUrl()));
+    }
+
+    /** A slot that never arrived is not a time the article was live: publishing later goes live then. */
+    public function testUnpublishingAScheduledArticleDropsTheSlotItNeverReached(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(['status' => 'draft']), null);
+        self::assertTrue($store->publish($id, time() + 3600));
+        self::assertTrue($store->unpublish($id));
+        $row = $store->find($id);
+        self::assertSame(['draft', null], [$row['status'], $row['published_at']], 'the schedule is dropped');
+
+        // The slot has passed while it was a draft: published now, it is dated now.
+        $this->db->update('news_articles', ['status' => 'published', 'published_at' => time() + 5], ['id' => $id]);
+        self::assertTrue($store->unpublish($id));
+        $before = time();
+        self::assertTrue($store->publish($id));
+        self::assertGreaterThanOrEqual($before, (int) $store->find($id)['published_at']);
+        self::assertLessThanOrEqual(time(), (int) $store->find($id)['published_at']);
+
+        $live = time() - 86400;
+        $this->db->update('news_articles', ['published_at' => $live], ['id' => $id]);
+        self::assertTrue($store->unpublish($id));
+        self::assertSame($live, (int) $store->find($id)['published_at'], 'a time it was live is kept');
+    }
+
+    /** A form made from an earlier version of the article is refused, and writes nothing. */
+    public function testAStaleFormChangesNothing(): void
+    {
+        $store = $this->store();
+        $id = $store->create(self::draft(), null);
+        $this->db->update('news_articles', ['updated_at' => 1000], ['id' => $id]);
+        $theirs = self::draft(['title' => 'Wireless mic licences change, and the deadline moves', 'categories' => ['legal']]);
+        $mine = self::draft(['title' => 'Wireless mic licences change for an older reason', 'categories' => ['audio']]);
+
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $theirs, null, 1000), 'the form was made from the article as it is');
+        $saved = (int) $store->find($id)['updated_at'];
+        self::assertGreaterThan(1000, $saved);
+        self::assertNull($store->update($id, $mine, null, 1000), 'the other form was made before that save');
+        $row = $store->find($id);
+        self::assertSame(['Wireless mic licences change, and the deadline moves', ['legal'], $saved], [$row['title'], $row['categories'], (int) $row['updated_at']], 'nothing written');
+        self::assertNull($store->update($id, $theirs, null, 1000), 'even when it changes nothing, a stale form is refused');
+        self::assertSame([], $store->update($id, $theirs, null, $saved));
+
+        // Within one second: a save always moves the version on.
+        $soon = time() + 100;
+        $this->db->update('news_articles', ['updated_at' => $soon], ['id' => $id]);
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $mine, null, $soon));
+        self::assertSame($soon + 1, (int) $store->find($id)['updated_at']);
+        self::assertNull($store->update($id, $theirs, null, $soon), 'a form from before that save is stale');
+
+        $loaded = (int) $store->find($id)['updated_at'];
+        $this->db->update('news_articles', ['updated_at' => $loaded - 200], ['id' => $id]);
+        $loaded -= 200;
+        self::assertTrue($store->unpublish($id));
+        self::assertNull($store->update($id, $theirs, null, $loaded), 'a takedown since counts as a change');
+        self::assertSame(['title', 'seo_title', 'categories'], $store->update($id, $theirs, null), 'without a version, as before');
+    }
+
+    /** A new article's address comes from its own SEO title when it has one, else its headline, and then stays. */
+    public function testANewArticlesAddressComesFromItsSeoTitle(): void
+    {
+        $store = $this->store();
+        $seo = $store->create(self::draft(['title' => 'Wireless mic licences change for the spring season, and the booking deadline is earlier than last year', 'seo_title' => 'Mic licences: book by March']), null);
+        self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug']);
+        $long = 'Wireless mic licences change for the spring season, and the booking deadline for shared channels is earlier';
+        $plain = $store->create(self::draft(['title' => $long]), null);
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season-and-the', Prose::slug($long, 60), 'cut at 60 alone');
+        self::assertSame('wireless-mic-licences-change-for-the-spring-season', $store->find($plain)['slug'], 'cut at 60 at a word, then no stop word at its end');
+        self::assertSame(Paths::slug($long), $store->find($plain)['slug']);
+        $default = Draft::fromArray(['title' => $long, 'seo_title' => Prose::cut($long, 60)], 'manual');
+        self::assertSame(Paths::slug($long), $default->slugBase(), 'an SEO title that is only the headline cut short is not one of its own');
+        self::assertSame('article', Draft::fromArray(['title' => '!!!'], 'manual')->slugBase());
+        self::assertSame('article', Draft::fromArray(['title' => 'The and of'], 'manual')->slugBase(), 'nothing but stop words');
+
+        self::assertSame(['seo_title'], $store->update($seo, self::draft(['title' => 'Wireless mic licences change for the spring season, and the booking deadline is earlier than last year', 'seo_title' => 'A new SEO title for the story']), null));
+        self::assertSame('mic-licences-book-by-march', $store->find($seo)['slug'], 'the address changes only when a draft names one');
+    }
+
+    /** news_links.host holds the longest host an address can have (the MySQL leg proves the column). */
+    public function testTheLongestHostIsStored(): void
+    {
+        $host = implode('.', [str_repeat('a', 63), str_repeat('b', 63), str_repeat('c', 63), str_repeat('d', 53), 'example']);
+        self::assertSame(Urls::HOST_MAX, strlen($host));
+        $url = 'https://' . $host . '/story';
+        $id = $this->store()->create(self::draft(['sources' => [['url' => $url, 'title' => 'A long host', 'publisher' => 'Long', 'kind' => 'press']], 'confirmed' => [], 'speculation' => []]), null);
+        self::assertSame($host, (string) $this->db->value('SELECT host FROM news_links WHERE article_id = ? AND is_source = 1', [$id]));
+    }
+
+    public function testAnAiArticleStaysAiWritten(): void
+    {
+        $id = $this->makeArticle(['origin' => 'ai']);
+        $row = $this->store()->find($id);
+        self::assertSame(['ai', 1, 'Industry Updates desk'], [$row['origin'], (int) $row['ai_written'], $row['byline']]);
+        $draft = $this->store()->draft($id);
+        $draft->aiWritten = false;
+        $this->store()->update($id, $draft, null);
+        self::assertSame(1, (int) $this->store()->find($id)['ai_written']);
+        self::assertSame(Urls::key('https://example.com/news/story-1'), $this->store()->links($id)[0]['url_key']);
+    }
+}

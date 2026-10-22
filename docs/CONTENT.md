@@ -23,9 +23,10 @@ return [
         ['label' => 'Products', 'children' => [['product' => 'patterns'], ['product' => 'stagewatch'], …]],
         ['label' => 'Workflows', 'href' => '/workflows/'],
         ['label' => 'Licensing', 'href' => '/licensing/'],
+        ['label' => 'News', 'href' => '/news/'],             // Industry Updates; the bar fits a short label only
         ['label' => 'Support', 'href' => '/support/'],
     ],
-    'footer' => [ ['title' => 'Products', 'links' => [['label' => …, 'href' => …], …]], … ],
+    'footer' => [ ['title' => 'Products', 'links' => [['label' => …, 'href' => …], …]], … ], // Company lists Industry Updates
     'trademarks' => '…NDI® is a registered trademark of Vizrt NDI AB. … belong to their owners…',
     'block_training' => false, // robots.txt: true asks model-training crawlers to stay away
 ];
@@ -42,8 +43,8 @@ return [
     'role_line' => 'The show clock',           // short, under the name on cards
     'definition' => '…ONE sentence that defines the product, used first on its pages and everywhere it is described…',
     'tagline' => '…≤ 12 words…',
-    'summary' => '…1–2 sentences: cards, meta, llms.txt…',
-    'pitch' => '…2–3 sentences: the overview hero…',
+    'summary' => '…1 or 2 sentences: cards, meta, llms.txt…',
+    'pitch' => '…2 or 3 sentences: the overview hero…',
     'version' => '2.16',                       // only if stated by the product; else null
     'os' => 'Windows 10 and 11 (64-bit)',      // the "Runs on" line; may be a sentence
     'schema_os' => 'Windows 10, Windows 11 (64-bit)', // structured data's operatingSystem: operating systems only
@@ -52,23 +53,23 @@ return [
     'status' => 'available',                   // available | early-access
     'external_url' => null,                    // the product's own site, if any
     'audiences' => ['Show callers', '…'],
-    'highlights' => [['title' => '…', 'text' => '…'], …],          // 6–8, the hero claims
-    'feature_groups' => [                                           // 6–10; features page sections
+    'highlights' => [['title' => '…', 'text' => '…'], …],          // 6 to 8, the hero claims
+    'feature_groups' => [                                           // 6 to 10; features page sections
         ['id' => 'running-order', 'title' => '…', 'benefit' => '…', 'items' => ['…', …], 'icon' => 'list'],
     ],
     'workflows' => ['conference-timing', …],                        // slugs in content/workflows.php
     'integrations' => [['name' => 'Bitfocus Companion', 'text' => '…'], …],
     'ai' => ['title' => '…', 'text' => '…', 'items' => ['…']],     // always "a person approves"
     'requirements' => [['label' => 'Windows', 'value' => '…'], …],
-    'getting_started' => [['title' => '…', 'text' => '…'], …],     // 5–8 steps, plain words, no commands
+    'getting_started' => [['title' => '…', 'text' => '…'], …],     // 5 to 8 steps, plain words, no commands
     'troubleshooting' => [['q' => '…', 'a' => '…'], …],            // the support page; surface level
-    'faqs' => [['q' => '…', 'a' => '…'], …],                       // 8–12, plain-text answers
+    'faqs' => [['q' => '…', 'a' => '…'], …],                       // 8 to 12, plain-text answers
     'glossary' => [['term' => '…', 'definition' => '…'], …],
     'screenshots' => [['src' => '/assets/img/products/stagewatch/x.webp', 'src_small' => '…-800.webp',
                        'width' => 1600, 'height' => 1000, 'alt' => '…', 'caption' => '…'], …],
     'illustration' => 'countdown',             // the drawn visual a page uses when there is no screenshot
     'roadmap' => ['…coming, plainly labelled…'],
-    'ecosystem' => '…how it works with the other apps, 2–3 sentences…',
+    'ecosystem' => '…how it works with the other apps, 2 or 3 sentences…',
     'architecture' => [['title' => '…', 'text' => '…'], …],       // a high-level "built for show day" overview: no internals
 ];
 ```
@@ -87,7 +88,7 @@ return [
         'title' => '…', 'h1' => '…', 'summary' => '…', 'audience' => '…',
         'products' => ['stagewatch', 'patterns'],
         'duration' => '…', 'you_need' => ['…'],
-        'steps' => [['title' => '…', 'text' => '…', 'product' => 'stagewatch'], …],   // 5–8
+        'steps' => [['title' => '…', 'text' => '…', 'product' => 'stagewatch'], …],   // 5 to 8
         'outcome' => '…', 'tips' => ['…'], 'faqs' => [['q' => '…', 'a' => '…']],
         'related' => ['led-wall-line-up'],
     ],
@@ -107,6 +108,17 @@ return [
 ## `knowledge/<topic>.md`
 
 Extra notes for the support assistant only (never shown on a page): surface-level facts in plain prose and short
-lists, headed `# <Product> — assistant notes`. The same rules apply, and in addition: no code, commands, file
+lists, headed `# <Product>: assistant notes`. The same rules apply, and in addition: no code, commands, file
 paths inside the products, configuration contents, internals or protection details. Architecture only as a short,
 high-level overview of its advantages.
+
+## Industry Updates (`/news/`)
+
+The section's own words (its labels, the empty states, the verdict labels and the fourteen categories with their
+titles, descriptions and intros) are in `content/news.php`, and they follow the rules above like any other content
+file. The articles do not: they are news, kept in the database (docs/NEWS.md), not site copy. An article may name
+other companies and their products and may say "open-source" when the story does; the confirmed, speculation and
+source rules of docs/NEWS.md §7 keep it true instead. The launch articles in `content/news/articles/*.json` are
+imported into the database once, and the same applies to them. The articles' voice is `content/news/voice.md` (and
+the research brief `content/news/brief.md`): the AI desk's defaults, which an administrator edits on the desk's
+prompt page. No em dash in any of them; the site's dash fence reads all of `content/`.

@@ -9,6 +9,13 @@ use Anthropic\Beta\Messages\BetaRawMessageDeltaEvent;
 use Anthropic\Beta\Messages\BetaRawMessageStartEvent;
 use Anthropic\Beta\Messages\BetaTextDelta;
 use Anthropic\Client;
+use GuzzleHttp\Handler\CurlHandler;
+use GuzzleHttp\Handler\StreamHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\FnStream;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * The assistant's model calls through the official Anthropic PHP SDK.
@@ -20,17 +27,31 @@ use Anthropic\Client;
  *   Server-side fallbacks ("default") retry a classifier decline on the model Anthropic recommends.
  * - Usage is kept as the stream runs, cache writes and reads included (the API reports them apart from
  *   input_tokens), so lastUsage() answers for a stream that was stopped early too.
+ * - The SDK enforces no timeout of its own (it never reads its timeout option), so the HTTP clients carry the
+ *   limits: a call ends after the configured timeout, a connection takes at most CONNECT_TIMEOUT seconds, and a
+ *   call that receives nothing for LOW_SPEED_TIME seconds is dropped.
  */
 final class AnthropicGateway implements ModelGateway
 {
     private const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+    /** Seconds to open a connection to the API. */
+    public const CONNECT_TIMEOUT = 10;
+
+    /** A call that receives less than LOW_SPEED_LIMIT bytes a second for LOW_SPEED_TIME seconds is dropped. */
+    public const LOW_SPEED_LIMIT = 1;
+    public const LOW_SPEED_TIME = 30;
 
     private Client $client;
 
     /** @var array{tokens_in: int, tokens_out: int, cache_write: int, cache_read: int} */
     private array $usage = ['tokens_in' => 0, 'tokens_out' => 0, 'cache_write' => 0, 'cache_read' => 0];
 
-    /** @param array<string, mixed> $requestOptions extra SDK request options (tests pass a transporter) */
+    /**
+     * @param float $timeoutSeconds the longest one call may take, chat.timeout_seconds
+     * @param array<string, mixed> $requestOptions extra SDK request options; a transporter passed here (tests pass
+     *     one) carries every call, streams included, in place of the clients below
+     */
     public function __construct(
         string $apiKey,
         private readonly string $model,
@@ -39,16 +60,83 @@ final class AnthropicGateway implements ModelGateway
         float $timeoutSeconds,
         array $requestOptions = [],
     ) {
+        if (!isset($requestOptions['transporter'])) {
+            $requestOptions['transporter'] = self::http($timeoutSeconds);
+            // Without allow_url_fopen there is no stream handler, and the SDK streams through curl, all at once.
+            if (filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
+                $requestOptions['streamingTransporter'] ??= self::streaming($timeoutSeconds);
+            }
+        }
         $this->client = new Client(
             apiKey: $apiKey,
-            requestOptions: ['timeout' => $timeoutSeconds, 'maxRetries' => 1] + $requestOptions,
+            requestOptions: ['maxRetries' => 1] + $requestOptions,
             openTelemetry: false,
         );
     }
 
+    /** Whether the SDK, Guzzle and curl are installed. */
     public static function available(): bool
     {
-        return class_exists(Client::class) && class_exists(\GuzzleHttp\Client::class);
+        return class_exists(Client::class) && class_exists(\GuzzleHttp\Client::class) && class_exists(CurlHandler::class) && extension_loaded('curl');
+    }
+
+    /**
+     * The client for every call that is not streamed (the scope check), on curl: $timeoutSeconds for the whole call,
+     * CONNECT_TIMEOUT to connect, and dropped after LOW_SPEED_TIME seconds of receiving nothing.
+     */
+    public static function http(float $timeoutSeconds): \GuzzleHttp\Client
+    {
+        return new \GuzzleHttp\Client([
+            'handler' => HandlerStack::create(new CurlHandler()),
+            'timeout' => $timeoutSeconds,
+            'connect_timeout' => self::CONNECT_TIMEOUT,
+            'curl' => [CURLOPT_LOW_SPEED_LIMIT => self::LOW_SPEED_LIMIT, CURLOPT_LOW_SPEED_TIME => self::LOW_SPEED_TIME],
+        ]);
+    }
+
+    /**
+     * The client for the streamed answer, so the visitor reads it as it is written: curl hands a body over only once
+     * the whole of it has arrived, so streams go through PHP's own stream handler. The limits are the same: a wait
+     * of LOW_SPEED_TIME seconds for the connection, the headers or the next bytes ends the call, and so does reading
+     * past $timeoutSeconds from the start. A read that times out fails (PHP returns false and the body throws); one
+     * that comes back empty because it timed out is failed here too, so a stalled stream is never waited on for ever.
+     *
+     * @param callable|null $handler the HTTP handler (tests pass a mock); null: PHP's stream handler
+     */
+    public static function streaming(float $timeoutSeconds, ?callable $handler = null): ClientInterface
+    {
+        // The stream handler's timeout is each wait on the socket (connecting, the headers), not the whole call.
+        $http = new \GuzzleHttp\Client([
+            'handler' => HandlerStack::create($handler ?? new StreamHandler()),
+            'timeout' => self::LOW_SPEED_TIME,
+            'read_timeout' => self::LOW_SPEED_TIME,
+        ]);
+        return new class ($http, $timeoutSeconds) implements ClientInterface {
+            public function __construct(private readonly \GuzzleHttp\Client $http, private readonly float $timeoutSeconds)
+            {
+            }
+
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                $deadline = hrtime(true) + (int) ($this->timeoutSeconds * 1e9);
+                // The SDK's own options for a stream: error statuses and redirects come back as responses.
+                $response = $this->http->send($request, ['stream' => true, 'http_errors' => false, 'allow_redirects' => false]);
+                $body = $response->getBody();
+                $limit = $this->timeoutSeconds;
+                return $response->withBody(FnStream::decorate($body, [
+                    'read' => static function (int $length) use ($body, $deadline, $limit): string {
+                        if (hrtime(true) >= $deadline) {
+                            throw new \RuntimeException('The answer took longer than ' . $limit . ' seconds.');
+                        }
+                        $chunk = $body->read($length);
+                        if ($chunk === '' && $body->getMetadata('timed_out') === true) {
+                            throw new \RuntimeException('Nothing arrived for ' . AnthropicGateway::LOW_SPEED_TIME . ' seconds.');
+                        }
+                        return $chunk;
+                    },
+                ]));
+            }
+        };
     }
 
     public function classify(string $system, array $messages, array $schema): array

@@ -1082,4 +1082,201 @@ final class AccountsTest extends TestCase
         $this->register('line@example.test', ['name' => "Line\nBreak", 'company' => "Two\r\nLines"]);
         self::assertSame(['name' => 'Line Break', 'company' => 'Two Lines'], $this->db->one('SELECT name, company FROM users WHERE email = ?', ['line@example.test']));
     }
+
+    // ------------------------------------------------------- Industry Updates comments and the way back
+
+    /** A news comment straight into the database, with the article's visible count kept true. */
+    private function newsComment(int $article, int $user, string $body, string $status = 'visible', int $reports = 0): int
+    {
+        $id = $this->db->insert('news_comments', ['article_id' => $article, 'user_id' => $user, 'body' => $body, 'status' => $status, 'reports' => $reports, 'created_at' => time() - 60, 'updated_at' => time() - 60]);
+        \Psc\News\Comments::recountArticles($this->db, [$article]);
+        return $id;
+    }
+
+    public function testTheDataCopyListsNewsCommentsInEveryStatusAndTheReportsMade(): void
+    {
+        $me = $this->makeUser();
+        $other = $this->makeUser('other@example.test');
+        $article = $this->makeArticle(['slug' => 'export-me', 'title' => 'An article to comment on for the copy']);
+        $this->newsComment($article, $me, 'My visible comment');
+        $this->newsComment($article, $me, 'My waiting comment', 'pending');
+        $this->newsComment($article, $me, 'My hidden comment', 'hidden');
+        $theirs = $this->newsComment($article, $other, 'Their words, which I reported', 'visible', 1);
+        $this->db->insert('news_comment_reports', ['comment_id' => $theirs, 'user_id' => $me, 'created_at' => time()]);
+        $this->newsComment($article, $other, 'Their other words');
+
+        $this->signIn();
+        $data = json_decode($this->request('GET', '/portal/account/export/')->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['My visible comment', 'My waiting comment', 'My hidden comment'], array_column($data['news_comments'], 'body'));
+        self::assertSame(['visible', 'pending', 'hidden'], array_column($data['news_comments'], 'status'));
+        self::assertSame('https://patternsshowcontrol.test/news/video/export-me/', $data['news_comments'][0]['url'], 'the article\'s own address');
+        self::assertSame('An article to comment on for the copy', $data['news_comments'][0]['article']);
+        self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', (string) $data['news_comments'][0]['created_at']);
+        self::assertSame([$theirs], array_column($data['news_comment_reports'], 'comment_id'));
+        $copy = json_encode($data, JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString('Their words, which I reported', $copy, 'a report names the comment, never the other person\'s words');
+        self::assertStringNotContainsString('Their other words', $copy);
+        self::assertStringNotContainsString('other@example.test', $copy);
+    }
+
+    /**
+     * The account page lists the person's news comments, the newest first, each linking to its comment page (where it
+     * can be deleted) and naming its article only while that is live: the one way to find a comment on an article
+     * taken down since.
+     */
+    public function testTheAccountPageListsTheNewsCommentsWithTheWayToEach(): void
+    {
+        $me = $this->makeUser();
+        $other = $this->makeUser('other@example.test');
+        $live = $this->makeArticle(['slug' => 'still-live', 'title' => 'An article still on the site', 'categories' => ['audio', 'video']]);
+        $gone = $this->makeArticle(['slug' => 'taken-down-since', 'title' => 'A headline nobody may read now', 'categories' => ['legal']]);
+        $visible = $this->newsComment($live, $me, "My visible comment\nover two lines");
+        $hidden = $this->newsComment($live, $me, 'My hidden comment', 'hidden');
+        $orphan = $this->newsComment($gone, $me, 'My comment on the article taken down');
+        $this->newsComment($live, $other, 'Their comment, never on my page');
+        $this->db->update('news_comments', ['created_at' => time() - 3600], ['id' => $visible]);
+        (new \Psc\News\ArticleStore($this->app))->unpublish($gone);
+
+        $this->signIn();
+        $page = $this->request('GET', '/portal/account/');
+        self::assertSame(200, $page->status);
+        self::assertSame(1, preg_match('#<section class="pt-section" id="comments"[^>]*>(.*?)</section>#s', $page->body, $section));
+        preg_match_all('#<th scope="row"><a href="([^"]+)">([^<]*)</a></th>#', $section[1], $rows, PREG_SET_ORDER);
+        self::assertSame([
+            ['/news/legal/taken-down-since/comment/#comment-' . $orphan, 'My comment on the article taken down'],
+            ['/news/audio/still-live/comment/#comment-' . $hidden, 'My hidden comment'],
+            ['/news/audio/still-live/comment/#comment-' . $visible, 'My visible comment over two lines'],
+        ], array_map(static fn (array $r): array => [html_entity_decode($r[1]), $r[2]], $rows), 'the newest first, each to its comment page');
+        self::assertStringContainsString('An article still on the site', $section[1]);
+        self::assertStringNotContainsString('A headline nobody may read now', $section[1], 'an article not live is not named');
+        self::assertStringContainsString('An article that is not published at the moment', $section[1]);
+        self::assertStringContainsString('Hidden by a moderator', $section[1]);
+        self::assertStringNotContainsString('Their comment', $page->body);
+        self::assertStringContainsString('<table class="pt-table pt-table--stack">', $section[1]);
+        foreach (['Article', 'Status', 'Posted'] as $label) {
+            self::assertStringContainsString('data-label="' . $label . '"', $section[1]);
+        }
+
+        // That page is the person's, and its delete takes the comment.
+        $there = $this->request('GET', '/news/legal/taken-down-since/comment/');
+        self::assertSame(200, $there->status);
+        self::assertStringContainsString('name="comment" value="' . $orphan . '"', $there->body);
+
+        $this->freshBrowser();
+        $this->makeUser('quiet@example.test');
+        $this->signIn('quiet@example.test');
+        self::assertStringNotContainsString('id="comments"', $this->request('GET', '/portal/account/')->body, 'no section without comments');
+    }
+
+    public function testDeletingAnAccountDeletesItsNewsCommentsAndReportsAndCountsAgain(): void
+    {
+        $me = $this->makeUser();
+        $others = [$this->makeUser('a@example.test'), $this->makeUser('b@example.test'), $this->makeUser('c@example.test')];
+        $article = $this->makeArticle();
+        $second = $this->makeArticle();
+        $this->newsComment($article, $me, 'Mine, visible');
+        $this->newsComment($second, $me, 'Mine, also visible');
+        $this->newsComment($second, $me, 'Mine, waiting', 'pending');
+        $mineReported = $this->newsComment($article, $me, 'Mine, reported by others', 'visible', 2);
+        foreach ([$others[0], $others[1]] as $u) {
+            $this->db->insert('news_comment_reports', ['comment_id' => $mineReported, 'user_id' => $u, 'created_at' => time()]);
+        }
+        $theirs = $this->newsComment($article, $others[2], 'Theirs, which I reported', 'visible', 2);
+        foreach ([$me, $others[0]] as $u) {
+            $this->db->insert('news_comment_reports', ['comment_id' => $theirs, 'user_id' => $u, 'created_at' => time()]);
+        }
+        self::assertSame(3, (int) $this->db->value('SELECT comment_count FROM news_articles WHERE id = ?', [$article]));
+        self::assertSame(1, (int) $this->db->value('SELECT comment_count FROM news_articles WHERE id = ?', [$second]));
+
+        $this->signIn();
+        $page = $this->request('GET', '/portal/account/')->body;
+        self::assertStringContainsString('(you have 4 comments) are public, so they are deleted for good with your account', $page);
+
+        $r = $this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE']);
+        self::assertRedirect($r, '/portal/login/');
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_comments WHERE user_id = ?', [$me]));
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_comment_reports WHERE user_id = ?', [$me]));
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_comment_reports WHERE comment_id = ?', [$mineReported]), 'reports on the deleted comments went with them');
+        self::assertSame(1, (int) $this->db->value('SELECT reports FROM news_comments WHERE id = ?', [$theirs]), 'counted again without the deleted report');
+        self::assertSame(1, (int) $this->db->value('SELECT comment_count FROM news_articles WHERE id = ?', [$article]));
+        self::assertSame(0, (int) $this->db->value('SELECT comment_count FROM news_articles WHERE id = ?', [$second]));
+        self::assertSame('Deleted user', $this->db->value('SELECT name FROM users WHERE id = ?', [$me]), 'the account row is still anonymised, not removed');
+
+        $audit = json_decode((string) $this->db->value("SELECT meta FROM audit_log WHERE action = 'account.deleted'"), true);
+        self::assertSame(['news_comments' => 4, 'news_reports' => 1], $audit['removed']);
+        $mail = $this->lastMailTo('owner@example.test');
+        self::assertNotNull($mail);
+        self::assertSame(['news_comments' => 4, 'news_reports' => 1], $mail['data']['removed']);
+        self::assertStringContainsString('4 comments on Industry Updates articles and 1 report of other people', $mail['html']);
+        self::assertStringContainsString('0 comments on tickets', $mail['html']);
+    }
+
+    public function testRegistrationCarriesWhereThePersonWasGoingToTheConfirmationPage(): void
+    {
+        $this->makeArticle(['slug' => 'good-read']);
+        $form = $this->request('GET', '/portal/register/?next=' . rawurlencode('/news/video/good-read/#comments'));
+        self::assertSame(200, $form->status);
+        $this->register('nina@example.test');
+        $check = $this->request('GET', '/portal/register/');
+        self::assertStringContainsString('Check your email', $check->body);
+        self::assertStringContainsString('take you back to the article you were reading', $check->body);
+
+        $url = $this->mailUrl('nina@example.test', 'verify-email');
+        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        self::assertStringContainsString('Email address confirmed', $verify->body);
+        self::assertStringContainsString('<a class="pt-btn pt-btn--primary" href="/portal/login/?next=' . e(rawurlencode('/news/video/good-read/#comments')) . '">Sign in</a>', $verify->body);
+        self::assertStringContainsString('<a class="pt-btn pt-btn--ghost" href="/news/video/good-read/#comments">Continue to the article</a>', $verify->body);
+        self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION, 'offered once');
+
+        $login = $this->post('/portal/login/', ['email' => 'nina@example.test', 'password' => self::PASSWORD, 'next' => '/news/video/good-read/#comments']);
+        self::assertRedirect($login, '/news/video/good-read/#comments');
+    }
+
+    public function testThePortalSwitchFromSignInKeepsTheWayBack(): void
+    {
+        // Sent to sign in from an article's comment page, the person picks Create an account instead.
+        $this->request('GET', '/portal/login/?next=' . rawurlencode('/news/switch-story/comment/'));
+        $this->request('GET', '/portal/register/');
+        $this->register('nina@example.test');
+        $url = $this->mailUrl('nina@example.test', 'verify-email');
+        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        self::assertStringContainsString('href="/news/switch-story/#comments">Continue to the article</a>', $verify->body);
+        self::assertStringContainsString('href="/portal/login/?next=' . e(rawurlencode('/news/switch-story/comment/')) . '"', $verify->body);
+    }
+
+    public function testOnlyASafeArticlePathIsOfferedAsTheWayBack(): void
+    {
+        foreach (['//evil.example/news/x/', 'https://evil.example/', '/%2F%2Fevil.example/'] as $next) {
+            $this->freshBrowser();
+            $this->request('GET', '/portal/register/?next=' . rawurlencode($next));
+            self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION, $next);
+        }
+
+        // A portal page is carried for the sign-in but is not an article.
+        $this->freshBrowser();
+        $this->request('GET', '/portal/register/?next=' . rawurlencode('/portal/tickets/new/'));
+        $this->register('nina@example.test');
+        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('nina@example.test', 'verify-email'))));
+        self::assertStringContainsString('href="/portal/login/?next=' . e(rawurlencode('/portal/tickets/new/')) . '"', $verify->body);
+        self::assertStringNotContainsString('Continue to the article', $verify->body);
+
+        $articleOf = [\Psc\Controllers\Portal\AuthController::class, 'articleOf'];
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/'));
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/comment/'));
+        self::assertSame('/news/audio/x-y/#comments', $articleOf('/news/audio/x-y/comment/?utm_source=mail#form'));
+        self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/'), 'the lasting address, which leads to the article');
+        self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/comment/'));
+        self::assertSame('/news/x-y/#comments', $articleOf('/news/x-y/#comments'));
+        foreach (['/news/', '/news/category/video/', '/news/category/', '/news/go/3/', '/news/x/y/z/', '/portal/news/x/', '/news/X/', '/news/video/', '/news/video/page/2/', '/news/page/2/', '/news/rumours/x-y/'] as $path) {
+            self::assertNull($articleOf($path), $path);
+        }
+
+        // A sign-in that goes through forgets the kept way back, so it is never offered later by surprise.
+        $this->freshBrowser();
+        $this->makeUser();
+        $this->request('GET', '/portal/login/?next=' . rawurlencode('/news/old-story/comment/'));
+        self::assertSame('/news/old-story/comment/', $_SESSION[\Psc\Controllers\Portal\AuthController::RETURN_KEY]);
+        $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'next' => '/news/old-story/comment/']);
+        self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION);
+    }
 }

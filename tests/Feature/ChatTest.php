@@ -265,7 +265,7 @@ final class ChatTest extends TestCase
         yield ['You can import your running order from a CSV file.', false];
         yield ['The holographic display uses three.js and the Node.js runtime ships inside.', false];
         yield ['Bitfocus Companion can start the countdown over OSC or HTTP.', false];
-        yield ["- **Standard** — £9\n- **Pro** — £29", false];
+        yield ["- **Standard**: £9\n- **Pro**: £29", false];
         // PowerShell with its usual PascalCase parameters, and the commands around it.
         yield ['Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass', true];
         yield ['Invoke-WebRequest -Uri https://example.test/p.zip -OutFile p.zip', true];

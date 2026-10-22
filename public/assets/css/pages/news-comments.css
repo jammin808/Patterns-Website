@@ -1,0 +1,61 @@
+/*
+ * Industry Updates comments: the section at the foot of an article (templates/partials/news/comments.php, filled in
+ * by news-comments.js) and the comment page for readers without scripting (templates/news/comment.php). Everything
+ * sits in the components layer and uses the tokens from site.css; no raw colours. A waiting comment is amber and
+ * dashed (standing by) beside the words that say so, and a hidden one dotted and dimmed beside its note, so colour is
+ * never the only cue.
+ */
+@layer components {
+  /* ===== The section: its heading, the list, the box ===== */
+  .news-comments { display: grid; gap: var(--sp-5); scroll-margin-top: calc(var(--header-h) + 16px);
+    & > h2 { font-size: var(--fs-5); } }
+  .news-comments-list { display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none;
+    &:empty { display: none; } }
+  .news-comments-empty { color: var(--text-2); }
+
+  /* ===== One comment ===== */
+  .news-comment { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
+    scroll-margin-top: calc(var(--header-h) + 16px);
+    &:focus { outline: none; }
+    &:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } }
+  .news-comment--staff { border-left: 3px solid var(--text); }
+  .news-comment--pending { --focus: var(--text); border: 1px dashed var(--ink-standby); background: color-mix(in srgb, var(--lamp-standby) 7%, var(--s1)); }
+  /* Hidden by a moderator, shown to its author alone: set back on the page, dotted, its words dimmed, beside the note
+     that says so (the note, not the look, carries the meaning). */
+  .news-comment--hidden { border: 1px dotted var(--line-2); background: var(--bg);
+    & .news-comment-body { color: var(--text-2); }
+    & .news-comment-note { color: var(--text-2); } }
+  .news-comment-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 8px; font-size: var(--fs-0); color: var(--text-2); }
+  .news-comment-author { font-size: var(--fs-1); font-weight: 650; color: var(--text); }
+  .news-comment-note { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: var(--fs-0); font-weight: 600; color: var(--ink-standby);
+    & .c-icon { width: 16px; height: 16px; } }
+  .news-comment-body { max-width: 70ch; font-size: var(--fs-2); color: var(--text); overflow-wrap: anywhere; }
+  .news-comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: var(--fs-1); color: var(--text-2);
+    &:empty { display: none; }
+    & > a { display: inline-flex; align-items: center; min-height: 36px; } }
+  /* The answer that replaces a comment's buttons (Reported, or a refusal) takes focus, so it draws no ring. */
+  .news-comment-said:focus { outline: none; }
+
+  /* ===== The box: the sign-in link, the form, or why comments are closed ===== */
+  .news-comments-box { display: grid; gap: var(--sp-4); padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1);
+    & > h2 { font-size: var(--fs-4); font-stretch: 108%; letter-spacing: -0.01em; } }
+  .news-comments-cta { font-size: var(--fs-2); & a { font-weight: 620; } }
+  .news-comments-closed { display: flex; align-items: center; gap: 10px; color: var(--text-2);
+    & .c-icon { color: var(--text-3); } }
+  .news-comments-alert { padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--lamp-standby) 40%, var(--line)); border-left: 3px solid var(--lamp-standby);
+    border-radius: var(--r-2); background: color-mix(in srgb, var(--lamp-standby) 9%, var(--s1)); color: var(--text-2); font-size: var(--fs-1); --focus: var(--text);
+    & a { font-weight: 620; color: var(--text); } }
+  .news-comments-form { gap: var(--sp-4); }
+  .news-comments-submit { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+  .news-comments-rules, .news-comments-note { flex: 1 1 16rem; font-size: var(--fs-0); color: var(--text-3); & a { color: var(--text-2); } }
+
+  /* ===== The comment page ===== */
+  .news-comment-page { padding-block: clamp(24px, 3vw, 40px) var(--section-y);
+    & > .l-wrap { display: grid; gap: var(--sp-6); } }
+  .news-comment-back { margin: 0; }
+
+  @media (forced-colors: active) {
+    .news-comment--pending { border-style: dashed; }
+    .news-comment--hidden { border-style: dotted; }
+  }
+}

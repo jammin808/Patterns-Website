@@ -1,0 +1,131 @@
+{
+  "key": "2026-10-22-companion-5-1",
+  "title": "Companion 5.1 puts a prototype REST API under the buttons",
+  "seo_title": "Companion 5.1: prototype REST API, tokens and metrics",
+  "dek": "Bitfocus Companion 5.1.0 arrived on 11 October with a prototype full-system REST API, REST API token management and Prometheus metrics, plus mirror controls and linked presets. 5.1.1 followed on 21 October and is now the current build. If you are coming from 4.x, read the 5.0 notes first.",
+  "summary": "Companion 5.1 adds a prototype REST API, API tokens and Prometheus metrics. 5.1.1, out 21 October, is the current build. What changed and what to test.",
+  "body": "Bitfocus released Companion 5.1.0 on 11 October, and [5.1.1 followed on 21 October](https://github.com/bitfocus/companion/releases). GitHub labels 5.1.1 Latest, so if you are installing this week, that is the build to fetch. The headline of 5.1 is not on the buttons at all. It is underneath them: a prototype of a new full-system REST API, a REST API to list surfaces and set their brightness, REST API token management, and Prometheus metrics for monitoring.\n\n## The plumbing\n\n\"Prototype\" is Bitfocus's own word in the [5.1.0 notes](https://github.com/bitfocus/companion/blob/main/CHANGELOG.md), and we would take it at face value. Our reading, not Bitfocus's, is that a prototype API can change shape between releases. By all means point a producer's dashboard or a room control system at it on the bench. We would not hang a show cue off it yet.\n\nToken management is the part we were most pleased to see. The notes do not say how the HTTP API was secured before 5.1, so we will not claim a security gain we cannot see described. What we will say is that if your Companion machine sits on a network other people use, the tokens are the first thing to look at after the upgrade.\n\nThe Prometheus metrics give Companion something to say to whatever monitoring you already run, if you run any. We have not seen a list of which metrics are exposed, so find out before you build an alert around one.\n\nSmaller, and very welcome: log entries now carry milliseconds. Anyone who has tried to work out whether the key press or the fault came first will understand.\n\nOne open issue on the [v5.1 milestone](https://github.com/bitfocus/companion/milestone/25) sits right on top of all this. #4251, tagged BUG, is titled \"Run shell command (local) error when invoking HTTP API through PowerShell\". If you fire buttons from a script and those buttons run local shell commands, test that exact combination before you rely on it.\n\n## On the buttons\n\nControls get a reference/mirror control type and linked presets. Variables can now be local to a page, and expressions get an oscillator function. There is also a \"Surface: When connected\" feedback, which does what it says.\n\nWe expect mirror controls and linked presets to cut the copy-and-paste a big page layout tends to need. The notes name the features and say nothing about that, so treat it as our hope rather than their promise.\n\nOn the graphics side there is a WYSIWYG toolbar for basic edits to a button's style, and the style editor gets pinned properties for the ones you reach for most. Surfaces get gauge LEDs. Corner radius arrives for box elements and rotation for composite elements: not every element, just those two.\n\n## What 5.1.1 fixes\n\nEmulator buttons no longer blank on first press when the emulator is not 4x8. A fallback font makes missing glyphs consistent. And Companion now detects when USB is not available and does not enable hotplug. None of it is dramatic, which is exactly what you want from a point release ten days after a feature release.\n\n## Coming from 4.x\n\nIf you skipped 5.0, read the [5.0.0 release](https://github.com/bitfocus/companion/releases/tag/v5.0.0) of 12 July before anything else. It needs macOS 13.5 or later. Shell command execution, and installing modules over the network from another machine, are disabled by default; [the 5.0.0 page on Bitfocus's docs site](https://companion.free/whats-new/v5-0-0/) says both can be re-enabled from the launcher. The dedicated Elgato plugin server has gone, and the Elgato Stream Deck plugin now connects over the Satellite API, so make sure the plugin is up to date and configured to connect that way.\n\n## Still open\n\nThe v5.1 milestone has no due date. Among its open issues, #4503 (tagged BUG) reports multiple Stream Deck Network Docks disconnecting at once and reconnecting a few seconds later. #4515, tagged Enhancement, asks for \"Button press by key and mouse like before 5.1\", which suggests something about pressing buttons changed in this release. We have not read either thread, so we cannot say how widespread the dock drops are or what exactly changed with presses. If your rig leans on Network Docks, give 5.1.1 a proper soak, measured in hours rather than minutes.\n\nOur view: 5.1.1 is worth testing now, on a spare laptop or between jobs. The keynote morning can stay on whatever ran last week.",
+  "confirmed": [
+    {
+      "text": "Companion v5.1.0 was released on 11 October 2026 and v5.1.1 on 21 October 2026; GitHub labels v5.1.1 Latest.",
+      "url": "https://github.com/bitfocus/companion/releases"
+    },
+    {
+      "text": "Companion 5.1.0 adds a prototype of a new full-system REST API, a REST API to list surfaces and set brightness, and REST API token management.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Companion 5.1.0 adds Prometheus metrics for monitoring, milliseconds in log entries and a 'Surface: When connected' feedback.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Companion 5.1.0 adds a reference/mirror control type, linked presets, Local Variables on pages and an expression oscillator function.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Companion 5.1.0's graphics changes include a WYSIWYG toolbar for basic edits to a button's style, pinned properties in the style editor, surface gauge LEDs, corner radius for box elements and rotation for composite elements.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Companion 5.1.1 fixes emulator buttons blanking on first press when the emulator is not 4x8, adds a fallback font to make missing glyphs consistent, and does not enable hotplug when USB is not available.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Companion 5.0.0, released on 12 July, requires macOS 13.5 or later and removes the dedicated Elgato plugin server.",
+      "url": "https://github.com/bitfocus/companion/releases/tag/v5.0.0"
+    },
+    {
+      "text": "From Companion 5.0.0, shell command execution and installing modules over the network from another machine are disabled by default.",
+      "url": "https://github.com/bitfocus/companion/releases/tag/v5.0.0"
+    },
+    {
+      "text": "Bitfocus's 5.0.0 documentation says shell commands and network module installs can be re-enabled from the launcher.",
+      "url": "https://companion.free/whats-new/v5-0-0/"
+    },
+    {
+      "text": "The Elgato Stream Deck plugin now connects over the Satellite API, and its users should make sure it is up to date and configured to connect that way.",
+      "url": "https://companion.free/whats-new/v5-0-0/"
+    },
+    {
+      "text": "Open issues on the v5.1 milestone include #4251 (tagged BUG), a shell command error when invoking the HTTP API through PowerShell, and #4503 (tagged BUG), multiple Stream Deck Network Docks disconnecting at once and reconnecting a few seconds later.",
+      "url": "https://github.com/bitfocus/companion/milestone/25"
+    },
+    {
+      "text": "Open issue #4515 on the v5.1 milestone, tagged Enhancement, asks for button presses by key and mouse to work as before 5.1; the milestone has no due date.",
+      "url": "https://github.com/bitfocus/companion/milestone/25"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "Bitfocus calls the full-system REST API a prototype. Our reading, not a Bitfocus statement, is that its endpoints could change in a later release, so it should not yet carry show-critical triggers.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "The release notes we read do not describe how the HTTP API was authenticated before 5.1, so any security gain from token management is our inference, not Bitfocus's claim.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "We expect linked presets and the mirror control type to reduce duplicated button programming. The notes name the features but say nothing about their effect.",
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md"
+    },
+    {
+      "text": "Issue #4515 asks for key and mouse presses to work as they did before 5.1, which suggests a change in 5.1. We have not read the thread or seen the change described.",
+      "url": "https://github.com/bitfocus/companion/milestone/25"
+    },
+    {
+      "text": "Issue #4503 reports Network Docks disconnecting at once. We have not read the issue itself, so how widespread it is, and whether the maintainers have reproduced it, is not known.",
+      "url": "https://github.com/bitfocus/companion/milestone/25"
+    }
+  ],
+  "impact": "**If you carry your own Companion machine.** Test 5.1.1 between jobs, not in the week of a show, and keep a backup of your configuration and the installer you run now. 5.1.1 is the current build, so there is no reason to start from 5.1.0.\n\n**If that machine is a Mac.** From 5.0.0, Companion needs macOS 13.5 or later. The old office MacBook that has quietly been the show controller for years may need an OS update first, or a dignified retirement.\n\n**If your show file runs shell commands, or you install modules from another machine.** Both have been off by default since 5.0.0 and are switched back on from the launcher. Check the launcher at the rehearsal, not at the half.\n\n**If you use the Elgato Stream Deck plugin.** The dedicated plugin server has gone. Update the plugin and configure it for the Satellite API before you load in.\n\n**If you hook Companion into something else.** The new full-system REST API is a prototype. We would point a producer's dashboard or a test integration at it, and keep show-critical triggers on the paths you already trust. Look at token management, and if a script calls the HTTP API to fire a button that runs a local shell command, test it against open issue #4251.\n\n**If you look after a fleet.** In our view the Prometheus metrics will matter most to rental and install teams that already run Prometheus for the rest of their kit. Check which metrics are exposed before you promise a client a dashboard.\n\n**If you use Stream Deck Network Docks.** Keep an eye on open issue #4503 and soak the rig for longer than usual before show day.",
+  "verdict": "test",
+  "verdict_note": "Test 5.1.1 on a spare machine before it goes near a show, and build nothing show-critical on the prototype REST API yet. If your rig uses Stream Deck Network Docks, watch open issue #4503 first.",
+  "categories": [
+    "automation",
+    "technology"
+  ],
+  "tags": [
+    "bitfocus companion",
+    "stream deck",
+    "rest api",
+    "prometheus",
+    "show control",
+    "elgato",
+    "macos"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/bitfocus/companion/releases",
+      "title": "Releases · bitfocus/companion · GitHub (v5.1.0, v5.1.1 release notes)",
+      "publisher": "Bitfocus (GitHub)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://github.com/bitfocus/companion/blob/main/CHANGELOG.md",
+      "title": "companion/CHANGELOG.md at main · bitfocus/companion · GitHub (v5.1.1, v5.1.0, v5.0.0 sections)",
+      "publisher": "Bitfocus (GitHub)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://github.com/bitfocus/companion/releases/tag/v5.0.0",
+      "title": "Release Bitfocus Companion v5.0.0 · bitfocus/companion · GitHub",
+      "publisher": "Bitfocus (GitHub)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://companion.free/whats-new/v5-0-0/",
+      "title": "Companion v5.0.0 | Bitfocus Companion",
+      "publisher": "Bitfocus (documentation site)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://github.com/bitfocus/companion/milestone/25",
+      "title": "v5.1 Milestone · bitfocus/companion · GitHub",
+      "publisher": "Bitfocus (GitHub)",
+      "kind": "primary"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "bitfocus-companion-5-1-release",
+  "ai_written": true
+}

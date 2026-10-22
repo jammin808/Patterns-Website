@@ -746,14 +746,14 @@ final class TicketsTest extends TestCase
 
         $this->actAs(self::A);
         $page = $this->request('GET', "/portal/tickets/{$id}/")->body;
-        self::assertStringContainsString('<dd>In progress — being worked on now.</dd>', $page);
+        self::assertStringContainsString('<dd>In progress. Being worked on now.</dd>', $page);
         self::assertStringContainsString('<dd><span class="pt-badge pt-badge--show_stopper">Show-stopper</span></dd>', $page);
 
         $this->actAs(self::ADMIN, 'admin');
         $this->post("/portal/admin/tickets/{$id}/", ['status' => 'closed', 'visibility' => 'private', 'severity' => 'low']);
         $this->actAs(self::A);
         $closed = $this->request('GET', "/portal/tickets/{$id}/")->body;
-        self::assertStringContainsString('<dd>Closed — add a reply if you need to pick it up again.</dd>', $closed, 'a first sentence that repeats the status goes');
+        self::assertStringContainsString('<dd>Closed. Add a reply if you need to pick it up again.</dd>', $closed, 'a first sentence that repeats the status goes');
         self::assertStringContainsString('<dd><span class="pt-badge pt-badge--low">Low</span></dd>', $closed);
     }
 
@@ -894,7 +894,7 @@ final class TicketsTest extends TestCase
         $this->actAs(self::A);
         $tmp = (string) tempnam(sys_get_temp_dir(), 'psc-up');
         file_put_contents($tmp, self::pngBytes());
-        // attachments[a][] — no form of ours sends this shape; reading it as strings raised PHP warnings.
+        // attachments[a][]: no form of ours sends this shape; reading it as strings raised PHP warnings.
         $files = ['attachments' => ['name' => [['a.png']], 'type' => [['image/png']], 'tmp_name' => [[$tmp]], 'error' => [[UPLOAD_ERR_OK]], 'size' => [[67]]]];
         $r = $this->request('POST', '/portal/tickets/', self::bug() + ['_csrf' => $this->csrf()], [], null, true, $files);
         $id = self::idFrom($r);

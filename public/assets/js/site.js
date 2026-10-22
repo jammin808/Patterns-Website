@@ -1,5 +1,5 @@
 /*
- * Patterns Show Control — site behaviour. An ES module with no dependencies, loaded on every page:
+ * Patterns Show Control: site behaviour. An ES module with no dependencies, loaded on every page:
  *   <script type="module" src="/assets/js/site.js"></script>
  *
  * Every feature finds its elements by data-* attributes (classes are for styling only), does nothing when they

@@ -4,7 +4,12 @@
  *
  * @var string $state confirmed | approval | invalid | disabled
  * @var bool $signedIn
+ * @var string|null $next where the person was going before signing up (AuthController::RETURN_KEY), once confirmed
+ * @var string|null $article that place's article, at its comments, when it is one
  */
+$next ??= null;
+$article ??= null;
+$signIn = '/portal/login/' . ($next !== null ? '?next=' . rawurlencode($next) : '');
 $titles = [
     'confirmed' => 'Email address confirmed',
     'approval' => 'Email address confirmed',
@@ -26,11 +31,22 @@ $titles = [
     </header>
 
     <?php if ($state === 'confirmed'): ?>
+        <?php if ($article !== null && !$signedIn): ?>
+            <p>Sign in and you will go straight back to the article, ready to comment.</p>
+        <?php endif; ?>
         <div class="pt-actions">
             <?php if ($signedIn): ?>
-                <a class="pt-btn pt-btn--primary" href="/portal/">Go to your dashboard</a>
+                <?php if ($article !== null): ?>
+                    <a class="pt-btn pt-btn--primary" href="<?= e($article) ?>">Continue to the article</a>
+                    <a class="pt-btn pt-btn--ghost" href="/portal/">Go to your dashboard</a>
+                <?php else: ?>
+                    <a class="pt-btn pt-btn--primary" href="/portal/">Go to your dashboard</a>
+                <?php endif; ?>
             <?php else: ?>
-                <a class="pt-btn pt-btn--primary" href="/portal/login/">Sign in</a>
+                <a class="pt-btn pt-btn--primary" href="<?= e($signIn) ?>">Sign in</a>
+                <?php if ($article !== null): ?>
+                    <a class="pt-btn pt-btn--ghost" href="<?= e($article) ?>">Continue to the article</a>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     <?php elseif ($state === 'approval'): ?>

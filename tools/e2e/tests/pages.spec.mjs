@@ -3,11 +3,23 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-async function pagePaths(request) {
-  const res = await request.get('/sitemap.xml');
-  expect(res.ok()).toBeTruthy();
+/** The <loc>s of a sitemap or a sitemap index (an image's <image:loc> is not one). */
+async function locs(request, path) {
+  const res = await request.get(path);
+  expect(res.ok(), path).toBeTruthy();
   const xml = await res.text();
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+}
+
+// The site's sitemap (its pages and the news hubs), then the section's own: its index, then each month's sitemap and
+// the news sitemap it names, so every article still gets the page checks. Each page once.
+async function pagePaths(request) {
+  const paths = await locs(request, '/sitemap.xml');
+  for (const child of await locs(request, '/news/sitemap.xml')) {
+    expect(child).toMatch(/^\/news\/sitemap-[a-z0-9-]+\.xml$/);
+    paths.push(...await locs(request, child));
+  }
+  return [...new Set(paths)];
 }
 
 test('every page in the sitemap is healthy', async ({ page, request }, info) => {

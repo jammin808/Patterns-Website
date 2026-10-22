@@ -1,0 +1,128 @@
+{
+  "key": "2026-10-22-disguise-x-series",
+  "title": "Disguise X2 and X3: full Designer and up to three 4K outputs, on a Windows box you bring yourself",
+  "seo_title": "Disguise X2 and X3: up to three 4K outputs on your own PC",
+  "dek": "Disguise has extended its software-only X Series with X2 and X3, which run full Designer on compatible Windows hardware with two or three 4K outputs. Prices across the three tiers run from $6,000 to $15,000 per user per year, and the tier you buy is the tier you keep.",
+  "summary": "Disguise X2 and X3 run full Designer on your own Windows hardware with two or three 4K outputs, at $10,000 and $15,000 per user per year.",
+  "body": "Disguise has added two tiers to its X Series, the software-only way of running Designer without one of its media servers. X2 and X3, announced on 1 October, extend the range to two and three 4K outputs. They join X1, which [arrived in July 2025](https://www.panoramaaudiovisual.com/en/2025/07/23/disguise-estrena-x1-version-portatil-designer-contenido-4k-sin-servidores-multimedia) with one 4K DCI output per licence. All three run on what Disguise calls compatible Windows hardware, and its Chief Product and Technology Officer, Raed Al Tikriti, describes \"the flexibility to run on your hardware of choice, including a Windows laptop\".\n\nThey are not new to everyone. The [release](https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series) says X2 and X3 \"have been available to select customers since earlier this year\", and Disguise says they are already powering productions for David Guetta, Martin Garrix and Central Cee. That is Disguise's claim. The Guetta testimonial on its own product page is tagged X1.\n\n## What you get, and what it costs\n\nEvery tier on the [product page](https://www.disguise.one/en/products/x-series) lists the same four things: full Designer functionality and plugins, a portable licence dongle, output from compatible Windows hardware, and support for receiving RenderStream. Training, 24/7 support and free lifetime software updates come with any X Series licence. What changes between tiers is the number of outputs, and the bill.\n\nThe prices are in US dollars, per user:\n\n- **X1:** $6,000 a year, or monthly plans from $600.\n- **X2:** $10,000 a year, or monthly plans from $1,000.\n- **X3:** $15,000 a year, annual only.\n\nThe sums are ours. At those \"from\" prices, ten months on a monthly X1 or X2 plan costs the same as a year, so annual only pays if you would be on it for most of the year. The third output costs $5,000 a year more than the second.\n\nThen the catch. The FAQ says X Series licences cannot be upgraded or downgraded between X1, X2 and X3. Buy X2 for a season of two-screen conferences, land a three-output job in the autumn, and the licence will not stretch to meet it. Pick the tier for the work you expect, not the job in front of you.\n\n## The route back to a server\n\n[TPi's coverage](https://www.tpimagazine.com/disguise-expands-touring-capabilities-with-x-series/) sets out the pitch: start on X1, X2 or X3, then switch to Disguise media servers for large productions \"when greater output or clustering is required\", which TPi says ends up \"reducing the need to rebuild or reprogramme the show file as requirements change\". Alex Loftie, who beta tested X2 on the Central Cee tour, is quoted by TPi: \"We could easily transition back to Disguise's GX 3 media servers for the larger arena shows in Europe.\"\n\nThat is the useful idea. Programme on your own machine, then hand the file to a server when the job grows. Disguise's release goes further and talks about \"eliminating the need for costly logistics or time spent reprogramming on other solutions\". TPi's \"reducing\" is the word we would plan around. None of the pages we read gives a Designer version number or any detail of file compatibility for the move to a GX 3, so try the round trip with a real show file before a client's date depends on it.\n\nThe product page does not pretend the servers are finished, either. On it, Kate Freer, a projection designer at Festival Napa Valley who used X1, says: \"Having this new solution doesn't totally eliminate the need for server-run shows.\" Refreshingly candid, for a vendor's own page.\n\n## The machine is your problem now\n\nWhich puts the weight on the hardware. The product page names Renderboxes and Silverdraft as recommended partners and links to a specifications page, but it publishes no measured performance figures for third-party laptops or render boxes. Read the specifications before you buy anything. Then run your real content, at full output resolution, on the machine you will take to the job, for longer than the show lasts.\n\nA laptop that copes for an hour in the office can feel rather different by the second half of an awards dinner.\n\n## MyDisguise, and the Disguise Cloud question\n\nThe same week, according to the release, Disguise launched MyDisguise, a platform for managing software subscriptions and buying licences, X Series included. The product page sends buyers there to create an account and buy a plan. A [pre-launch iSquint report](https://isquint.net/2026/disguise-replaces-disguise-cloud-with-mydisguise-teases-x-series-launch/) on 29 September said MyDisguise was replacing Disguise Cloud and that migration would be automatic, with Disguise telling users they need do nothing before launch. We have not seen that confirmed since launch, and both the release and the product page still pointed to a Disguise Cloud address when we checked. If you already hold Disguise licences, log in and make sure they are all there now, rather than at the next load-in.",
+  "confirmed": [
+    {
+      "text": "On 1 October 2026 Disguise announced X2 and X3, which extend the X Series to two and three 4K outputs.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "X2 and X3 have been available to select customers since earlier in 2026.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "Disguise's release says X2 and X3 are already powering productions for artists including David Guetta, Martin Garrix and Central Cee. This is Disguise's own claim.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "Raed Al Tikriti, Disguise's Chief Product and Technology Officer, says the X Series gives the flexibility to run on your hardware of choice, including a Windows laptop.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "Published prices per user per year are X1 $6,000, X2 $10,000 and X3 $15,000. Monthly plans start from $600 per user for X1 and $1,000 per user for X2; X3 is annual only.",
+      "url": "https://www.disguise.one/en/products/x-series"
+    },
+    {
+      "text": "X Series licences cannot be upgraded or downgraded between X1, X2 and X3.",
+      "url": "https://www.disguise.one/en/products/x-series"
+    },
+    {
+      "text": "Each tier lists full Designer functionality and plugins, a portable licence dongle, output from compatible Windows hardware and support for receiving RenderStream.",
+      "url": "https://www.disguise.one/en/products/x-series"
+    },
+    {
+      "text": "Disguise training, 24/7 support and free lifetime software updates come with an X Series licence.",
+      "url": "https://www.disguise.one/en/products/x-series"
+    },
+    {
+      "text": "Teams can start on X1, X2 or X3 and switch to Disguise media servers for large productions when greater output or clustering is required, reducing the need to rebuild or reprogramme the show file.",
+      "url": "https://www.tpimagazine.com/disguise-expands-touring-capabilities-with-x-series/"
+    },
+    {
+      "text": "Alex Loftie, a beta tester for X2 on the Central Cee tour, says they could easily move back to Disguise's GX 3 media servers for the larger arena shows in Europe.",
+      "url": "https://www.tpimagazine.com/disguise-expands-touring-capabilities-with-x-series/"
+    },
+    {
+      "text": "Disguise launched MyDisguise in the week of the X Series announcement, as a platform for managing software subscriptions and licence purchases, including the X Series.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "X1 launched in July 2025 as a software version of Designer for 4K content without media servers, with one 4K DCI output per licence.",
+      "url": "https://www.panoramaaudiovisual.com/en/2025/07/23/disguise-estrena-x1-version-portatil-designer-contenido-4k-sin-servidores-multimedia"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "iSquint reported on 29 September 2026, before launch, that MyDisguise is replacing Disguise Cloud, that migration is automatic and that Disguise says users need do nothing before launch. No post-launch source we read confirms the migration, and the release does not mention Disguise Cloud.",
+      "url": "https://isquint.net/2026/disguise-replaces-disguise-cloud-with-mydisguise-teases-x-series-launch/"
+    },
+    {
+      "text": "Disguise's Raed Al Tikriti says the X Series means eliminating the need for costly logistics or time spent reprogramming on other solutions. This is a vendor claim with no measured evidence given.",
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series"
+    },
+    {
+      "text": "Vishal Sharma, video programmer at All Of It Now on Martin Garrix's shows, says he believes the X Series is going to really change the way the industry thinks about video. This is a customer's opinion, quoted in Disguise's launch coverage.",
+      "url": "https://www.tpimagazine.com/disguise-expands-touring-capabilities-with-x-series/"
+    },
+    {
+      "text": "Kate Freer, a projection designer at Festival Napa Valley who used X1 (not X2 or X3), says on the product page that the new solution doesn't totally eliminate the need for server-run shows. The page publishes no measured performance figures for third-party laptops or render boxes.",
+      "url": "https://www.disguise.one/en/products/x-series"
+    }
+  ],
+  "impact": "**If you programme Designer as a freelancer.** The licence is per user, can sit on a portable dongle and, for X1 and X2, comes on monthly plans. That lets you output Designer from your own machine and price the licence into a job or a season. Check the minimum term and the cancellation terms before you sign up.\n\n**If you deliver corporate events.** In our view, two or three outputs is the shape of a lot of conference and AGM stages (a centre screen and a pair of side screens, say), which makes X2 and X3 the tiers to look at. The risk moves to the hardware. Name the machine in the tech spec and rehearse on it at full output resolution, then work out what the spare is. If the dongle moves the licence between machines the way its name suggests, the spare is a dongle swap away, but confirm that with Disguise before you rely on it.\n\n**If the job might grow.** Choose the tier for the biggest job you expect in the licence's term, because it cannot be upgraded or downgraded later. If the show might end up on a GX 3, test that move with a real show file first.\n\n**If you hire in a Designer programmer.** The licence is per user, so ask whose it is and whether it is the tier your show needs.\n\n**If you already have Disguise licences.** Log in to MyDisguise and check they are all there before the next job, not on the morning of it.",
+  "verdict": "test",
+  "verdict_note": "Worth a trial if you already work in Designer: start on a monthly X1 or X2 plan, prove your own machine at full output, and commit to an annual tier only once you know how many outputs your work needs, because the tier cannot be changed later.",
+  "categories": [
+    "video",
+    "production",
+    "freelance"
+  ],
+  "tags": [
+    "disguise",
+    "x series",
+    "designer",
+    "media server",
+    "renderstream",
+    "mydisguise",
+    "software licensing"
+  ],
+  "sources": [
+    {
+      "url": "https://www.financialcontent.com/article/bizwire-2026-10-1-disguise-brings-the-software-behind-the-worlds-biggest-stages-to-every-production-with-the-expanded-x-series",
+      "title": "Disguise Brings the Software Behind the World's Biggest Stages to Every Production With the Expanded X Series",
+      "publisher": "Business Wire (via FinancialContent)",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.disguise.one/en/products/x-series",
+      "title": "Disguise X Series",
+      "publisher": "Disguise",
+      "kind": "primary"
+    },
+    {
+      "url": "https://www.tpimagazine.com/disguise-expands-touring-capabilities-with-x-series/",
+      "title": "Disguise expands touring capabilities with X Series",
+      "publisher": "TPi",
+      "kind": "press"
+    },
+    {
+      "url": "https://isquint.net/2026/disguise-replaces-disguise-cloud-with-mydisguise-teases-x-series-launch/",
+      "title": "Disguise Replaces Disguise Cloud with MyDisguise, Teases X Series Launch",
+      "publisher": "iSquint",
+      "kind": "press"
+    },
+    {
+      "url": "https://www.panoramaaudiovisual.com/en/2025/07/23/disguise-estrena-x1-version-portatil-designer-contenido-4k-sin-servidores-multimedia",
+      "title": "Disguise launches X1, a portable version of Designer that allows you to create 4K content without media servers",
+      "publisher": "Panorama Audiovisual",
+      "kind": "press"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "disguise-x-series-x2-x3-launch",
+  "ai_written": true
+}

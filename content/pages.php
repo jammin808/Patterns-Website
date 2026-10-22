@@ -390,6 +390,19 @@ return [
         'og' => '/assets/img/og/support.png',
         'updated' => $updated,
     ],
+    '/news/' => [
+        'template' => 'news/index',
+        'title' => 'Industry Updates: AV and live event news',
+        'description' => 'AV and live event industry news for freelance crew and corporate event teams: video, audio, lighting, streaming, show control, AI and the law.',
+        'crumb' => 'Industry Updates',
+        'parent' => '/',
+        'section' => 'news',
+        'type' => 'hub',
+        'og' => '/assets/img/og/news.png',
+        'og_alt' => 'Industry Updates, AV and live event news. In every article: what\'s confirmed, what\'s still speculation, what it means for your shows and whether it is worth testing.',
+        // The page's own last change; the sitemap gives the newest live article's time when that is later.
+        'updated' => '2026-10-22',
+    ],
     '/contact/' => [
         'template' => 'pages/contact',
         'title' => 'Contact Patterns Show Control',
@@ -422,7 +435,7 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
     '/legal/terms/' => [
         'template' => 'pages/legal/terms',
@@ -432,7 +445,7 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
     '/legal/licence-terms/' => [
         'template' => 'pages/legal/licence-terms',
@@ -452,6 +465,6 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
 ];

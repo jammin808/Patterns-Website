@@ -38,7 +38,7 @@ CSS. Every class here has a style; a template needs no other.
 | `pt-field--inline` | checkbox/radio with its label on one line |
 | `pt-fieldset` > `legend` | grouped fields |
 | `pt-alert` + `pt-alert--{info,success,warning,danger}` | flash messages and notices (`role="status"` or `role="alert"` for danger) |
-| `pt-kv` (a `dl`) | key–value facts: `dt` / `dd` |
+| `pt-kv` (a `dl`) | key-value facts: `dt` / `dd` |
 | `pt-thread` > `article.pt-comment` (`pt-comment--staff`, `pt-comment--internal`) | ticket conversation; `pt-comment-meta`, `pt-comment-body` |
 | `pt-files` > `li` | attachment or licence-file list with size |
 | `pt-tabs` > `a` (`aria-current="page"` on the active one) | filter tabs |
@@ -48,6 +48,36 @@ CSS. Every class here has a style; a template needs no other.
 | `pt-prose` | rendered Markdown (ticket bodies, release notes) |
 | `pt-muted`, `pt-small`, `pt-mono` | text helpers |
 | `pt-auth` | the narrow centred card for sign-in, register, reset |
+
+## Industry Updates' article editor (`public/assets/css/pages/admin-news.css`)
+
+The admin article pages (`templates/admin/news/`) push one stylesheet and one script of their own,
+`pages/admin-news.css` and `admin-news.js`, for the few parts the contract above has no class for. Each class is
+styled there, and only those pages load it. The article form itself is a plain `form.pt-form` with
+`data-news-editor` (the unsaved-changes guard), every image form carries `data-news-image-form`, and the warning
+that the image buttons wait for a save is `data-news-dirty`.
+
+| Class | Use |
+|---|---|
+| `pt-news-count` | a field's character count, with `c-count`: plain text under the control, never a live region (`data-news-count="#id"` and `data-news-max` on the control) |
+| `pt-news-rows` > `ol.pt-news-row-list` > `li.pt-news-row` (`pt-news-row--source`) | a repeating list in a `pt-fieldset` (`data-news-rows`, `data-news-row`, a hidden `data-news-add` button): a fact or claim and its address side by side, a source's four fields two by two |
+| `pt-news-checks` | the category ticks, one to three across |
+| `pt-news-when` | the schedule's date and time side by side |
+| `pt-news-images` > `li.pt-news-image` (`pt-news-thumb`, `pt-news-image-body`) | the images section: each picture beside its forms (`data-news-image-form`) |
+| `pt-news-upload` | the upload form, a dashed panel under the images |
+
+## Industry Updates' desk (`public/assets/css/pages/admin-desk.css`)
+
+The desk pages (`templates/admin/news/desk/`) push `pages/admin-desk.css` from their shared `_nav.php`. Each class is
+styled there, and only those pages load it.
+
+| Class | Use |
+|---|---|
+| `pt-desk-state`, `pt-desk-cron`, `pt-desk-next` | the desk's state with its reason, the last tick (with the stale warning) and the next sessions |
+| `pt-desk-hold` | the pause form's tick box that also holds the articles the desk has scheduled, or, while paused, how many still go live |
+| `pt-desk-slot` > `pt-desk-slot-time`, `pt-desk-days` > `pt-desk-day`, `pt-desk-slot-remove` | one session row on the settings page: its time, its seven weekday ticks and its Remove tick |
+| `pt-desk-cal` > `pt-desk-cal-day` (`-num`, `-meta`, `-mark`, `-changed`, `-past`, `-blank`, `-gone`) | the calendar's month table and its day cells: the date, the session count, the Changed marker, past and padding days |
+| `pt-desk-prompt`, `pt-desk-versions`, `pt-desk-version-meta`, `pt-desk-rules`, `pt-desk-brief` | the prompt page: the editable texts, their versions, and the fixed rules shown read-only |
 
 ## Rules
 

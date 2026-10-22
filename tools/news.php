@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * The Industry Updates desk (docs/NEWS.md §6), run by a Hostinger cron job every 15 minutes:
+ *   /usr/bin/php /home/<user>/domains/<domain>/public_html/tools/news.php tick
+ *
+ *   tick    write the heartbeat, reap runs whose process died (and tell the admins), import
+ *           content/news/articles/*.json, run the queued or due session (which keeps the heartbeat fresh), write the
+ *           heartbeat again (each step on its own, so one failing never stops the others)
+ *   run     run a session now (refused while one is queued or running)
+ *   import  only import the article files
+ *
+ * One process at a time: the lock is held for the whole command, and a second one exits at once. Prints one JSON
+ * line; its usage keys are usage_in and usage_out, never "tokens", so the log does not mask them.
+ */
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+$app = require dirname(__DIR__) . '/app/bootstrap.php';
+$command = $argv[1] ?? 'tick';
+if (!in_array($command, ['tick', 'run', 'import'], true)) {
+    fwrite(STDERR, "Usage: php tools/news.php [tick|run|import]\n");
+    exit(2);
+}
+
+$lock = fopen($app->storage->dir('cache') . '/news.lock', 'c');
+if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+    echo json_encode(['command' => $command, 'status' => 'busy', 'summary' => 'Another news command is running.']) . PHP_EOL;
+    exit(0);
+}
+
+try {
+    $now = new DateTimeImmutable('now');
+    $pipeline = new Psc\News\Pipeline($app);
+    if ($command === 'import') {
+        $result = (new Psc\News\Importer($app))->run();
+        $report = [
+            'imported' => count($result['imported']),
+            'skipped' => count($result['skipped']),
+            'import_failed' => count($result['failed']),
+            'failed_files' => array_column($result['failed'], 'file'),
+        ];
+    } else {
+        $model = Psc\News\AnthropicNewsModel::fromConfig($app);
+        $report = $command === 'tick' ? $pipeline->tick($now, $model) : $pipeline->runNow($model, $now);
+    }
+    if ($command !== 'tick') {
+        $app->log->info('news ' . $command, $report);
+    }
+    echo json_encode(['command' => $command] + $report, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+    $code = ($report['status'] ?? '') === 'failed' ? 1 : 0;
+} finally {
+    flock($lock, LOCK_UN);
+    fclose($lock);
+}
+exit($code);

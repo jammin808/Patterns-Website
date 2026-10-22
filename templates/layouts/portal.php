@@ -27,6 +27,7 @@ $adminLinks = $isAdmin ? [
     ['/portal/admin/tickets/', 'All tickets'],
     ['/portal/admin/licences/', 'Licence requests'],
     ['/portal/admin/releases/', 'Releases'],
+    ['/portal/admin/news/', 'Industry Updates'],
     ['/portal/admin/users/', 'Users'],
     ['/portal/admin/messages/', 'Messages'],
     ['/portal/admin/chats/', 'Assistant chats'],

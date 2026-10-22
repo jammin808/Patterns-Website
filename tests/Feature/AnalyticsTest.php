@@ -99,7 +99,11 @@ final class AnalyticsTest extends TestCase
         self::assertContains('https://*.googletagmanager.com', $directives['script-src']);
         self::assertContains('https://*.google-analytics.com', $directives['connect-src']);
         self::assertContains('https://*.analytics.google.com', $directives['connect-src']);
+        // The tag sends page views to the bare host, which no *. wildcard matches.
+        self::assertContains('https://analytics.google.com', $directives['connect-src']);
+        self::assertContains('https://analytics.google.com', $directives['img-src']);
         self::assertContains('https://*.google-analytics.com', $directives['img-src']);
+        self::assertNotContains('https://*.g.doubleclick.net', $directives['connect-src'], 'no advertising endpoints');
         self::assertSame(["'self'"], $directives['style-src'], 'nothing else is loosened');
     }
 

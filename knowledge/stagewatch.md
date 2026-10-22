@@ -1,4 +1,4 @@
-# StageWatch — assistant notes
+# StageWatch: assistant notes
 
 StageWatch is a Windows stage timer and show-calling app for conferences and live events, made in the UK by Ben Rohleder and part of the Patterns ecosystem with Patterns, AGMessage and PlayMap. The current version is 2.16.0. Inside the app and the installer the name is written "Stagewatch", as one word with a small w. It is the same product; the brand is StageWatch.
 

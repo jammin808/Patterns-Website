@@ -79,4 +79,37 @@ final class MigratorTest extends TestCase
             self::assertSame($tables($mysql), $tables($sqlite), basename($mysql));
         }
     }
+
+    /**
+     * 0005 keeps the time each article live when it arrives went live (first_live_at from published_at), so a
+     * reschedule after the deploy cannot free its slug; a scheduled article and a draft keep none. It also brings
+     * the table of retired slugs.
+     */
+    public function testFirstLiveIsKeptForEveryArticleLiveWhen0005Arrives(): void
+    {
+        $root = dirname(__DIR__, 2) . '/database/migrations';
+        $dir = sys_get_temp_dir() . '/psc-mig-' . bin2hex(random_bytes(4));
+        mkdir($dir . '/sqlite', 0777, true);
+        foreach (glob($root . '/sqlite/000[1-4]_*.sql') ?: [] as $file) {
+            copy($file, $dir . '/sqlite/' . basename($file));
+        }
+        $db = Database::connect('sqlite::memory:');
+        (new Migrator($db, $dir, $dir . '/schema-version'))->migrate();
+        $now = time();
+        foreach (['live' => ['published', $now - 3600], 'scheduled' => ['published', $now + 3600], 'draft' => ['draft', null]] as $slug => [$status, $at]) {
+            $db->insert('news_articles', ['slug' => $slug, 'title' => $slug, 'body' => '', 'status' => $status, 'published_at' => $at, 'created_at' => $now - 9000, 'updated_at' => $now - 9000]);
+        }
+        copy($root . '/sqlite/0005_news_first_live.sql', $dir . '/sqlite/0005_news_first_live.sql');
+        self::assertSame(['0005_news_first_live'], (new Migrator($db, $dir, $dir . '/schema-version'))->migrate());
+
+        $first = array_column($db->all('SELECT slug, first_live_at FROM news_articles'), 'first_live_at', 'slug');
+        self::assertSame(['live' => $now - 3600, 'scheduled' => null, 'draft' => null], array_map(static fn (mixed $v): ?int => $v !== null ? (int) $v : null, $first));
+        self::assertSame(0, (int) $db->value('SELECT COUNT(*) FROM news_retired_slugs'));
+
+        foreach ([...(glob($dir . '/sqlite/*.sql') ?: []), $dir . '/schema-version', $dir . '/schema-version.lock'] as $file) {
+            @unlink($file);
+        }
+        @rmdir($dir . '/sqlite');
+        @rmdir($dir);
+    }
 }

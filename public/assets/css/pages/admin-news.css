@@ -1,0 +1,46 @@
+/*
+ * Industry Updates' admin pages (templates/admin/news/): the article editor's repeating rows, counts, category ticks
+ * and schedule, and the images section. Everything sits in the components layer and uses the tokens from site.css;
+ * no raw colours. Pushed only by those pages' templates. The rest of each page is the portal contract
+ * (docs/PORTAL-UI.md).
+ */
+@layer components {
+  /* ===== The editor: its lists and counts keep the portal form's measure ===== */
+  /* A count sits under its control, before the error, at the right (the hint stays above, as on every form). */
+  .pt-form .pt-field > .pt-news-count { order: 2; margin-top: -2px; }
+  .pt-news-rows { gap: 12px;
+    & > .pt-actions { margin-top: 2px; } }
+  .pt-news-row-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  /* One row: the sentence and its address side by side from 40rem; a source's four fields two by two. */
+  .pt-news-row { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line);
+    &:first-child { padding-top: 0; border-top: 0; }
+    & > .pt-field { gap: 6px; }
+    & > .pt-field > label { display: block; font-size: var(--fs-0); color: var(--text-2); } }
+  @media (width >= 40rem) {
+    .pt-news-row { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+    .pt-news-row--source { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* A list of choices shows its rows, not a drop-down's arrow. */
+  .pt-form select[multiple] { padding-right: 14px; background-image: none; }
+
+  /* ===== Categories: a grid of ticks, two then three across ===== */
+  .pt-news-checks { display: grid; gap: 12px 20px; grid-template-columns: minmax(0, 1fr); }
+  @media (width >= 30rem) { .pt-news-checks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (width >= 48rem) { .pt-news-checks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  /* ===== The schedule: date and time side by side ===== */
+  .pt-news-when { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+
+  /* ===== Images: each picture beside its forms from 40rem, then the upload form ===== */
+  .pt-news-images { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+  .pt-news-image { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--s1); scroll-margin-top: 44px;
+    & .pt-form { max-width: none; gap: 16px; }
+    & .pt-actions { margin: 0; } }
+  @media (width >= 40rem) { .pt-news-image { grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); align-items: start; } }
+  .pt-news-thumb { display: block; width: 100%; max-width: 15rem; height: auto; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s2); }
+  .pt-news-image-body { display: grid; gap: 14px; min-width: 0;
+    & > .pt-small { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; overflow-wrap: anywhere; } }
+  .pt-news-upload { margin-top: 8px; padding: 16px 18px 18px; border: 1px dashed var(--field); border-radius: var(--r-3); scroll-margin-top: 44px;
+    & > h3 { margin: 0; } }
+}

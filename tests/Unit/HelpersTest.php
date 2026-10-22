@@ -19,6 +19,23 @@ final class HelpersTest extends TestCase
         self::assertStringContainsString('<li>bad', $html);
     }
 
+    /**
+     * A link counted as the site's own when its address merely began with the site's address, so a look-alike host
+     * such as patternsshowcontrol.co.uk.evil.example opened in the same tab without nofollow. The host decides now.
+     */
+    public function testMarkdownLinksAreExternalByTheirHost(): void
+    {
+        self::rmrf($this->storage);
+        $this->bootApp(['app' => ['url' => 'https://patternsshowcontrol.co.uk']]);
+        $external = ' rel="nofollow noopener" target="_blank"';
+        self::assertSame('<a href="https://patternsshowcontrol.co.uk.evil.example/"' . $external . '>x</a>', md_inline('[x](https://patternsshowcontrol.co.uk.evil.example/)'));
+        self::assertSame('<p><a href="https://patternsshowcontrol.co.uk.evil.example/support/"' . $external . '>x</a></p>', md('[x](https://patternsshowcontrol.co.uk.evil.example/support/)'));
+        self::assertSame('<a href="https://patternsshowcontrol.co.uk/support/">x</a>', md_inline('[x](https://patternsshowcontrol.co.uk/support/)'));
+        self::assertSame('<a href="https://www.patternsshowcontrol.co.uk/support/">x</a>', md_inline('[x](https://www.patternsshowcontrol.co.uk/support/)'));
+        self::assertSame('<a href="/support/">x</a>', md_inline('[x](/support/)'));
+        self::assertSame('<a href="https://example.com/"' . $external . '>x</a>', md_inline('[x](https://example.com/)'));
+    }
+
     public function testPriceFormatting(): void
     {
         self::assertSame('£29', price('29'));

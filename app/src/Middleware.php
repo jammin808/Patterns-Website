@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc;
 
+use Psc\Controllers\NewsController;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Support\Uploads;
@@ -17,6 +18,8 @@ use Psc\Support\Uploads;
  *   guest    signed-in visitors are sent to the dashboard (login, register)
  *   api      a same-origin fetch carrying X-Requested-With (JSON endpoints)
  *   nostore  never cached anywhere; noindex unless the handler chose otherwise
+ *   news-address  a live article's comment page asked for at an address it does not have (another category, or
+ *            /news/{slug}/): moved for good to its own (NewsController::elsewhere()), before any session starts
  */
 final class Middleware
 {
@@ -74,6 +77,9 @@ final class Middleware
                     return Response::json(['error' => 'forbidden'], 403);
                 }
                 return $next($request);
+
+            case 'news-address':
+                return NewsController::elsewhere($app, $request) ?? $next($request);
 
             case 'nostore':
                 $response = $next($request);

@@ -24,8 +24,9 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /(pages|forms|consent)\.spec/ },
   ],
+  // The launch articles are imported first (docs/NEWS.md §12), so the sitemap, and with it pages.spec, holds them.
   webServer: {
-    command: 'php -S 127.0.0.1:8765 tools/dev-router.php',
+    command: 'php tools/news.php import && php -S 127.0.0.1:8765 tools/dev-router.php',
     cwd: '../..',
     url: 'http://127.0.0.1:8765/health',
     reuseExistingServer: !process.env.CI,

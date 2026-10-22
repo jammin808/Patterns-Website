@@ -16,8 +16,7 @@ $votes = (int) $votes;
     <input type="hidden" name="return" value="<?= e($return) ?>">
     <button type="submit" class="pt-vote" aria-pressed="<?= $voted ? 'true' : 'false' ?>">
         <span class="pt-vote-count"><?= $votes ?></span>
-        <span class="pt-small"><?= $votes === 1 ? 'vote' : 'votes' ?></span>
-        <span class="u-visually-hidden">— vote for “<?= e($title) ?>”</span>
+        <span class="pt-small"><?= $votes === 1 ? 'vote' : 'votes' ?></span><span class="u-visually-hidden">, vote for “<?= e($title) ?>”</span>
     </button>
     <?php if ($voted): ?><span class="pt-small pt-muted">You voted</span><?php endif; ?>
 </form>

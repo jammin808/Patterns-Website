@@ -1,12 +1,12 @@
 # Brand icons and Open Graph cards
 
 **Regenerate the Open Graph cards** (`public/assets/img/og/*.png`, 1200 × 630, each under 150 KB) after changing a
-headline, a product's name or role, a StageWatch price or the workflow list, or after adding an `og` image to
-`content/pages.php`:
+headline, a product's name or role, a StageWatch price or the workflow list, an Industry Updates category's title or
+artwork (its card is `news-{key}`), or after adding an `og` image to `content/pages.php`:
 
 ```sh
 (cd tools/e2e && npm ci)        # once: Playwright and its Chromium
-node tools/og/build.mjs         # every card; or only some: node tools/og/build.mjs home stagewatch
+node tools/og/build.mjs         # every card; or only some: node tools/og/build.mjs home news-video
 ```
 
 It needs Node 20+, PHP (to read `content/`) and Python 3 with Pillow (to optimise). It starts its own static server

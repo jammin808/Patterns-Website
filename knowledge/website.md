@@ -1,4 +1,4 @@
-# This website and the client portal — assistant notes
+# This website and the client portal: assistant notes
 
 This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can read the product, features, licensing, workflow, support and FAQ pages and use the contact form, with no account. The client portal is the signed-in part of the site: downloads, licence requests and licence files, tickets, and the Feature requests board. A client account is free.
 
@@ -10,6 +10,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 - Licensing: how licensing works across the apps, with each product's own licensing page for its plans.
 - Support: getting-started guides, troubleshooting, the FAQ and this assistant.
 - Downloads: what is available to download. Signed-in clients get every build open to them in the portal.
+- Industry Updates (/news/): AV and live event industry news, filtered by category, such as Video, Audio, Lighting, Streaming, Freelance and Legal. Articles are written by the site's AI desk, which says so on each one, or by hand, and anyone signed in to a client account can comment where comments are open. The assistant does not know what the articles say, so point people to the page rather than summarising the news.
 - The client portal's menu, once signed in: Dashboard, Downloads, Licences, Tickets, Feature requests and Account.
 
 ## Creating an account
@@ -73,7 +74,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 ## Your account and your data
 
 - Account lets a signed-in client change their name, company and email preferences and their password, download a copy of their data, and delete their account.
-- Licence records are kept after an account is deleted, for as long as the licence may be used and for the period accounting law requires. Tickets remain under "Deleted user".
+- Licence records are kept after an account is deleted, for as long as the licence may be used and for the period accounting law requires. Tickets remain under "Deleted user". Industry Updates comments are deleted with the account.
 - The privacy policy explains what is collected and for how long; the cookies page lists the Google Analytics cookies the pages use (and how to block them) and the essential ones the contact form, the portal and the assistant use.
 
 ## What the assistant can and cannot do
