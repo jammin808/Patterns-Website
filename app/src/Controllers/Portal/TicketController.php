@@ -241,9 +241,9 @@ final class TicketController extends Controller
         ]);
 
         $done = [
-            'bug' => 'Thanks — your bug report is in. You will get an email when someone replies.',
-            'feature' => 'Thanks — your idea is on the board, where other clients can vote for it.',
-            'question' => 'Thanks — your question is in. You will get an email when someone replies.',
+            'bug' => 'Thanks, your bug report is in. You will get an email when someone replies.',
+            'feature' => 'Thanks, your idea is on the board, where other clients can vote for it.',
+            'question' => 'Thanks, your question is in. You will get an email when someone replies.',
         ];
         return $this->redirect(self::path($id), 'success', $done[$type]);
     }
@@ -421,7 +421,7 @@ final class TicketController extends Controller
             $db->exec('UPDATE tickets SET votes = (SELECT COUNT(*) FROM ticket_votes WHERE ticket_id = ?) WHERE id = ?', [$id, $id]);
             return $added;
         });
-        return $this->redirect($this->voteReturn($request->input('return'), $id), 'success', $added ? 'Thanks — your vote is in.' : 'Your vote was taken back.');
+        return $this->redirect($this->voteReturn($request->input('return'), $id), 'success', $added ? 'Thanks, your vote is in.' : 'Your vote was taken back.');
     }
 
     /** Sends an attachment to someone who may see its ticket (and, for an internal note's file, only to staff). */

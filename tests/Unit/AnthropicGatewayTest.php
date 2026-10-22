@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace Psc\Tests\Unit;
 
 use GuzzleHttp\Client as Guzzle;
+use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\FnStream;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Utils;
 use PHPUnit\Framework\TestCase;
 use Psc\Chat\AnthropicGateway;
 use Psc\Chat\Prompts;
+use Psr\Http\Client\ClientInterface;
 
 /**
  * The assistant's real SDK path against a mocked HTTP transport: the exact requests sent to the Messages API (models,
@@ -144,6 +148,153 @@ final class AnthropicGatewayTest extends TestCase
         });
         self::assertSame([300, 32, 49000, 0], [$out['tokens_in'], $out['tokens_out'], $out['cache_write'], $out['cache_read']]);
         self::assertSame(['tokens_in' => 300, 'tokens_out' => 32, 'cache_write' => 49000, 'cache_read' => 0], $g->lastUsage());
+    }
+
+    /** @return array{transporter: mixed, streamingTransporter: mixed, maxRetries: mixed} the SDK options the gateway's client sends with */
+    private static function options(AnthropicGateway $g): array
+    {
+        $client = (new \ReflectionProperty(AnthropicGateway::class, 'client'))->getValue($g);
+        self::assertInstanceOf(\Anthropic\Client::class, $client);
+        $o = $client->mergedOptions(null);
+        return ['transporter' => $o->transporter, 'streamingTransporter' => $o->streamingTransporter, 'maxRetries' => $o->maxRetries];
+    }
+
+    /** Whether $client is the streaming client AnthropicGateway::streaming() makes, not the SDK's wrapper of a transporter. */
+    private static function isTheGatewaysOwn(mixed $client): bool
+    {
+        $r = new \ReflectionClass($client);
+        return $r->isAnonymous() && $r->getFileName() === (new \ReflectionClass(AnthropicGateway::class))->getFileName();
+    }
+
+    private static function innerHandler(Guzzle $http): mixed
+    {
+        $stack = $http->getConfig('handler');
+        self::assertInstanceOf(HandlerStack::class, $stack);
+        return (new \ReflectionProperty(HandlerStack::class, 'handler'))->getValue($stack);
+    }
+
+    /**
+     * The SDK never reads its own timeout option, so the gateway's HTTP clients carry chat.timeout_seconds: curl for
+     * the scope check (the whole call, 10 seconds to connect, dropped after 30 seconds of nothing) and a client of its
+     * own for the streamed answer.
+     */
+    public function testTheDefaultClientsCarryTheTimeouts(): void
+    {
+        self::assertTrue(AnthropicGateway::available(), 'the SDK, Guzzle and curl are installed');
+        $http = AnthropicGateway::http(42.0);
+        self::assertSame(42.0, $http->getConfig('timeout'));
+        self::assertSame(10, $http->getConfig('connect_timeout'));
+        self::assertSame([CURLOPT_LOW_SPEED_LIMIT => 1, CURLOPT_LOW_SPEED_TIME => 30], $http->getConfig('curl'));
+        self::assertInstanceOf(CurlHandler::class, self::innerHandler($http));
+
+        $o = self::options(new AnthropicGateway('sk-test', 'claude-sonnet-5-5', 'claude-haiku-5-5', 1200, 42.0));
+        self::assertInstanceOf(Guzzle::class, $o['transporter']);
+        self::assertSame(42.0, $o['transporter']->getConfig('timeout'), 'chat.timeout_seconds reaches the transport');
+        self::assertSame(10, $o['transporter']->getConfig('connect_timeout'));
+        self::assertSame([CURLOPT_LOW_SPEED_LIMIT => 1, CURLOPT_LOW_SPEED_TIME => 30], $o['transporter']->getConfig('curl'));
+        self::assertInstanceOf(CurlHandler::class, self::innerHandler($o['transporter']));
+        self::assertSame(1, $o['maxRetries']);
+        self::assertTrue(filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN), 'the test runs with allow_url_fopen on');
+        self::assertInstanceOf(ClientInterface::class, $o['streamingTransporter']);
+        self::assertTrue(self::isTheGatewaysOwn($o['streamingTransporter']), 'the answer streams through the gateway\'s own client');
+
+        $mine = new Guzzle(['handler' => HandlerStack::create(new MockHandler([]))]);
+        $passed = self::options(new AnthropicGateway('sk-test', 'claude-sonnet-5-5', 'claude-haiku-5-5', 1200, 42.0, ['transporter' => $mine]));
+        self::assertSame($mine, $passed['transporter'], 'a transporter passed in is kept');
+        self::assertFalse(self::isTheGatewaysOwn($passed['streamingTransporter']), 'and carries the streams too');
+    }
+
+    /** The answer's own client hands the stream on as it arrives, through the SDK's parsing, to the same result. */
+    public function testTheAnswerStreamsThroughItsOwnClient(): void
+    {
+        $streamed = [];
+        $stack = HandlerStack::create(new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], self::sse(self::cacheWriteStream()))]));
+        $stack->push(Middleware::history($streamed));
+        $g = new AnthropicGateway('sk-test', 'claude-sonnet-5-5', 'claude-haiku-5-5', 1200, 10.0, [
+            'transporter' => new Guzzle(['handler' => HandlerStack::create(new MockHandler([]))]),
+            'streamingTransporter' => AnthropicGateway::streaming(10.0, $stack),
+        ]);
+        $out = $g->stream([['type' => 'text', 'text' => 'S']], [['role' => 'user', 'content' => 'q']], static function (string $t): void {
+        });
+        self::assertSame('To install, run winget install Patterns now.', $out['text']);
+        self::assertSame([300, 32, 49000], [$out['tokens_in'], $out['tokens_out'], $out['cache_write']]);
+        self::assertCount(1, $streamed, 'one request, through the streaming client');
+        self::assertTrue($streamed[0]['options']['stream']);
+        self::assertSame(30, $streamed[0]['options']['read_timeout']);
+        self::assertSame(30, $streamed[0]['options']['timeout']);
+    }
+
+    /**
+     * A real socket that sends the start of an answer and then nothing: the read that waits out the socket's timeout
+     * fails, the call ends and what the start reported is kept. The writer stays open, so only the timeout ends it.
+     */
+    public function testAStreamThatStopsSendingIsDropped(): void
+    {
+        [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP) ?: self::fail('a socket pair');
+        fwrite($write, self::sse(array_slice(self::cacheWriteStream(), 0, 3)));
+        stream_set_timeout($read, 0, 200000);
+        $g = new AnthropicGateway('sk-test', 'claude-sonnet-5-5', 'claude-haiku-5-5', 1200, 10.0, [
+            'transporter' => new Guzzle(['handler' => HandlerStack::create(new MockHandler([]))]),
+            'streamingTransporter' => AnthropicGateway::streaming(10.0, new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], Utils::streamFor($read))])),
+        ]);
+        $seen = [];
+        $started = hrtime(true);
+        try {
+            $g->stream([['type' => 'text', 'text' => 'S']], [['role' => 'user', 'content' => 'q']], static function (string $t) use (&$seen): void {
+                $seen[] = $t;
+            });
+            self::fail('a stalled stream ends the call');
+        } catch (\RuntimeException) {
+            self::assertSame(['To install, run '], $seen, 'the text before the stall was handed on as it arrived');
+            self::assertSame(300, $g->lastUsage()['tokens_in']);
+            self::assertSame(49000, $g->lastUsage()['cache_write']);
+            self::assertLessThan(5 * 1_000_000_000, hrtime(true) - $started, 'ended by the timeout, not by waiting');
+        } finally {
+            fclose($write);
+        }
+    }
+
+    /** A read that comes back empty because it timed out (rather than failing) ends the call too. */
+    public function testAnEmptyTimedOutReadEndsTheCallToo(): void
+    {
+        $reads = 0;
+        $stalled = FnStream::decorate(Utils::streamFor(''), [
+            'read' => static function () use (&$reads): string {
+                ++$reads;
+                return '';
+            },
+            // Ends after a few reads, so a fence that failed cannot hang the suite.
+            'eof' => static function () use (&$reads): bool {
+                return $reads >= 3;
+            },
+            'getMetadata' => static fn (?string $key = null): mixed => $key === 'timed_out' ? true : null,
+        ]);
+        $g = new AnthropicGateway('sk-test', 'claude-sonnet-5-5', 'claude-haiku-5-5', 1200, 10.0, [
+            'transporter' => new Guzzle(['handler' => HandlerStack::create(new MockHandler([]))]),
+            'streamingTransporter' => AnthropicGateway::streaming(10.0, new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], $stalled)])),
+        ]);
+        try {
+            $g->stream([['type' => 'text', 'text' => 'S']], [['role' => 'user', 'content' => 'q']], static function (string $t): void {
+            });
+            self::fail('an empty timed-out read ends the call');
+        } catch (\RuntimeException $e) {
+            self::assertSame(1, $reads, 'the first empty read that timed out ends it');
+            self::assertSame('Nothing arrived for 30 seconds.', $e->getMessage());
+        }
+    }
+
+    /** A stream still running when chat.timeout_seconds is up ends the call at the next read. */
+    public function testAStreamPastItsTimeIsDropped(): void
+    {
+        $client = AnthropicGateway::streaming(0.0, new MockHandler([new Response(200, ['Content-Type' => 'text/event-stream'], self::sse(self::cacheWriteStream()))]));
+        $response = $client->sendRequest(new \GuzzleHttp\Psr7\Request('POST', 'https://api.anthropic.com/v1/messages', ['Accept' => 'text/event-stream']));
+        self::assertSame(200, $response->getStatusCode());
+        try {
+            $response->getBody()->read(64);
+            self::fail('the read after the deadline fails');
+        } catch (\RuntimeException $e) {
+            self::assertSame('The answer took longer than 0 seconds.', $e->getMessage());
+        }
     }
 
     /** A stream stopped by its callback (the code guard) still reports what it spent, cached prompt included. */

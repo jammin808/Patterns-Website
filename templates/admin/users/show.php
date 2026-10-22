@@ -224,7 +224,7 @@ if (!$isSelf && !$deleted) {
                                     <span class="pt-muted">Former account</span>
                                 <?php endif; ?>
                             </td>
-                            <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
+                            <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">None</span><?php endif; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

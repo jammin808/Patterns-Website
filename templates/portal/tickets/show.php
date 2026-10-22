@@ -56,11 +56,11 @@ if ($isAdmin) {
 $fileError = $err('attachments');
 $accept = implode(',', array_map(static fn (string $x): string => '.' . $x, $allowed));
 $m = static fn (string $k, string $default): string => (string) ($oldManage[$k] ?? $default);
-// The status and what it means as one phrase ("In progress — being worked on now"): the description carries on
-// after the dash, so it starts in lower case, and a first sentence that only repeats the status ("Closed.") goes.
+// The status, then what it means ("In progress. Being worked on now."); a first sentence that only repeats the
+// status ("Closed.") goes, so the status is never said twice.
 $statusLabel = (string) ($statuses[$status] ?? $status);
 $statusMeaning = trim((string) preg_replace('/^' . preg_quote($statusLabel, '/') . '\.\s*/iu', '', trim((string) ($statusHelp[$status] ?? ''))));
-$statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb_strtolower(mb_substr($statusMeaning, 0, 1)) . mb_substr($statusMeaning, 1);
+$statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . '. ' . $statusMeaning;
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow"><?= e($types[$type] ?? 'Ticket') ?> <span class="pt-mono">#<?= $id ?></span></p>
@@ -209,7 +209,7 @@ $statusText = $statusMeaning === '' ? $statusLabel : $statusLabel . ' — ' . mb
                 'failed' => 'The ticket was not changed',
             ]) ?>
             <?= $field(['name' => 'status', 'id' => 'manage-status', 'label' => 'Status', 'kind' => 'select', 'value' => $m('status', $status), 'error' => $err('status'), 'help' => 'The owner gets an email when the status changes.', 'required' => true, 'options' => $statuses]) ?>
-            <?= $field(['name' => 'visibility', 'id' => 'manage-visibility', 'label' => 'Who can see it', 'kind' => 'select', 'value' => $m('visibility', $visibility), 'error' => $err('visibility'), 'help' => 'Public: every signed-in client can read the ticket, its replies and its files. Public feature requests also appear on the board.', 'required' => true, 'options' => ['private' => 'Private — the owner and staff', 'public' => 'Public — every signed-in client']]) ?>
+            <?= $field(['name' => 'visibility', 'id' => 'manage-visibility', 'label' => 'Who can see it', 'kind' => 'select', 'value' => $m('visibility', $visibility), 'error' => $err('visibility'), 'help' => 'Public: every signed-in client can read the ticket, its replies and its files. Public feature requests also appear on the board.', 'required' => true, 'options' => ['private' => 'Private: the owner and staff', 'public' => 'Public: every signed-in client']]) ?>
             <?php if ($type === 'bug'): ?>
                 <?= $field(['name' => 'severity', 'id' => 'manage-severity', 'label' => 'Severity', 'kind' => 'select', 'value' => $m('severity', $severity), 'error' => $err('severity'), 'required' => true, 'options' => $severities]) ?>
             <?php endif; ?>

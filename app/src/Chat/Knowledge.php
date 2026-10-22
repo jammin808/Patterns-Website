@@ -64,7 +64,7 @@ final class Knowledge
                 $out[] = 'For: ' . implode('; ', array_map('strval', $p['audiences']));
             }
             foreach ($p['feature_groups'] ?? [] as $g) {
-                $out[] = '## ' . ($g['title'] ?? '') . (!empty($g['benefit']) ? ' — ' . $g['benefit'] : '');
+                $out[] = '## ' . ($g['title'] ?? '') . (!empty($g['benefit']) ? '. ' . $g['benefit'] : '');
                 foreach ($g['items'] ?? [] as $item) {
                     $out[] = '- ' . self::plain($item);
                 }
@@ -120,7 +120,7 @@ final class Knowledge
                     if ($launch !== null) {
                         $price = price($launch) . ' launch price (list price ' . price(isset($t['price']) ? (string) $t['price'] : null) . ')';
                     }
-                    $out[] = '- ' . ($t['name'] ?? '') . ' — ' . $price . (!empty($t['machines']) ? ', ' . $t['machines'] . ' machine(s)' : '') . (!empty($t['summary']) ? ': ' . self::plain($t['summary']) : '');
+                    $out[] = '- ' . ($t['name'] ?? '') . ': ' . $price . (!empty($t['machines']) ? ', ' . $t['machines'] . ' machine(s)' : '') . (!empty($t['summary']) ? '. ' . self::plain($t['summary']) : '');
                 }
                 foreach ($lic['extras'] ?? [] as $x) {
                     $out[] = '- ' . ($x['title'] ?? '') . ': ' . self::plain($x['text'] ?? '');
@@ -180,17 +180,18 @@ final class Knowledge
         }
         $out[] = '';
         $out[] = '# Pages on this site (link with these relative paths)';
+        // Each line is "path (name): what it is": a name and its line are joined by a colon here, never a dash.
         foreach (Content::pages() as $path => $page) {
             if (empty($page['noindex'])) {
-                $out[] = '- ' . $path . ' — ' . ($page['crumb'] ?? $page['title']) . ': ' . $page['description'];
+                $out[] = '- ' . $path . ' (' . ($page['crumb'] ?? $page['title']) . '): ' . $page['description'];
             }
         }
-        $out[] = '- /portal/register/ — create a free client account';
-        $out[] = '- /portal/login/ — client sign-in';
-        $out[] = '- /portal/tickets/new/ — report a bug or ask for help (account needed)';
-        $out[] = '- /portal/ideas/ — feature requests board and votes (account needed)';
-        $out[] = '- /portal/downloads/ — downloads (account needed)';
-        $out[] = '- /portal/licences/request/ — request a licence (account needed)';
+        $out[] = '- /portal/register/: create a free client account';
+        $out[] = '- /portal/login/: client sign-in';
+        $out[] = '- /portal/tickets/new/: report a bug or ask for help (account needed)';
+        $out[] = '- /portal/ideas/: feature requests board and votes (account needed)';
+        $out[] = '- /portal/downloads/: downloads (account needed)';
+        $out[] = '- /portal/licences/request/: request a licence (account needed)';
         return trim(implode("\n", $out)) . "\n";
     }
 

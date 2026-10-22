@@ -457,8 +457,8 @@ final class SiteTest extends TestCase
         }
         self::assertStringContainsString('<b>£59</b> <s><span class="u-visually-hidden">was </span>£79</s> launch price', $this->request('GET', '/stagewatch/licensing/')->body);
         $knowledge = (new \Psc\Chat\Knowledge(PSC_ROOT, $this->storage . '/cache'))->compile();
-        self::assertStringContainsString('- Production — £59 launch price (list price £79), 2 machine(s)', $knowledge);
-        self::assertStringNotContainsString('- Production — £79', $knowledge);
+        self::assertStringContainsString('- Production: £59 launch price (list price £79), 2 machine(s)', $knowledge);
+        self::assertStringNotContainsString('- Production: £79', $knowledge);
     }
 
     /** The schema's operatingSystem names operating systems, while the page keeps its sentence. */

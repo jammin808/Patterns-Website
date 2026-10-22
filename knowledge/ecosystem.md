@@ -1,4 +1,4 @@
-# The Patterns ecosystem — assistant notes
+# The Patterns ecosystem: assistant notes
 
 The Patterns ecosystem is a family of four Windows show apps for live events, made in the UK by Ben Rohleder: Patterns for the picture, StageWatch for time, AGMessage for the people behind the meeting, and PlayMap for mapping and playback. Each app works on its own; on the same venue network they find each other and work together. The family is called "the Patterns ecosystem" and the shared network language is called Show Bus. "Patterns" is both the family's name and one of the apps: say "the Patterns ecosystem" for the family and "Patterns" for the app.
 

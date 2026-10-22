@@ -100,7 +100,7 @@ $oldRole = isset($roles[$old['role'] ?? '']) ? (string) $old['role'] : 'client';
                     <tr<?= $uStatus === 'approval' ? ' class="is-unread"' : '' ?>>
                         <th scope="row"><a href="/portal/admin/users/<?= (int) $u['id'] ?>/"><?= e($u['name']) ?></a></th>
                         <td data-label="Email"><?= e($u['email']) ?></td>
-                        <td data-label="Company"><?= ($u['company'] ?? '') !== '' ? e($u['company']) : '<span class="pt-muted">—</span>' ?></td>
+                        <td data-label="Company"><?= ($u['company'] ?? '') !== '' ? e($u['company']) : '<span class="pt-muted">Not given</span>' ?></td>
                         <td data-label="Role"><span class="pt-badge pt-badge--<?= e($uRole) ?>"><?= e($roles[$uRole] ?? $uRole) ?></span></td>
                         <td data-label="Status"><span class="pt-badge pt-badge--<?= e($uStatus) ?>"><?= e($statuses[$uStatus] ?? $uStatus) ?></span></td>
                         <td class="pt-num" data-label="Tickets"><?= (int) $u['ticket_count'] ?></td>
