@@ -70,7 +70,9 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
      Each tick imports any new article files, runs the session that is due (the sessions are London times set on
      the desk's settings page, so the clock change needs no new cron line) and records a heartbeat. A tick that
      finds another still running exits at once. The desk page (Portal → Admin → Industry Updates → Open the AI
-     desk) warns when the last tick is more than 35 minutes old, and `/health` reports `"news": "stale"`.
+     desk) and the admin overview's Industry Updates card say when the cron job has not ticked yet or its last tick
+     is more than 35 minutes old (a session still running inside its time counts as ticking), and `/health`
+     reports `"news": "stale"`.
 10. **Your admin account.** Register at `/portal/register/` with an address listed in `app.admin_emails` and
     confirm the email: that account is an administrator.
 
@@ -154,8 +156,13 @@ so to remove something at once:
 3. If the request came from outside (a correction, a complaint), note what was changed and when; the audit log
    (Portal → Admin → Audit log, `news.`) has the record.
 
-To stop the desk publishing anything new while you look into it, pause it on the desk page, or untick *Publish
-articles automatically* in its settings so every article waits as a draft.
+To stop the desk while you look into it, pause it on the desk page (Portal → Admin → Industry Updates → Open the AI
+desk). Pausing stops new sessions; a session already running finishes. Leave *When pausing, also hold the articles
+the desk has already scheduled* ticked, as it is by default, and every AI article a session has scheduled but not
+yet published becomes a draft under *Held for review* (its review note says "Held when the desk was paused"), for you
+to publish again or delete. Unticked, those articles still go live at their times; unpublish any of them from the
+*Scheduled* tab. Unticking *Publish articles automatically* in the desk's settings makes every article from the next
+session on wait as a draft; it does not touch articles already scheduled.
 
 ## 6. Backups
 
