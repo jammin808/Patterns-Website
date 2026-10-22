@@ -20,6 +20,11 @@ use Psc\Support\FormGuard;
  * carry FormGuard's honeypot and signed showing time, and are rate limited per network address and per email
  * address. A filled honeypot gets the answer a person would and nothing is done; a send faster than a person fills
  * the form in comes back with the input kept and a request to press the button again.
+ *
+ * Where the person was going (a safe ?next= path, such as an article's comments) is kept in the session from the
+ * sign-in and sign-up pages through the check-your-email page to the confirmation link, so the confirmation page
+ * can take them back: its sign-in returns there, and an article gets "Continue to the article". A sign-in that
+ * goes through uses its own next and forgets the kept one.
  */
 final class AuthController extends Controller
 {
@@ -45,13 +50,24 @@ final class AuthController extends Controller
 
     private const REGISTRATION_MODES = ['open', 'approval', 'invite'];
 
+    /** The session key holding where the person was going before signing in or creating an account. */
+    public const RETURN_KEY = 'return_to';
+
+    /** First segments under /news/ that are not articles. */
+    private const NEWS_PAGES = ['category', 'go', 'media'];
+
     public function loginForm(Request $request): Response
     {
         $session = $this->app->session();
         $notice = $session->get('login_notice');
         $session->forget('login_notice');
+        $next = $this->safeNext($request->queryString('next'));
+        // Kept, so the portal's Create an account switch (which carries no next) still leads back there.
+        if ($next !== '/portal/') {
+            $session->set(self::RETURN_KEY, $next);
+        }
         return $this->portal('portal/auth/login', [
-            'next' => $this->safeNext($request->queryString('next')),
+            'next' => $next,
             'notice' => is_string($notice) && in_array($notice, self::LOGIN_NOTICES, true) ? $notice : null,
             'old' => $session->takeOld(),
             'errors' => $this->takeErrors(),
@@ -78,6 +94,7 @@ final class AuthController extends Controller
         $result = $this->app->auth()->attempt($email, $password, $request->input('remember') === '1');
         switch ($result['reason']) {
             case 'ok':
+                $this->app->session()->forget(self::RETURN_KEY);
                 return $this->redirect($next);
             case 'throttled':
                 $minutes = max(1, (int) ceil($this->app->config->int('security.login_window_seconds', 900) / 60));
@@ -103,7 +120,15 @@ final class AuthController extends Controller
         $registered = $session->get('registered_email');
         if (is_string($registered) && $registered !== '') {
             $session->forget('registered_email');
-            return $this->portal('portal/auth/check-email', ['email' => $registered], 'Check your email');
+            $kept = $session->get(self::RETURN_KEY);
+            return $this->portal('portal/auth/check-email', [
+                'email' => $registered,
+                'article' => is_string($kept) ? self::articleOf($kept) : null,
+            ], 'Check your email');
+        }
+        $next = $this->safeNext($request->queryString('next'), '');
+        if ($next !== '' && $next !== '/portal/') {
+            $session->set(self::RETURN_KEY, $next);
         }
         return $this->portal('portal/auth/register', [
             'registration' => $this->registrationMode(),
@@ -181,10 +206,33 @@ final class AuthController extends Controller
             'approval' => 'Email address confirmed',
             'disabled' => 'This account cannot sign in',
         ];
+        // Where the person was going before signing up, offered once the address is confirmed (only in the browser
+        // that signed up: the session holds it).
+        $next = null;
+        if ($state !== 'invalid') {
+            $session = $this->app->session();
+            $kept = $session->get(self::RETURN_KEY);
+            $session->forget(self::RETURN_KEY);
+            $next = is_string($kept) && $this->safeNext($kept, '') !== '' ? $kept : null;
+        }
         return $this->portal('portal/auth/verify', [
             'state' => $state,
             'signedIn' => $this->app->auth()->user() !== null,
+            'next' => $state === 'confirmed' ? $next : null,
+            'article' => $state === 'confirmed' && $next !== null ? self::articleOf($next) : null,
         ], $titles[$state]);
+    }
+
+    /**
+     * The article a return path belongs to, at its comments (/news/{slug}/#comments), or null when the path is not an
+     * article's: an article, its comment page, or either with a fragment.
+     */
+    public static function articleOf(string $next): ?string
+    {
+        if (!preg_match('#^/news/([a-z0-9-]+)/(?:comment/)?(?:[?\#].*)?$#', $next, $m) || in_array($m[1], self::NEWS_PAGES, true)) {
+            return null;
+        }
+        return '/news/' . $m[1] . '/#comments';
     }
 
     /**

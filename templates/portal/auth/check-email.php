@@ -4,7 +4,9 @@
  * tells anyone which addresses are registered.
  *
  * @var string $email
+ * @var string|null $article the article the person was reading when they signed up (AuthController::articleOf())
  */
+$article ??= null;
 ?>
 <div class="pt-auth">
     <header class="pt-header">
@@ -20,6 +22,9 @@
         <div class="pt-card-body">
             <p>Open the link in that email to confirm your address and finish setting up your account. The link works for 48 hours.</p>
             <p>If this address already has an account, the email says so and explains how to sign in instead.</p>
+            <?php if ($article !== null): ?>
+                <p>Open the link in this browser and the confirmation page will take you back to the article you were reading.</p>
+            <?php endif; ?>
         </div>
     </div>
 

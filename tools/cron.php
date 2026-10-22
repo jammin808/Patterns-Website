@@ -8,7 +8,8 @@ declare(strict_types=1);
  * Removes what the privacy policy says is kept no longer (Psc\Support\Housekeeping): expired rate-limit windows,
  * spent and expired one-time tokens, assistant conversations past their retention, contact messages after two
  * years, download records and the audit log after about thirteen months, accounts never confirmed, ended session
- * files and old log files. Safe to run at any time and any number of times.
+ * files and old log files, and for Industry Updates: link click counts after about thirteen months, the desk's run
+ * records after six months, and images left without an article. Safe to run at any time and any number of times.
  */
 
 if (PHP_SAPI !== 'cli') {

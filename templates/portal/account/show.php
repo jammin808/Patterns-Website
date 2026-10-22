@@ -7,11 +7,13 @@
  * @var array<string, string> $errors
  * @var int $minLength
  * @var array{licences: int, tickets: int} $kept
+ * @var int $newsComments the account's comments on Industry Updates articles, in every status
  * @var string $deleteWord
  * @var bool $soleAdmin the only active administrator (the account cannot be deleted until there is another)
  * @var list<array{type: string, message: string}> $flashes
  */
 $soleAdmin ??= false;
+$newsComments ??= 0;
 // Which of the three forms was sent last (its hidden "form" field comes back with the kept input), so a refusal no
 // field explains is said in that form's error summary and nowhere else.
 $posted = (string) ($old['form'] ?? '');
@@ -32,6 +34,7 @@ $marketing = $fromProfile ? ($old['marketing'] ?? '') === '1' : (int) $account['
 $isAdmin = ($account['role'] ?? '') === 'admin';
 $licenceCount = $kept['licences'] . ' ' . ($kept['licences'] === 1 ? 'licence' : 'licences');
 $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'tickets');
+$newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments');
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow">Client portal</p>
@@ -136,7 +139,7 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
 
 <section class="pt-section" id="data" aria-labelledby="data-title">
     <h2 class="pt-h2" id="data-title">Your data</h2>
-    <p>Download a copy of everything your account holds: your details, tickets and comments, licences and any conversations with the support assistant while you were signed in. It is a JSON file, which most text editors can open.</p>
+    <p>Download a copy of everything your account holds: your details, tickets and their comments, licences, your comments on Industry Updates articles (including any waiting for approval or hidden) and the comments you reported, and any conversations with the support assistant while you were signed in. It is a JSON file, which most text editors can open.</p>
     <div class="pt-actions">
         <a class="pt-btn pt-btn--secondary" href="/portal/account/export/">Download my data</a>
     </div>
@@ -151,8 +154,9 @@ $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'ti
     <p>We remove your name, email address, company and password straight away. Some records stay because they are business records:</p>
     <ul>
         <li>Licences stay on record<?php if ($kept['licences'] > 0): ?> (you have <?= e($licenceCount) ?>)<?php endif; ?>. Download any licence files you need first.</li>
-        <li>Tickets and comments stay<?php if ($kept['tickets'] > 0): ?> (you have <?= e($ticketCount) ?>)<?php endif; ?>, so conversations still make sense. They show &ldquo;Deleted user&rdquo; as the author.</li>
+        <li>Tickets and their comments stay<?php if ($kept['tickets'] > 0): ?> (you have <?= e($ticketCount) ?>)<?php endif; ?>, so conversations still make sense. They show &ldquo;Deleted user&rdquo; as the author.</li>
     </ul>
+    <p>Your comments on Industry Updates articles<?php if ($newsComments > 0): ?> (you have <?= e($newsCount) ?>)<?php endif; ?> are public, so they are deleted for good with your account, and so are any reports you made about other people's comments.</p>
     <p>If you would like a copy of your data, <a href="/portal/account/export/">download it</a> before you continue.</p>
 
     <?php if ($soleAdmin): ?>
