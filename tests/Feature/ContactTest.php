@@ -296,6 +296,77 @@ final class ContactTest extends TestCase
         self::assertStringContainsString('messages from this email address today', $this->request('GET', '/contact/')->body);
     }
 
+    /** Country is optional: the United Kingdom and the United States come first, then every country A to Z. */
+    public function testTheCountryListPutsTheCommonestFirstThenEveryCountryAToZ(): void
+    {
+        $form = $this->request('GET', '/contact/')->body;
+        self::assertSame(1, preg_match('#<select id="country" name="country" autocomplete="country">(.*?)</select>#s', $form, $m));
+        self::assertStringNotContainsString('required', $m[0], 'optional');
+        self::assertMatchesRegularExpression('#<label for="country">Country <span class="c-label-opt">Optional</span></label>#', $form);
+        self::assertMatchesRegularExpression('#^\s*<option value="" selected>Choose a country</option>#', $m[1], 'nothing chosen by default');
+
+        self::assertSame(1, preg_match('#<optgroup label="Most common">(.*?)</optgroup>#s', $m[1], $top));
+        preg_match_all('#<option value="([A-Z]{2})">([^<]+)</option>#', $top[1], $first);
+        self::assertSame(['GB', 'US'], $first[1]);
+        self::assertSame(['United Kingdom', 'United States'], $first[2]);
+
+        self::assertSame(1, preg_match('#<optgroup label="All countries">(.*?)</optgroup>#s', $m[1], $all));
+        preg_match_all('#<option value="([A-Z]{2})">([^<]+)</option>#', $all[1], $rest);
+        self::assertCount(249, $rest[1], 'every ISO 3166-1 country');
+        self::assertSame(count($rest[1]), count(array_unique($rest[1])));
+        self::assertContains('GB', $rest[1], 'and the commonest again in their place');
+        $names = array_map(static fn (string $n): string => html_entity_decode($n, ENT_QUOTES), $rest[2]);
+        $sorted = $names;
+        usort($sorted, static fn (string $a, string $b): int => strcmp(self::sortKey($a), self::sortKey($b)));
+        self::assertSame($sorted, $names, 'alphabetical');
+        self::assertSame('Afghanistan', $names[0]);
+        self::assertSame('Zimbabwe', $names[count($names) - 1]);
+    }
+
+    /** A chosen country is stored as its code and named in the administrator's email; the visitor's receipt does not echo it. */
+    public function testAChosenCountryIsStoredAndNamedInTheEmail(): void
+    {
+        $this->post('/contact/', self::message(['country' => 'GB']) + $this->openForm(30));
+        self::assertSame('GB', $this->db->value('SELECT country FROM contact_messages'));
+        $mail = $this->lastMailTo('owner@example.test');
+        self::assertStringContainsString('&lt;Rita@Example.test&gt; · Flown Ltd · United Kingdom</p>', (string) ($mail['html'] ?? ''));
+        self::assertStringNotContainsString('United Kingdom', (string) ($this->lastMailTo('Rita@Example.test')['html'] ?? ''));
+    }
+
+    public function testNoCountryIsStoredAsNone(): void
+    {
+        $this->post('/contact/', self::message() + $this->openForm(30));
+        self::assertNull($this->db->value('SELECT country FROM contact_messages'));
+        self::assertStringContainsString('&lt;Rita@Example.test&gt; · Flown Ltd</p>', (string) ($this->lastMailTo('owner@example.test')['html'] ?? ''));
+    }
+
+    /** A code that is not on the list (a bot's, or a tampered form's) comes back with the rest of the input kept. */
+    public function testACountryNotOnTheListIsRefusedAndTheInputKept(): void
+    {
+        $r = $this->post('/contact/', self::message(['country' => 'ZZ']) + $this->openForm(30));
+        self::assertSame('/contact/#form', $r->getHeader('Location'));
+        self::assertSame(0, $this->storedMessages());
+        $form = $this->request('GET', '/contact/')->body;
+        self::assertStringContainsString('<li><a href="#country">Choose a country from the list.</a></li>', $form);
+        self::assertMatchesRegularExpression('/id="country"[^>]*aria-invalid="true"[^>]*aria-describedby="country-err"/', $form);
+        self::assertStringContainsString('value="Flown Ltd"', $form);
+
+        // A kept choice is selected once, in the group the visitor picked it from.
+        $this->post('/contact/', self::message(['country' => 'US', 'email' => 'bad']) + $this->openForm(30));
+        self::assertSame(1, preg_match('#<select id="country".*?</select>#s', $this->request('GET', '/contact/')->body, $select));
+        self::assertSame(1, substr_count($select[0], ' selected>'), 'one option selected');
+        self::assertMatchesRegularExpression('#<optgroup label="Most common">\s*<option value="GB">United Kingdom</option>\s*<option value="US" selected>United States</option>#', $select[0], 'in the group it was picked from');
+        $this->post('/contact/', self::message(['country' => 'FR', 'email' => 'bad']) + $this->openForm(30));
+        self::assertStringContainsString('<option value="FR" selected>France</option>', $this->request('GET', '/contact/')->body);
+    }
+
+    /** The comparison key for A to Z: letters without their accents, case folded. */
+    private static function sortKey(string $name): string
+    {
+        $plain = strtr($name, ['Å' => 'A', 'Ç' => 'C', 'É' => 'E', 'ô' => 'o', 'é' => 'e', 'ç' => 'c', 'ã' => 'a', 'í' => 'i', 'ü' => 'u']);
+        return strtolower($plain);
+    }
+
     /** Without scripting, a question typed into the assistant's box lands here as ?q=, ready to send. */
     public function testAQuestionFromTheAssistantsBoxIsReadyToSend(): void
     {

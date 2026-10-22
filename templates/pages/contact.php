@@ -33,6 +33,8 @@ if ($turnstileKey !== '' && !$sent) {
 }
 $site = content('site');
 $products = \Psc\Content\Content::products();
+$countries = \Psc\Content\Content::countries();
+$topCountries = \Psc\Content\Content::topCountries();
 $val = static fn (string $k): string => is_scalar($old[$k] ?? null) ? (string) $old[$k] : '';
 $err = static fn (string $k): ?string => isset($errors[$k]) && is_string($errors[$k]) ? $errors[$k] : null;
 // After a failed POST the redirect lands on #form: the error summary carries that id then, so the fragment focuses it
@@ -40,7 +42,7 @@ $err = static fn (string $k): ?string => isset($errors[$k]) && is_string($errors
 // an hour, for one) is said there too, where the visitor is, with the other ways to reach a person.
 $summary = $this->partial('error-summary', [
     'errors' => $errors,
-    'fields' => ['name' => 'name', 'email' => 'email', 'company' => 'company', 'topic' => 'topic', 'product' => 'product', 'message' => 'message', 'turnstile' => 'turnstile'],
+    'fields' => ['name' => 'name', 'email' => 'email', 'company' => 'company', 'country' => 'country', 'topic' => 'topic', 'product' => 'product', 'message' => 'message', 'turnstile' => 'turnstile'],
     'flashes' => $flashes ?? [],
     'id' => 'form',
     'action' => 'before sending',
@@ -108,10 +110,30 @@ $errorMsg = static fn (string $k): string => $err($k) !== null ? '<p class="c-er
                         </div>
                     </div>
 
-                    <div class="c-field<?= $err('company') !== null ? ' is-invalid' : '' ?>">
-                        <label for="company">Company or venue <span class="c-label-opt">Optional</span></label>
-                        <input id="company" name="company" autocomplete="organization" maxlength="160" value="<?= e($val('company')) ?>"<?= $invalid('company') ?><?= $describe('company') ?>>
-                        <?= $errorMsg('company') ?>
+                    <div class="c-form-row">
+                        <div class="c-field<?= $err('company') !== null ? ' is-invalid' : '' ?>">
+                            <label for="company">Company or venue <span class="c-label-opt">Optional</span></label>
+                            <input id="company" name="company" autocomplete="organization" maxlength="160" value="<?= e($val('company')) ?>"<?= $invalid('company') ?><?= $describe('company') ?>>
+                            <?= $errorMsg('company') ?>
+                        </div>
+                        <div class="c-field<?= $err('country') !== null ? ' is-invalid' : '' ?>">
+                            <label for="country">Country <span class="c-label-opt">Optional</span></label>
+                            <select id="country" name="country" autocomplete="country"<?= $invalid('country') ?><?= $describe('country') ?>>
+                                <option value=""<?= $val('country') === '' ? ' selected' : '' ?>>Choose a country</option>
+                                <?php /* The most common first, then every country A to Z; a choice selects its first match only. */ ?>
+                                <optgroup label="Most common">
+                                    <?php foreach ($topCountries as $code): ?>
+                                        <option value="<?= e($code) ?>"<?= $val('country') === $code ? ' selected' : '' ?>><?= e($countries[$code]) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <optgroup label="All countries">
+                                    <?php foreach ($countries as $code => $label): ?>
+                                        <option value="<?= e($code) ?>"<?= $val('country') === $code && !in_array($code, $topCountries, true) ? ' selected' : '' ?>><?= e($label) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            </select>
+                            <?= $errorMsg('country') ?>
+                        </div>
                     </div>
 
                     <div class="c-form-row">
