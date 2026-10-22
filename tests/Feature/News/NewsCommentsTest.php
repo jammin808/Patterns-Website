@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Psc\Tests\Feature\News;
 
+use Psc\Db\Database;
+use Psc\Db\Migrator;
 use Psc\Http\Response;
 use Psc\News\Comments;
 use Psc\News\Settings;
@@ -12,7 +14,8 @@ use Psc\Tests\TestCase;
 /**
  * Industry Updates comments (docs/NEWS.md §9): the API a cached article page uses, the state it merges in, the
  * comment page and its forms for readers without scripting, the limits and the pending rules, reports and their
- * auto-hide, deleting one's own, closed comments, public names, and 404 on every article that is not live. Each test
+ * auto-hide, deleting one's own (hidden ones, and on an article that is not live, too), closed comments, public
+ * names, 404 on every article that is not live otherwise, and the counts kept true when writers race. Each test
  * asserts the status, the stored rows and the published counts first, and the words second.
  */
 final class NewsCommentsTest extends TestCase
@@ -81,6 +84,69 @@ final class NewsCommentsTest extends TestCase
     private function adminMails(string $kind): array
     {
         return array_values(array_filter($this->mails(), static fn (array $m): bool => $m['template'] === 'news-comment-admin' && ($m['data']['kind'] ?? '') === $kind));
+    }
+
+    /** @return array<string, mixed> */
+    private function userRow(int $id): array
+    {
+        return (array) $this->db->one('SELECT * FROM users WHERE id = ?', [$id]);
+    }
+
+    /** One comment's list item on the comment page, or ''. */
+    private static function item(string $html, int $id): string
+    {
+        preg_match('#<li class="[^"]*" id="comment-' . $id . '">.*?</li>#s', $html, $m);
+        return $m[0] ?? '';
+    }
+
+    /**
+     * Swaps in a fresh database whose connection records each transaction's statements and runs another request's
+     * change at a chosen moment: just before the next transaction begins (beforeBegin), or just before a statement
+     * starting with given words is prepared (before), each once. SQLite takes one writer at a time and InnoDB's locks
+     * cannot be raised on it, so a race is staged by running the other side between the two steps it falls between,
+     * and a lock order is read from the statements.
+     */
+    private function stagedDatabase(): object
+    {
+        $pdo = new class ('sqlite::memory:') extends \PDO {
+            /** @var list<list<string>> each transaction's statements, in the order they were prepared */
+            public array $transactions = [];
+
+            /** @var array<string, \Closure> a statement's opening words => what runs just before it */
+            public array $before = [];
+
+            public ?\Closure $beforeBegin = null;
+
+            public function beginTransaction(): bool
+            {
+                $run = $this->beforeBegin;
+                $this->beforeBegin = null;
+                if ($run !== null) {
+                    $run();
+                }
+                $this->transactions[] = [];
+                return parent::beginTransaction();
+            }
+
+            public function prepare(string $query, array $options = []): \PDOStatement|false
+            {
+                foreach ($this->before as $start => $run) {
+                    if (str_starts_with($query, $start)) {
+                        unset($this->before[$start]);
+                        $run();
+                    }
+                }
+                if ($this->inTransaction()) {
+                    $this->transactions[array_key_last($this->transactions)][] = $query;
+                }
+                return parent::prepare($query, $options);
+            }
+        };
+        $this->db = new Database($pdo);
+        (new Migrator($this->db, PSC_ROOT . '/database/migrations', $this->storage . '/cache/schema-version'))->migrate();
+        $this->app->useDatabase($this->db);
+        $pdo->transactions = [];
+        return $pdo;
     }
 
     private function partial(int $article): string
@@ -385,6 +451,185 @@ final class NewsCommentsTest extends TestCase
         self::assertNull($this->commentStatus($mine));
         self::assertSame(1, $this->visibleCount($article));
         self::assertSame(404, $this->api('POST', '/api/news/comments/' . $mine . '/delete')->status, 'gone already');
+    }
+
+    public function testAPersonSeesAndDeletesTheirOwnHiddenComment(): void
+    {
+        $article = $this->makeArticle(['slug' => 'hidden-but-mine']);
+        $other = $this->makeUser('other@example.test');
+        $uid = $this->signInClient();
+        $hidden = $this->comment($article, $uid, 'Hidden by three reports', 'hidden', time() - 900, 3);
+        $theirs = $this->comment($article, $other, 'Someone else, showing', 'visible', time() - 800);
+        $theirsHidden = $this->comment($article, $other, 'Someone else, hidden', 'hidden', time() - 700);
+        $alsoHidden = $this->comment($article, $uid, 'Hidden by a moderator too', 'hidden', time() - 600);
+        self::assertSame(1, $this->visibleCount($article));
+
+        // The comment page: the person's hidden comments, marked, each with its delete form; never someone else's.
+        $page = $this->request('GET', '/news/hidden-but-mine/comment/');
+        self::assertSame(200, $page->status);
+        foreach ([$hidden, $alsoHidden] as $id) {
+            self::assertStringContainsString('name="action" value="delete"', self::item($page->body, $id));
+            self::assertStringContainsString('name="comment" value="' . $id . '"', self::item($page->body, $id));
+            self::assertStringContainsString(Comments::HIDDEN_NOTE, self::item($page->body, $id));
+            self::assertStringContainsString('news-comment--hidden', self::item($page->body, $id));
+            self::assertStringNotContainsString('value="report"', self::item($page->body, $id));
+        }
+        self::assertStringNotContainsString(Comments::HIDDEN_NOTE, self::item($page->body, $theirs));
+        self::assertSame('', self::item($page->body, $theirsHidden), 'someone else\'s hidden comment is not shown');
+
+        // The cached page's state: in mine as hidden (whenever the page was drawn) and in own, so it gets Delete.
+        $state = self::data($this->api('GET', '/api/news/' . $article . '/state?since=' . time() . '&ids=' . $theirs));
+        self::assertSame([$hidden, $alsoHidden], $state['own']);
+        self::assertSame([$hidden, $alsoHidden], array_column($state['mine'], 'id'));
+        self::assertSame(['hidden', 'hidden'], array_column($state['mine'], 'status'));
+        self::assertSame([false, false], array_column($state['mine'], 'pending'));
+        self::assertSame([true, true], array_column($state['mine'], 'own'));
+        self::assertNotContains('Someone else, hidden', array_column($state['mine'], 'body'));
+        self::assertStringContainsString('data-comment-hidden hidden', $this->partial($article), 'the cached page carries the note, inert');
+
+        // Deleted from the comment page and through the API alike; the visible count is unchanged.
+        $r = $this->post('/news/hidden-but-mine/comment/', ['action' => 'delete', 'comment' => (string) $hidden]);
+        self::assertSame(303, $r->status);
+        self::assertSame('/news/hidden-but-mine/comment/#comments', $r->getHeader('Location'));
+        self::assertSame('Your comment is deleted.', end($_SESSION['_flash'])['message']);
+        self::assertNull($this->commentStatus($hidden));
+        $api = $this->api('POST', '/api/news/comments/' . $alsoHidden . '/delete');
+        self::assertSame(200, $api->status);
+        self::assertSame(['ok' => true, 'id' => $alsoHidden], self::data($api));
+        self::assertNull($this->commentStatus($alsoHidden));
+        self::assertSame(404, $this->api('POST', '/api/news/comments/' . $theirsHidden . '/delete')->status, 'never someone else\'s');
+        self::assertSame('hidden', $this->commentStatus($theirsHidden));
+        self::assertSame(1, $this->visibleCount($article));
+    }
+
+    public function testAPersonDeletesTheirOwnCommentsOnceTheArticleIsNotLive(): void
+    {
+        $article = $this->makeArticle(['slug' => 'taken-down-later', 'title' => 'A headline that was taken down']);
+        $other = $this->makeUser('other@example.test');
+        $uid = $this->signInClient();
+        $first = $this->comment($article, $uid, 'My first word on it', 'visible', time() - 900);
+        $second = $this->comment($article, $uid, 'And a second, waiting', 'pending', time() - 800);
+        $theirs = $this->comment($article, $other, 'Someone else said this', 'visible', time() - 700);
+        $this->db->update('news_articles', ['status' => 'draft'], ['id' => $article]);
+        $page = '/news/taken-down-later/comment/';
+
+        // The comment page shows the person their own comments with delete forms, and nothing else of the article.
+        $r = $this->request('GET', $page);
+        self::assertSame(200, $r->status);
+        self::assertStringContainsString('noindex', (string) $r->getHeader('X-Robots-Tag'));
+        self::assertStringContainsString('name="comment" value="' . $first . '"', self::item($r->body, $first));
+        self::assertStringContainsString('name="comment" value="' . $second . '"', self::item($r->body, $second));
+        self::assertSame('', self::item($r->body, $theirs));
+        self::assertStringNotContainsString('Someone else said this', $r->body);
+        self::assertStringNotContainsString('A headline that was taken down', $r->body, 'not the title of an article that is not published');
+        self::assertStringNotContainsString('href="/news/taken-down-later/"', $r->body);
+        self::assertStringContainsString(e(Comments::NOT_LIVE_OWN), $r->body);
+        self::assertStringNotContainsString('value="post"', $r->body);
+        self::assertStringNotContainsString('value="report"', $r->body);
+
+        // Nothing but a delete is taken there.
+        self::assertSame(404, $this->post($page, ['action' => 'post', 'body' => 'Still trying'])->status);
+        self::assertSame(404, $this->post($page, ['action' => 'report', 'comment' => (string) $theirs])->status);
+        self::assertSame(0, (int) $this->db->value('SELECT reports FROM news_comments WHERE id = ?', [$theirs]));
+        self::assertSame(3, (int) $this->db->value('SELECT COUNT(*) FROM news_comments'));
+
+        // The API deletes the person's own; the page's form deletes the last, and the answer goes to the account page.
+        $api = $this->api('POST', '/api/news/comments/' . $first . '/delete');
+        self::assertSame(200, $api->status);
+        self::assertSame(['ok' => true, 'id' => $first], self::data($api));
+        self::assertNull($this->commentStatus($first));
+        self::assertSame(1, $this->visibleCount($article));
+        self::assertSame(404, $this->api('POST', '/api/news/comments/' . $theirs . '/delete')->status);
+        $last = $this->post($page, ['action' => 'delete', 'comment' => (string) $second]);
+        self::assertSame(303, $last->status);
+        self::assertSame('/portal/account/', $last->getHeader('Location'));
+        self::assertSame('success', end($_SESSION['_flash'])['type']);
+        self::assertNull($this->commentStatus($second));
+        self::assertSame('visible', $this->commentStatus($theirs));
+        self::assertSame(404, $this->request('GET', $page)->status, 'with none of theirs left, the page is no one\'s');
+    }
+
+    // ------------------------------------------------------------ writers racing
+
+    public function testEveryWriteToAnArticlesCommentsTakesTheArticleRowFirst(): void
+    {
+        $pdo = $this->stagedDatabase();
+        $article = $this->makeArticle();
+        $elsewhere = $this->makeArticle();
+        $author = $this->makeUser('author@example.test');
+        $this->age($author);
+        $readers = array_map(fn (string $email): int => $this->makeUser($email), ['r1@example.test', 'r2@example.test', 'r3@example.test']);
+        $comments = new Comments($this->app);
+        $pdo->transactions = [];
+
+        $posted = $comments->post($article, $this->userRow($author), 'Two of these at once queue on the article row.');
+        self::assertSame('visible', $posted['status']);
+        $id = (int) $posted['comment']['id'];
+        $this->comment($elsewhere, $author, 'On another article');
+        foreach ($readers as $reader) {
+            self::assertSame('reported', $comments->report($id, $this->userRow($reader)));
+        }
+        self::assertSame('hidden', $this->commentStatus($id), 'the third report hid it, in the same transaction as its recount');
+        self::assertTrue($comments->moveStatus($id, 'hidden', 'visible'));
+        self::assertSame(3, $comments->clearReports($id));
+        self::assertTrue($comments->remove($id, $this->userRow($author)));
+        $this->comment($article, $author, 'Posted again');
+        $kept = $this->comment($elsewhere, $readers[2], 'Someone else, elsewhere');
+        $this->db->insert('news_comment_reports', ['comment_id' => $kept, 'user_id' => $readers[0], 'created_at' => time()]);
+        self::assertSame(['comments' => 2, 'reports' => 0], $comments->deleteForAccount($author), 'its comments on both articles');
+        self::assertSame(['comments' => 0, 'reports' => 1], $comments->deleteForAccount($readers[0]));
+
+        $lock = 'UPDATE news_articles SET comment_count = comment_count WHERE id = ?';
+        $writes = 0;
+        foreach ($pdo->transactions as $i => $statements) {
+            $first = null;
+            foreach ($statements as $n => $sql) {
+                if (preg_match('/^(?:INSERT INTO|UPDATE|DELETE FROM) news_comment(?:s|_reports)\b/', $sql) === 1) {
+                    $first = $n;
+                    break;
+                }
+            }
+            if ($first === null) {
+                continue;
+            }
+            $writes++;
+            self::assertContains($lock, array_slice($statements, 0, $first), 'transaction ' . $i . ' wrote comments before it took the article row: ' . implode(' | ', $statements));
+        }
+        self::assertSame(1 + 3 + 1 + 1 + 1 + 2, $writes, 'post, three reports, show, clear, delete and two account deletions');
+        self::assertSame(0, $this->visibleCount($article));
+        self::assertSame(1, $this->visibleCount($elsewhere));
+    }
+
+    public function testADeleteThatRacesAnApprovalLeavesTheCountTrue(): void
+    {
+        $pdo = $this->stagedDatabase();
+        $article = $this->makeArticle();
+        $author = $this->makeUser('author@example.test');
+        $this->comment($article, $this->makeUser('other@example.test'), 'Already showing');
+        $waiting = $this->comment($article, $author, 'Waiting for approval', 'pending');
+        $comments = new Comments($this->app);
+        self::assertSame(1, $this->visibleCount($article));
+
+        // The administrator's approval lands after the author's delete has read the comment as pending, before its
+        // transaction begins.
+        $pdo->beforeBegin = function () use ($waiting, $article): void {
+            self::assertTrue((new Comments($this->app))->moveStatus($waiting, 'pending', 'visible'));
+            self::assertSame(2, $this->visibleCount($article));
+        };
+        self::assertTrue($comments->remove($waiting, $this->userRow($author)));
+        self::assertNull($pdo->beforeBegin, 'the approval ran in between');
+        self::assertNull($this->commentStatus($waiting));
+        self::assertSame(1, $this->visibleCount($article), 'the count is the visible comments that are left');
+
+        // The account's deletion read its comments before an approval, and deletes the approved one too.
+        $later = $this->comment($article, $author, 'Waiting again', 'pending');
+        $pdo->before['DELETE FROM news_comments WHERE user_id'] = function () use ($later, $article): void {
+            $this->db->exec("UPDATE news_comments SET status = 'visible' WHERE id = ?", [$later]);
+            Comments::recountArticles($this->db, [$article]);
+        };
+        self::assertSame(['comments' => 1, 'reports' => 0], $comments->deleteForAccount($author));
+        self::assertSame([], $pdo->before, 'the approval ran in between');
+        self::assertSame(1, $this->visibleCount($article));
     }
 
     public function testClosedCommentsTakeNoneAndKeepTheOnesThere(): void

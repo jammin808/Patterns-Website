@@ -13,9 +13,13 @@ use Psc\News\ArticleStore;
  * expired rate-limit windows and spent tokens go at once; assistant conversations after chat.retention_days;
  * contact messages after two years; download records, Industry Updates link clicks and the audit log after about
  * thirteen months; the AI desk's run records after six months; accounts never confirmed after thirty days; log and
- * mail files after ninety days; article images never attached to an article (and image files no row names) after a
- * day. Session files go once they are past the longest a session can live (remember-me is a database token, not a
- * session file). Safe to run at any time and any number of times.
+ * mail files after ninety days; article images never attached to an article after a day, with their files. Session
+ * files go once they are past the longest a session can live (remember-me is a database token, not a session file).
+ * Safe to run at any time and any number of times.
+ *
+ * An image file goes only with the row it belongs to, never because the connected database does not name it: a
+ * database that is the wrong one (the empty SQLite fallback while db.dsn is missing, a restored copy) names none of
+ * them, and the files are the only copies.
  *
  * The report's keys go into the log as they are, so none may look like a secret to the Logger (no "token", "hash",
  * "key" ...), or its count would be masked.
@@ -30,9 +34,6 @@ final class Housekeeping
     public const NEWS_CLICK_DAYS = 400;
     public const NEWS_RUN_DAYS = 180;
     public const ORPHAN_IMAGE_DAYS = 1;
-
-    /** The names article images are stored under (ArticleStore::imageFiles()), with the base they share. */
-    private const IMAGE_FILE = '/^([a-f0-9]{32})-(?:480|960|1600)\.webp$|^([a-f0-9]{32})-og\.jpg$/';
 
     /** @return array<string, int> rows or files removed, by kind */
     public static function run(App $app, ?int $now = null): array
@@ -74,9 +75,8 @@ final class Housekeeping
     }
 
     /**
-     * Article images uploaded before $cutoff that no article holds (an editor left before saving), with their files;
-     * then files under the images folder, by the stored naming, that no image row names and are as old (an upload
-     * that stopped halfway). A row an article took in the meantime is left alone. Returns [rows, files] removed.
+     * Article images uploaded before $cutoff that no article holds (an editor left before saving), with their files
+     * and no others. A row an article took in the meantime is left alone. Returns [rows, files] removed.
      *
      * @return array{0: int, 1: int}
      */
@@ -91,21 +91,6 @@ final class Housekeeping
             }
             $rows++;
             $files += self::removeImage($app, $image);
-        }
-        $dir = $app->storage->path(ArticleStore::IMAGE_DIR);
-        if (!is_dir($dir)) {
-            return [$rows, $files];
-        }
-        $known = array_flip(array_map('strval', array_column($db->all('SELECT base FROM news_images'), 'base')));
-        foreach (scandir($dir) ?: [] as $name) {
-            if (!preg_match(self::IMAGE_FILE, $name, $m)) {
-                continue;
-            }
-            $base = $m[1] !== '' ? $m[1] : $m[2];
-            $path = $dir . '/' . $name;
-            if (!isset($known[$base]) && is_file($path) && (int) @filemtime($path) < $cutoff && @unlink($path)) {
-                $files++;
-            }
         }
         return [$rows, $files];
     }

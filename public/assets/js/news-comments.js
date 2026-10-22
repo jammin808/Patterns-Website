@@ -4,9 +4,10 @@
  * the page was drawn (data-rendered-at), a sign-in link, and inert <template>s for the comment form, one comment and
  * two notices. Only while the portal's psc_li hint is set does this ask /api/news/{id}/state what the visitor may do
  * (so a reader who never signed in starts no session either); then it drops the comments removed since, merges in the
- * person's own recent and pending comments, offers Delete on theirs and Report on everyone else's, and swaps the
- * sign-in link for the form. When the server says the visitor is signed out the sign-in link stays, so a stale hint
- * does no harm. An unsent comment is kept in sessionStorage per article and put back.
+ * person's own recent and pending comments and the ones a moderator hid (marked so; only their author is sent them),
+ * offers Delete on theirs and Report on everyone else's, and swaps the sign-in link for the form. When the server
+ * says the visitor is signed out the sign-in link stays, so a stale hint does no harm. An unsent comment is kept in
+ * sessionStorage per article and put back.
  *
  * Requests are same-origin fetches with X-Requested-With, the api middleware's CSRF defence. Text from the server is
  * set with textContent, never as HTML. Focus moves only after the person acts: to their posted comment, to the
@@ -130,6 +131,13 @@ function init(root) {
       li.dataset.pending = '1';
       li.querySelector('[data-comment-pending]').hidden = false;
     }
+    if (c.status === 'hidden') {
+      // A page cached before the note existed lacks it; the comment still comes with its Delete.
+      li.classList.add('news-comment--hidden');
+      li.dataset.hidden = '1';
+      const note = li.querySelector('[data-comment-hidden]');
+      if (note) note.hidden = false;
+    }
     return li;
   }
 
@@ -201,7 +209,7 @@ function init(root) {
         }
       }));
       area.append(del);
-    } else if (!viewer.staff && li.dataset.pending !== '1') {
+    } else if (!viewer.staff && li.dataset.pending !== '1' && li.dataset.hidden !== '1') {
       const rep = button(TEXT.report, 'c-btn c-btn--ghost c-btn--sm', ` the comment by ${who} from ${when}`);
       rep.addEventListener('click', () => ask(li, TEXT.reportAsk, TEXT.reportYes, 'c-btn c-btn--secondary c-btn--sm', async (where) => {
         const res = await post(`/api/news/comments/${cid}/report`).catch(() => ({ status: 0, ok: false, data: {} }));

@@ -16,62 +16,78 @@ use Psc\News\Prose;
  * its forms for readers without scripting (show, not page: Controller::page() renders a template). The rules live in
  * Psc\News\Comments, so both routes post, delete and report alike.
  *
- * Every route answers 404 for an article that is not live. The API is same-origin fetch only (the api middleware's
- * X-Requested-With check is its CSRF defence) and its answers are JSON with no-store. The comment page's forms
- * answer with a 303 back to the comment page, never to the cached article, where a flash could not show.
+ * Every route answers 404 for an article that is not live, but for deleting one's own comments: the API's delete
+ * takes the person's own comment wherever its article stands, and the comment page of an article that is not live
+ * shows a person who commented there their own comments with delete forms (anyone else gets 404). The API is
+ * same-origin fetch only (the api middleware's X-Requested-With check is its CSRF defence) and its answers are JSON
+ * with no-store. The comment page's forms answer with a 303 back to the comment page, never to the cached article,
+ * where a flash could not show.
  */
 final class NewsCommentController extends Controller
 {
     /** The most comment ids a page may ask about in one state call (Comments::PAGE_MAX). */
     private const STATE_IDS = Comments::PAGE_MAX;
 
-    /** GET /news/{slug}/comment/: the box, the person's own comments with delete forms, report forms on the others. */
+    /**
+     * GET /news/{slug}/comment/: the box, the person's own comments with delete forms, report forms on the others. On
+     * an article that is not live, only the person's own comments with their delete forms, and never its title.
+     */
     public function show(Request $request): Response
     {
-        $article = (new ArticleStore($this->app))->findBySlug((string) $request->attr('slug'));
+        $user = $this->currentUser();
+        [$article, $live] = $this->pageArticle($request, $user) ?? [null, false];
         if ($article === null) {
             return $this->notFound();
         }
-        $user = $this->currentUser();
         $uid = (int) $user['id'];
         $id = (int) $article['id'];
         $comments = new Comments($this->app);
-        // The visible comments and the person's own pending ones, in the order they were posted.
-        $list = array_merge($comments->visible($id), $comments->pending($id, $uid));
+        // The visible comments and the person's own pending and hidden ones, in the order they were posted.
+        $list = $live ? array_merge($comments->visible($id), $comments->authored($id, $uid, true)) : $comments->authored($id, $uid);
         usort($list, static fn (array $a, array $b): int => [(int) $a['created_at'], (int) $a['id']] <=> [(int) $b['created_at'], (int) $b['id']]);
 
         $path = self::pagePath($article);
         $title = (string) $article['title'];
-        $seo = $this->app->seo('Comments: ' . Prose::cut($title, 40) . ' | Industry Updates', 'Comments on ' . Prose::cut($title, 120) . ', an Industry Updates article.', $path)->noindex();
+        $seo = $live
+            ? $this->app->seo('Comments: ' . Prose::cut($title, 40) . ' | Industry Updates', 'Comments on ' . Prose::cut($title, 120) . ', an Industry Updates article.', $path)->noindex()
+            : $this->app->seo('Your comments | Industry Updates', 'Your comments on an Industry Updates article that is not published at the moment.', $path)->noindex();
         $seo->breadcrumbs = Content::trail('/news/');
-        $seo->crumb((string) ($article['seo_title'] ?: $title), self::articlePath($article));
-        $seo->crumb('Comments', $path);
+        if ($live) {
+            $seo->crumb((string) ($article['seo_title'] ?: $title), self::articlePath($article));
+        }
+        $seo->crumb($live ? 'Comments' : 'Your comments', $path);
         $idle = $this->app->config->int('security.session_idle_seconds', 7200);
         return $this->page('news/comment', [
             'section' => 'news',
             'article' => $article,
+            'live' => $live,
             'comments' => $list,
             'viewer' => $user,
             'name' => Comments::publicName($user),
             'staff' => Comments::isStaff($user),
-            'closed' => $comments->closedReason($article),
+            'closed' => $live ? $comments->closedReason($article) : Comments::NOT_LIVE_OWN,
             'old' => $this->app->session()->takeOld(),
             'errors' => $this->takeErrors(),
             'idleSeconds' => $idle,
         ], $seo);
     }
 
-    /** POST /news/{slug}/comment/ (action: post, delete or report), then a 303 back to the comment page. */
+    /**
+     * POST /news/{slug}/comment/ (action: post, delete or report), then a 303 back to the comment page. On an article
+     * that is not live only delete is taken; the last of the person's comments there deleted, the answer goes to
+     * their account page, since the comment page is theirs only while they have comments on it.
+     */
     public function submit(Request $request): Response
     {
-        $article = (new ArticleStore($this->app))->findBySlug((string) $request->attr('slug'));
-        if ($article === null) {
+        $user = $this->currentUser();
+        [$article, $live] = $this->pageArticle($request, $user) ?? [null, false];
+        $action = $request->input('action');
+        if ($article === null || (!$live && $action !== 'delete')) {
             return $this->notFound();
         }
-        $user = $this->currentUser();
         $path = self::pagePath($article);
         $comments = new Comments($this->app);
-        switch ($request->input('action')) {
+        switch ($action) {
             case 'post':
                 $result = $comments->post((int) $article['id'], $user, $request->input('body'));
                 if (!$result['ok']) {
@@ -93,6 +109,9 @@ final class NewsCommentController extends Controller
                 if ($comment === null || (int) $comment['user_id'] !== (int) $user['id'] || !$comments->remove((int) $comment['id'], $user)) {
                     return $this->redirect($path . '#comments', 'danger', 'That comment was not deleted. It may have been deleted already; the list below is up to date.');
                 }
+                if (!$live && $comments->own((int) $article['id'], (int) $user['id']) === []) {
+                    return $this->redirect('/portal/account/', 'success', 'Your comment is deleted. You have no other comments on that article.');
+                }
                 return $this->redirect($path . '#comments', 'success', 'Your comment is deleted.');
 
             case 'report':
@@ -108,8 +127,9 @@ final class NewsCommentController extends Controller
     /**
      * GET /api/news/{id}/state?since=&ids=: what the person viewing a page drawn at since may do, and what changed
      * for them since: {signed_in, can_comment, closed_reason, name, mine, removed, own, staff}. mine is their pending
-     * comments and their visible ones posted or approved since; removed is which of ids (the comments the page
-     * shows) are no longer visible; own is the ids of their comments. Signed out, only removed is filled in.
+     * comments, the ones a moderator hid (status hidden, so the page can mark them and offer Delete) and their
+     * visible ones posted or approved since; removed is which of ids (the comments the page shows) are no longer
+     * visible; own is the ids of their comments, in every status. Signed out, only removed is filled in.
      */
     public function state(Request $request): Response
     {
@@ -160,13 +180,16 @@ final class NewsCommentController extends Controller
         return Response::json(['error' => $result['status'], 'message' => $result['message'], 'errors' => (object) $result['errors']], $codes[$result['status']] ?? 400);
     }
 
-    /** POST /api/news/comments/{id}/delete: the person's own comment on a live article; anything else is 404. */
+    /**
+     * POST /api/news/comments/{id}/delete: the person's own comment, in any status and whether or not its article is
+     * still live (a page cached before an unpublish still offers Delete); anything else is 404.
+     */
     public function delete(Request $request): Response
     {
         $user = $this->currentUser();
         $comments = new Comments($this->app);
         $comment = $comments->find($request->attrInt('id'));
-        if ($comment === null || (int) $comment['user_id'] !== (int) $user['id'] || $comments->liveArticle((int) $comment['article_id']) === null) {
+        if ($comment === null || (int) $comment['user_id'] !== (int) $user['id']) {
             return $this->notFound();
         }
         if (!$comments->remove((int) $comment['id'], $user)) {
@@ -228,6 +251,27 @@ final class NewsCommentController extends Controller
             'limited' => ['danger', Comments::REPORT_LIMIT],
             default => ['danger', 'That comment is no longer shown, so there is nothing to report.'],
         };
+    }
+
+    /**
+     * The article the comment page names, and whether it is live: a live one, or one that is not live on which the
+     * person has comments (so they can still delete them). Null for anything else, which is answered with 404, so a
+     * draft's address tells no one else anything.
+     *
+     * @param array<string, mixed> $user the signed-in account
+     * @return array{0: array<string, mixed>, 1: bool}|null
+     */
+    private function pageArticle(Request $request, array $user): ?array
+    {
+        $store = new ArticleStore($this->app);
+        $article = $store->findBySlug((string) $request->attr('slug'), false);
+        if ($article === null) {
+            return null;
+        }
+        if ($store->isLive($article)) {
+            return [$article, true];
+        }
+        return (new Comments($this->app))->own((int) $article['id'], (int) $user['id']) !== [] ? [$article, false] : null;
     }
 
     /**

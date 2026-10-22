@@ -19,8 +19,14 @@ use Psc\Support\Names;
  * A comment waits as pending while the desk's comments setting is "approval", or when an account younger than a day
  * includes a link; only its author sees it. Anyone signed in may report someone else's visible comment once; the
  * HIDE_AT-th report hides it until an administrator looks (never a staff comment), and the first report emails the
- * administrators. comment_count on the article is the number of visible comments, recounted in the same transaction
- * as every change that can move it.
+ * administrators. Its author may delete any of their comments, in any status, also once the article is not live
+ * (the privacy policy's promise), and still sees a hidden one, marked so, to do that. comment_count on the article
+ * is the number of visible comments, recounted from the table in the same transaction as every change that can
+ * move it.
+ *
+ * Every transaction that writes an article's comments or reports takes that article's row first (lockArticles), so
+ * writers on one article queue there; InnoDB would otherwise deadlock two of them on the foreign key's shared lock and
+ * the recount's next-key locks, and roll one back.
  */
 final class Comments
 {
@@ -50,6 +56,7 @@ final class Comments
 
     public const STAFF_BADGE = 'Patterns team';
     public const PENDING_NOTE = 'Only you can see this until it is approved.';
+    public const HIDDEN_NOTE = 'Hidden by a moderator. Only you can see this, and you can delete it.';
     public const CLOSED_ARTICLE = 'Comments are closed on this article.';
     public const CLOSED_SITE = 'Comments are closed at the moment.';
 
@@ -62,6 +69,7 @@ final class Comments
     public const REPORT_LIMIT = 'You have reported the most comments allowed in a day. Please try again tomorrow, or tell us through the contact page.';
     public const HIDDEN_REPEAT = 'You posted these words earlier and they were hidden. If you think that was a mistake, tell us through the contact page.';
     public const NOT_LIVE = 'This article is not published, so it takes no comments.';
+    public const NOT_LIVE_OWN = 'This article is not published at the moment, so it takes no comments. You can still delete yours.';
 
     private const COLUMNS = 'c.id, c.article_id, c.user_id, c.body, c.status, c.reports, c.created_at, c.updated_at,'
         . ' u.name AS author_name, u.email AS author_email, u.role AS author_role';
@@ -205,6 +213,7 @@ final class Comments
         $pending = !self::isStaff($user) && ($this->mode() === 'approval' || ($young && self::links($body) > 0));
         $status = $pending ? 'pending' : 'visible';
         $id = $this->db()->transaction(function (Database $db) use ($articleId, $uid, $body, $status, $now): int {
+            self::lockArticles($db, [$articleId]);
             $id = $db->insert('news_comments', [
                 'article_id' => $articleId,
                 'user_id' => $uid,
@@ -226,25 +235,26 @@ final class Comments
     }
 
     /**
-     * Deletes a comment for good: the author's own, or any for an administrator. False when it is gone already or
-     * the actor may not delete it.
+     * Deletes a comment for good, in any status and whether or not its article is live: the author's own, or any for
+     * an administrator. False when it is gone already or the actor may not delete it.
      *
      * @param array<string, mixed> $actor a users row
      */
     public function remove(int $commentId, array $actor): bool
     {
         $db = $this->db();
-        $row = $db->one('SELECT id, article_id, user_id, status FROM news_comments WHERE id = ?', [$commentId]);
+        $row = $db->one('SELECT id, article_id, user_id FROM news_comments WHERE id = ?', [$commentId]);
         if ($row === null || (!self::isStaff($actor) && (int) $row['user_id'] !== (int) ($actor['id'] ?? 0))) {
             return false;
         }
+        // A comment's article and author never change, so the read above holds; its status may not (an approval
+        // can land in between), so the article is recounted whatever the status was.
         return $db->transaction(static function (Database $db) use ($row): bool {
+            self::lockArticles($db, [(int) $row['article_id']]);
             if ($db->exec('DELETE FROM news_comments WHERE id = ?', [(int) $row['id']]) !== 1) {
                 return false;
             }
-            if ($row['status'] === 'visible') {
-                self::recountArticles($db, [(int) $row['article_id']]);
-            }
+            self::recountArticles($db, [(int) $row['article_id']]);
             return true;
         });
     }
@@ -280,6 +290,7 @@ final class Comments
         $now = time();
         try {
             $result = $db->transaction(static function (Database $db) use ($comment, $commentId, $uid, $now): array {
+                self::lockArticles($db, [(int) $comment['article_id']]);
                 $db->insert('news_comment_reports', ['comment_id' => $commentId, 'user_id' => $uid, 'created_at' => $now]);
                 $db->exec('UPDATE news_comments SET reports = reports + 1 WHERE id = ?', [$commentId]);
                 $reports = (int) $db->value('SELECT reports FROM news_comments WHERE id = ?', [$commentId]);
@@ -317,12 +328,17 @@ final class Comments
         if (!in_array($from, self::STATUSES, true) || !in_array($to, self::STATUSES, true) || $from === $to) {
             return false;
         }
-        return $this->db()->transaction(static function (Database $db) use ($commentId, $from, $to): bool {
+        $articleId = $this->articleOf($commentId);
+        if ($articleId === null) {
+            return false;
+        }
+        return $this->db()->transaction(static function (Database $db) use ($commentId, $articleId, $from, $to): bool {
+            self::lockArticles($db, [$articleId]);
             if ($db->update('news_comments', ['status' => $to, 'updated_at' => time()], ['id' => $commentId, 'status' => $from]) !== 1) {
                 return false;
             }
             if ($from === 'visible' || $to === 'visible') {
-                self::recountArticles($db, [(int) $db->value('SELECT article_id FROM news_comments WHERE id = ?', [$commentId])]);
+                self::recountArticles($db, [$articleId]);
             }
             return true;
         });
@@ -331,7 +347,9 @@ final class Comments
     /** Forgets a comment's reports (an administrator has looked); the same people may report it again. Returns how many. */
     public function clearReports(int $commentId): int
     {
-        return $this->db()->transaction(static function (Database $db) use ($commentId): int {
+        $articleId = (int) $this->articleOf($commentId);
+        return $this->db()->transaction(static function (Database $db) use ($commentId, $articleId): int {
+            self::lockArticles($db, [$articleId]);
             $cleared = $db->exec('DELETE FROM news_comment_reports WHERE comment_id = ?', [$commentId]);
             $db->exec('UPDATE news_comments SET reports = 0 WHERE id = ?', [$commentId]);
             return $cleared;
@@ -340,16 +358,21 @@ final class Comments
 
     /**
      * Deletes everything an account wrote or reported here, for the account's deletion: its comments and its
-     * reports, then recounts the articles' visible comments and the reports of the comments it had reported. Runs
-     * inside the caller's transaction when there is one. Returns how many of each went.
+     * reports, then recounts the visible comments of every article it commented on (in any status, as one may have
+     * been approved since it was read) and the reports of the comments it had reported. Runs inside the caller's
+     * transaction when there is one. Returns how many of each went.
      *
      * @return array{comments: int, reports: int}
      */
     public function deleteForAccount(int $userId): array
     {
         return $this->db()->transaction(static function (Database $db) use ($userId): array {
-            $articles = array_map('intval', array_column($db->all("SELECT DISTINCT article_id FROM news_comments WHERE user_id = ? AND status = 'visible'", [$userId]), 'article_id'));
+            $articles = array_map('intval', array_column($db->all('SELECT DISTINCT article_id FROM news_comments WHERE user_id = ?', [$userId]), 'article_id'));
             $reported = array_map('intval', array_column($db->all('SELECT comment_id FROM news_comment_reports WHERE user_id = ?', [$userId]), 'comment_id'));
+            $reportedOn = $reported !== []
+                ? array_map('intval', array_column($db->all('SELECT DISTINCT article_id FROM news_comments WHERE id IN (' . self::marks($reported) . ')', $reported), 'article_id'))
+                : [];
+            self::lockArticles($db, array_merge($articles, $reportedOn));
             $reports = $db->exec('DELETE FROM news_comment_reports WHERE user_id = ?', [$userId]);
             $comments = $db->exec('DELETE FROM news_comments WHERE user_id = ?', [$userId]);
             if ($reported !== []) {
@@ -362,6 +385,22 @@ final class Comments
             self::recountArticles($db, $articles);
             return ['comments' => $comments, 'reports' => $reports];
         });
+    }
+
+    /**
+     * Takes each article's row for the rest of the transaction, in ascending id order, before any comment or report
+     * of it is written: the one order every writer here uses (a write that changes nothing still holds the row lock
+     * on InnoDB, and starts SQLite's write lock). The caller is inside a transaction.
+     *
+     * @param list<int> $articleIds
+     */
+    private static function lockArticles(Database $db, array $articleIds): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $articleIds), static fn (int $id): bool => $id > 0)));
+        sort($ids);
+        foreach ($ids as $id) {
+            $db->exec('UPDATE news_articles SET comment_count = comment_count WHERE id = ?', [$id]);
+        }
     }
 
     /**
@@ -412,8 +451,8 @@ final class Comments
     }
 
     /**
-     * The person's comments a page drawn at $since may lack: every pending one, and the visible ones posted or
-     * approved since. The oldest first.
+     * The person's comments a page drawn at $since may lack: every pending one, every one a moderator hid (only its
+     * author sees it, to delete it), and the visible ones posted or approved since. The oldest first.
      *
      * @return list<array<string, mixed>>
      */
@@ -421,30 +460,32 @@ final class Comments
     {
         $rows = $this->db()->all(
             'SELECT ' . self::COLUMNS . ' FROM news_comments c JOIN users u ON u.id = c.user_id WHERE c.article_id = ? AND c.user_id = ?'
-            . " AND (c.status = 'pending' OR (c.status = 'visible' AND (c.created_at >= ? OR c.updated_at >= ?))) ORDER BY c.created_at, c.id",
+            . " AND (c.status IN ('pending', 'hidden') OR (c.status = 'visible' AND (c.created_at >= ? OR c.updated_at >= ?))) ORDER BY c.created_at, c.id",
             [$articleId, $userId, $since, $since]
         );
         return array_map(self::shape(...), $rows);
     }
 
     /**
-     * The person's pending comments on the article, the oldest first.
+     * The person's comments on the article, the oldest first: every one, or with $unlisted only the ones everyone
+     * else's list lacks (pending, and hidden by a moderator). Only their author is shown these.
      *
      * @return list<array<string, mixed>>
      */
-    public function pending(int $articleId, int $userId): array
+    public function authored(int $articleId, int $userId, bool $unlisted = false): array
     {
         $rows = $this->db()->all(
-            'SELECT ' . self::COLUMNS . " FROM news_comments c JOIN users u ON u.id = c.user_id WHERE c.article_id = ? AND c.user_id = ? AND c.status = 'pending' ORDER BY c.created_at, c.id",
+            'SELECT ' . self::COLUMNS . ' FROM news_comments c JOIN users u ON u.id = c.user_id WHERE c.article_id = ? AND c.user_id = ?'
+            . ($unlisted ? " AND c.status IN ('pending', 'hidden')" : '') . ' ORDER BY c.created_at, c.id',
             [$articleId, $userId]
         );
         return array_map(self::shape(...), $rows);
     }
 
-    /** @return list<int> the ids of the person's comments on the article that they can see (visible and pending) */
+    /** @return list<int> the ids of the person's comments on the article, in every status (each is theirs to delete) */
     public function own(int $articleId, int $userId): array
     {
-        return array_map('intval', array_column($this->db()->all("SELECT id FROM news_comments WHERE article_id = ? AND user_id = ? AND status <> 'hidden' ORDER BY id", [$articleId, $userId]), 'id'));
+        return array_map('intval', array_column($this->db()->all('SELECT id FROM news_comments WHERE article_id = ? AND user_id = ? ORDER BY id', [$articleId, $userId]), 'id'));
     }
 
     /**
@@ -469,7 +510,7 @@ final class Comments
     /**
      * A comment as the API sends it to the person viewing: never the author's full name or email.
      *
-     * @param array<string, mixed> $comment a row from find(), visible(), mine() or pending()
+     * @param array<string, mixed> $comment a row from find(), visible(), mine() or authored()
      * @return array{id: int, name: string, staff: bool, body: string, status: string, pending: bool, own: bool, time: string, time_label: string}
      */
     public static function toPublic(array $comment, int $viewerId): array
@@ -543,6 +584,13 @@ final class Comments
     private function db(): Database
     {
         return $this->app->db();
+    }
+
+    /** The comment's article (which never changes), read before a transaction locks it; null when it is gone. */
+    private function articleOf(int $commentId): ?int
+    {
+        $id = $this->db()->value('SELECT article_id FROM news_comments WHERE id = ?', [$commentId]);
+        return $id !== null ? (int) $id : null;
     }
 
     /**

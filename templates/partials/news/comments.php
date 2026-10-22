@@ -5,8 +5,8 @@
  * drawn (data-rendered-at), and a box that is a sign-in link to the comment page (behind sign-in, so signing in
  * brings the person back to it) or says why comments are closed. news-comments.js, when the portal's signed-in hint
  * is set, asks /api/news/{id}/state what the person may do and builds the rest from the inert templates below: the
- * comment form, the person's own recent and pending comments, and Delete and Report buttons. Without scripting the
- * comment page offers all of it.
+ * comment form, the person's own recent and pending comments and the ones a moderator hid (marked so, for their
+ * author only), and Delete and Report buttons. Without scripting the comment page offers all of it.
  *
  * Comments are plain text (nl2br(e())), never Markdown, with no live links; the author's short name and, for staff,
  * a badge of its own that no name can produce.
@@ -76,6 +76,7 @@ $this->push('scripts', '<script type="module" src="' . e(asset('/assets/js/news-
                 <time data-comment-time></time>
             </p>
             <p class="news-comment-note" data-comment-pending hidden><?= icon('clock') ?><span><?= e(\Psc\News\Comments::PENDING_NOTE) ?></span></p>
+            <p class="news-comment-note" data-comment-hidden hidden><?= icon('shield') ?><span><?= e(\Psc\News\Comments::HIDDEN_NOTE) ?></span></p>
             <p class="news-comment-body" data-comment-body></p>
             <div class="news-comment-actions" data-comment-actions></div>
         </li>

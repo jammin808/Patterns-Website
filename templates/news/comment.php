@@ -1,12 +1,16 @@
 <?php
 /**
  * /news/{slug}/comment/: one article's comments for a signed-in reader without scripting, and where signing in from
- * an article leads. The comment form, the visible comments with the person's own pending ones (each of theirs with
- * a delete form, everyone else's with a report form), and a link back to the article. Every form posts to this page
- * and comes back here with a 303, so its answer shows; the cached article page never could.
+ * an article leads. The comment form, the visible comments with the person's own pending and hidden ones (each of
+ * theirs with a delete form, everyone else's with a report form), and a link back to the article. On an article that
+ * is not live only the person's own comments, each with its delete form, without the article's title or a link to it.
+ * Every form posts to this page and comes back here with a 303, so its answer shows; the cached article page never
+ * could.
  *
  * @var array<string, mixed> $article
- * @var list<array<string, mixed>> $comments visible ones and the viewer's pending ones, the oldest first
+ * @var bool $live whether the article is live
+ * @var list<array<string, mixed>> $comments visible ones and the viewer's pending and hidden ones (only the viewer's
+ *   own when the article is not live), the oldest first
  * @var array<string, mixed> $viewer the signed-in account
  * @var string $name the viewer's public name
  * @var bool $staff whether the viewer is an administrator
@@ -36,7 +40,11 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
         <div class="c-hero-grid">
             <p class="c-eyebrow">Industry Updates</p>
             <h1 class="c-hero-title" id="comment-title">Comments</h1>
-            <p class="c-hero-lede">On <a href="<?= e($articlePath) ?>"><?= e($article['title']) ?></a></p>
+            <?php if ($live): ?>
+                <p class="c-hero-lede">On <a href="<?= e($articlePath) ?>"><?= e($article['title']) ?></a></p>
+            <?php else: ?>
+                <p class="c-hero-lede">Yours, on an article that is not published at the moment</p>
+            <?php endif; ?>
         </div>
     </div>
 </section>
@@ -44,7 +52,7 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
 <div class="l-section l-section--flush news-comment-page">
     <div class="l-wrap l-wrap--prose">
         <section class="news-comments" id="comments" aria-labelledby="comments-title">
-            <h2 id="comments-title">What people said</h2>
+            <h2 id="comments-title"><?= $live ? 'What people said' : 'Your comments' ?></h2>
             <?php if ($comments === []): ?>
                 <p class="news-comments-empty">No comments yet.</p>
             <?php else: ?>
@@ -53,8 +61,9 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
                         $cid = (int) $c['id'];
                         $own = (int) $c['user_id'] === $uid;
                         $pending = $c['status'] === 'pending';
+                        $hidden = $c['status'] === 'hidden';
                         $when = Comments::timeLabel((int) $c['created_at']);
-                        $classes = 'news-comment' . (!empty($c['staff']) ? ' news-comment--staff' : '') . ($pending ? ' news-comment--pending' : ''); ?>
+                        $classes = 'news-comment' . (!empty($c['staff']) ? ' news-comment--staff' : '') . ($pending ? ' news-comment--pending' : '') . ($hidden ? ' news-comment--hidden' : ''); ?>
                         <li class="<?= e($classes) ?>" id="comment-<?= $cid ?>">
                             <p class="news-comment-meta">
                                 <span class="news-comment-author"><bdi><?= e($own ? 'You' : $c['name']) ?></bdi></span>
@@ -63,6 +72,8 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
                             </p>
                             <?php if ($pending): ?>
                                 <p class="news-comment-note"><?= icon('clock') ?><span><?= e(Comments::PENDING_NOTE) ?></span></p>
+                            <?php elseif ($hidden): ?>
+                                <p class="news-comment-note"><?= icon('shield') ?><span><?= e(Comments::HIDDEN_NOTE) ?></span></p>
                             <?php endif; ?>
                             <p class="news-comment-body"><?= nl2br(e($c['body'])) ?></p>
                             <?php if ($own): ?>
@@ -74,7 +85,7 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
                                 </form>
                             <?php elseif ($staff): ?>
                                 <p class="news-comment-actions"><a href="/portal/admin/news/comments/?tab=visible&amp;article=<?= (int) $article['id'] ?>#comment-<?= $cid ?>">Moderate<span class="u-visually-hidden"> the comment by <?= e($c['name']) ?></span></a></p>
-                            <?php elseif (!$pending): ?>
+                            <?php elseif (!$pending && !$hidden): ?>
                                 <form method="post" action="<?= e($pagePath) ?>" class="news-comment-actions">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="action" value="report">
@@ -123,6 +134,10 @@ $described = 'comment-body-help comment-body-count' . ($bodyError !== null ? ' c
             <?php endif; ?>
         </section>
 
-        <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="<?= e($articlePath) ?>#comments">Back to the article</a></p>
+        <?php if ($live): ?>
+            <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="<?= e($articlePath) ?>#comments">Back to the article</a></p>
+        <?php else: ?>
+            <p class="news-comment-back"><a class="c-btn c-btn--secondary" href="/news/">Back to Industry Updates</a></p>
+        <?php endif; ?>
     </div>
 </div>

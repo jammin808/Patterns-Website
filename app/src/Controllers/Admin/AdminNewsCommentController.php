@@ -31,8 +31,12 @@ final class AdminNewsCommentController extends Controller
         'clear_reports' => ['from' => ['visible', 'pending', 'hidden'], 'to' => null, 'audit' => 'comment.reports_cleared', 'done' => 'Reports cleared. The same people can report the comment again.', 'already' => 'Nothing changed: that comment has no reports.'],
     ];
 
-    /** Said after a change that takes a comment off a cached article page (docs/NEWS.md §11, takedown actions). */
-    public const TAKEDOWN = 'It can take up to 2 minutes to leave the CDN. Run Flush CDN to remove it at once.';
+    /**
+     * Said after a change that takes a comment, an article or an image off the site (docs/NEWS.md §11, takedown
+     * actions; the article editor says it too). Each figure is the CDN lifetime its responses were sent with: a page's
+     * max-age (NewsController::CACHE) and an image's s-maxage (NewsMediaController::PUBLIC_CACHE).
+     */
+    public const TAKEDOWN = 'Pages can take up to about 2 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once.';
 
     private const PER_PAGE = 25;
 

@@ -12,8 +12,9 @@ use Psc\Tests\TestCase;
  * The daily clean-up keeps what the privacy policy promises: contact messages no longer than two years and download
  * records no longer than about thirteen months were never deleted, and session files outlived their sessions by a
  * month. Industry Updates adds link clicks (about thirteen months), the desk's runs (six months) and images no
- * article holds (a day), with their files. Rows and files on the near side of each limit stay, and the report reaches
- * the log with every count readable.
+ * article holds (a day), with their files and no others: an image file no row names stays, since a database that
+ * names none may be the wrong one. Rows and files on the near side of each limit stay, and the report reaches the log
+ * with every count readable.
  */
 final class HousekeepingTest extends TestCase
 {
@@ -118,27 +119,48 @@ final class HousekeepingTest extends TestCase
         [$orphan, $orphanBase] = $image(null, 2 * self::DAY);
         [$fresh, $freshBase] = $image(null, 3600);
         [$held, $heldBase] = $image($article, 30 * self::DAY);
-        // Files of an upload that stopped before its row was written, and an unrelated file that is not an image's.
+        // Files named like an image's that no row names (a month old), and an unrelated file.
         $stray = bin2hex(random_bytes(16));
-        $young = bin2hex(random_bytes(16)) . '-480.webp';
-        foreach ([$stray . '-960.webp' => 2 * self::DAY, $stray . '-og.jpg' => 2 * self::DAY, $young => 3600, 'notes.txt' => 30 * self::DAY] as $name => $age) {
+        foreach ([$stray . '-960.webp' => 30 * self::DAY, $stray . '-og.jpg' => 30 * self::DAY, 'notes.txt' => 30 * self::DAY] as $name => $age) {
             file_put_contents($dir . '/' . $name, 'x');
             touch($dir . '/' . $name, time() - $age);
         }
 
         $report = Housekeeping::run($this->app);
         self::assertSame(1, $report['news_images']);
-        self::assertSame(4 + 2, $report['news_image_files'], 'the orphan\'s four files and the two old stray ones');
+        self::assertSame(4, $report['news_image_files'], 'the orphan\'s four files, and no others');
         self::assertNull($this->db->value('SELECT id FROM news_images WHERE id = ?', [$orphan]));
         self::assertSame([$fresh, $held], array_map('intval', array_column($this->db->all('SELECT id FROM news_images ORDER BY id'), 'id')));
         self::assertSame([], glob($dir . '/' . $orphanBase . '-*') ?: []);
-        self::assertSame([], glob($dir . '/' . $stray . '-*') ?: []);
+        self::assertCount(2, glob($dir . '/' . $stray . '-*') ?: [], 'a file no row names is not this database\'s to judge');
         self::assertCount(4, glob($dir . '/' . $freshBase . '-*') ?: [], 'an image uploaded within the day stays');
         self::assertCount(4, glob($dir . '/' . $heldBase . '-*') ?: [], 'an article\'s image stays however old');
-        self::assertFileExists($dir . '/notes.txt', 'only files named like an image\'s are touched');
-        self::assertFileExists($dir . '/' . $young, 'a stray file under a day old stays (its upload may still be finishing)');
+        self::assertFileExists($dir . '/notes.txt');
 
         $again = Housekeeping::run($this->app);
         self::assertSame(0, $again['news_images'] + $again['news_image_files'], 'safe to run again');
+    }
+
+    public function testImageFilesStayWhenTheConnectedDatabaseNamesNone(): void
+    {
+        // The site on its empty SQLite fallback (db.dsn missing from the config) beside the real uploads folder:
+        // every article's images, a month old, and not one news_images row.
+        $dir = $this->app->storage->dir(ArticleStore::IMAGE_DIR);
+        $names = [];
+        foreach ([1, 2, 3] as $n) {
+            foreach (ArticleStore::imageFiles(['base' => bin2hex(random_bytes(16))]) as $name) {
+                file_put_contents($dir . '/' . $name, 'image ' . $n);
+                touch($dir . '/' . $name, time() - 30 * self::DAY);
+                $names[] = $name;
+            }
+        }
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_images'));
+
+        $report = Housekeeping::run($this->app);
+        self::assertSame(0, $report['news_images']);
+        self::assertSame(0, $report['news_image_files']);
+        foreach ($names as $name) {
+            self::assertFileExists($dir . '/' . $name, 'the files are the only copies; the database may be the wrong one');
+        }
     }
 }

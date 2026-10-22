@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Psc\Tests\Feature\Portal;
 
 use Psc\Controllers\Admin\AdminNewsCommentController;
+use Psc\Controllers\NewsController;
+use Psc\Controllers\NewsMediaController;
 use Psc\Http\Response;
 use Psc\News\Comments;
 use Psc\Tests\TestCase;
@@ -13,7 +15,7 @@ use Psc\Tests\TestCase;
  * Moderation of Industry Updates comments (docs/NEWS.md §11): the four tabs, the author's full name and email for
  * administrators only, and each action (approve, hide, show, delete, clear reports) changing exactly the state it
  * names, from the state the page showed, with the article's visible count kept true, an audit row (comment.*) and a
- * 303 back to the tab it was sent from.
+ * 303 back to the tab it was sent from; a takedown says how long the CDN may go on showing what was taken down.
  */
 final class AdminNewsCommentsTest extends TestCase
 {
@@ -216,5 +218,24 @@ final class AdminNewsCommentsTest extends TestCase
         self::assertFalse($comments->moveStatus($id, 'visible', 'hidden'), 'written only from the state that was read');
         self::assertFalse($comments->moveStatus($id, 'hidden', 'nonsense'));
         self::assertSame(0, $this->visibleCount($article));
+    }
+
+    public function testTheTakedownWordsAreTheCdnLifetimesTheResponsesWereSentWith(): void
+    {
+        // A page leaves the CDN with its max-age, an image with its s-maxage; the flash names each, and Flush CDN.
+        self::assertSame(1, preg_match('/(?:^|[ ,])max-age=(\d+)/', NewsController::CACHE, $page));
+        self::assertSame(1, preg_match('/s-maxage=(\d+)/', NewsMediaController::PUBLIC_CACHE, $image));
+        self::assertLessThanOrEqual(120, (int) $page[1], 'pages: "up to about 2 minutes"');
+        self::assertLessThanOrEqual(3600, (int) $image[1], 'images: "up to an hour"');
+        self::assertStringContainsString('Pages can take up to about 2 minutes to leave the CDN', AdminNewsCommentController::TAKEDOWN);
+        self::assertStringContainsString('images up to an hour', AdminNewsCommentController::TAKEDOWN);
+        self::assertStringEndsWith('Run Flush CDN to remove both at once.', AdminNewsCommentController::TAKEDOWN);
+
+        $this->signInAdmin();
+        $article = $this->makeArticle();
+        $id = $this->comment($article, $this->makeUser('author@example.test'), 'Taken down');
+        $this->post(self::LIST . $id . '/', ['action' => 'hide', 'tab' => 'visible']);
+        self::assertSame('hidden', $this->commentStatus($id));
+        self::assertSame(['type' => 'success', 'message' => 'Comment hidden. ' . AdminNewsCommentController::TAKEDOWN], self::lastFlash());
     }
 }
