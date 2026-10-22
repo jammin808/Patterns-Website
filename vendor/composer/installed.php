@@ -3,7 +3,7 @@
         'name' => 'patterns-show-control/website',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '5a9d5beaf3cfb4b6d6326da1229f6a954db8e35d',
+        'reference' => 'c02e0566fbdfae5cfb0b3707b40312bc4c8e4326',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -67,7 +67,7 @@
         'patterns-show-control/website' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '5a9d5beaf3cfb4b6d6326da1229f6a954db8e35d',
+            'reference' => 'c02e0566fbdfae5cfb0b3707b40312bc4c8e4326',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

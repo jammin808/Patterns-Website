@@ -174,7 +174,7 @@ final class AdminController extends Controller
         }
         $pager = Paginator::query(
             $db,
-            'SELECT id, name, email, company, topic, product, message, status, created_at FROM contact_messages WHERE status = ? ORDER BY created_at DESC, id DESC',
+            'SELECT id, name, email, company, country, topic, product, message, status, created_at FROM contact_messages WHERE status = ? ORDER BY created_at DESC, id DESC',
             [$status],
             $query,
             '/portal/admin/messages/',

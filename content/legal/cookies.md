@@ -1,13 +1,13 @@
-This site uses **Google Analytics** to understand how its pages are used, but **only if you accept statistics cookies** when the site asks. Until you accept, nothing is sent to Google and no analytics cookie is set. The contact form, the client portal and the support assistant set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
+This site uses **Google Analytics** to understand how its pages are used, and Google Analytics sets cookies on the pages you read. The contact form, the client portal and the support assistant set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
 
 ## Analytics cookies
 
-Set by Google Analytics only after you choose **Accept statistics cookies**. They are never set on pages reached through a one-time sign-in or password link, and those addresses are never sent to Google.
+Set by Google Analytics on every page, except pages reached through a one-time sign-in or password link (those addresses are never sent to Google).
 
 - **`_ga`**: tells one browser from another, so visits can be counted without knowing who you are. Lasts two years.
 - **`_ga_0C7QKZTNF7`**: keeps the state of your current visit. Lasts two years.
 
-Google Analytics collects which pages are viewed, how you arrived (the referring site), your device and browser type and an approximate location (country or city). It does not store IP addresses. It does not tell us who you are, and we do not combine it with your client portal account. **Your choice.** The site asks once, and your answer is kept in your browser for a year, after which it asks again. To change your mind, use **Cookie settings** at the foot of any page or the button below. Rejecting after accepting stops the analytics and removes its cookies. The site works the same whichever you choose.
+Google Analytics collects which pages are viewed, how you arrived (the referring site), your device and browser type and an approximate location (country or city). It does not store IP addresses. It does not tell us who you are, and we do not combine it with your client portal account. To refuse these cookies, block cookies from this site in your browser settings or install Google's [Analytics opt-out browser add-on](https://tools.google.com/dlpage/gaoptout). The site works fully without them.
 
 ## Essential cookies
 
@@ -20,8 +20,7 @@ Google Analytics collects which pages are viewed, how you arrived (the referring
 These are kept in your browser's own storage, not in cookies, and are never sent to this site.
 
 - **Theme preference**: if you choose light or dark mode, the choice is kept in your browser's local storage. Choosing "Follow the system" again removes it.
-- **Your cookie choice** (`psc-consent`): whether you accepted or rejected statistics cookies, and when, so the site does not ask on every page.
 - **Dismissed notices**: if you close an announcement, it is noted in your browser's local storage so it stays closed.
 - **Assistant conversation**: the messages shown in the assistant panel are kept in your browser's session storage so they stay visible as you move between pages; they are cleared when you close the tab. The questions you ask are sent to answer you, as the [privacy policy](/legal/privacy/) explains, but this copy stays in your browser.
 
-The essential cookies and the browser storage above are strictly necessary for features you ask for. The analytics cookies are not, so they are set only with your consent. You can delete any of them at any time in your browser settings.
+The essential cookies and the browser storage above are strictly necessary for features you ask for. The analytics cookies are not; you can block them as described above. You can delete any of them at any time in your browser settings.
