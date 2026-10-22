@@ -23,7 +23,8 @@ use Psc\View\Schema;
  * out to sources. They read the same for every visitor, never start a session and never set a cookie, and are
  * cached briefly (CACHE) so a correction or a takedown leaves the CDN within minutes. A search is the one list
  * that is private and never stored. A page number past the end is a 404 and ?page=1 is the clean address; every
- * page after the first, every search and an empty category are noindex, follow (docs/NEWS.md §10).
+ * page after the first, every search and an empty category are noindex, follow (docs/NEWS.md §10). A list whose
+ * articles cannot be read is a 503 with Retry-After, never stored and never indexed.
  *
  * A click on a source counts once per link per address in CLICK_WINDOW, never from a HEAD request or a user agent
  * that names itself a robot, and only while the article is live. /news/go/{id}/ goes to the stored address only.
@@ -50,6 +51,9 @@ final class NewsController extends Controller
 
     /** A change within this many seconds of going live (or of being stored) is part of publishing: no "Updated" line. */
     public const UPDATED_AFTER = 600;
+
+    /** Seconds a list that could not be read asks to be fetched again after (with its 503). */
+    public const RETRY_AFTER = 120;
 
     /** The share card of a news page without an image of its own. */
     public const SHARE_CARD = '/assets/img/og/news.png';
@@ -346,14 +350,15 @@ final class NewsController extends Controller
             $counts = $store->categoryCounts();
             $all = $key === null && $q === '' ? $result['total'] : $store->live(null, null, 1, 1)['total'];
         } catch (\Throwable $e) {
-            // The page still renders, saying the articles cannot be shown, and is not cached that way.
+            // The page still renders, saying the articles cannot be shown, as a 503 that is neither cached nor
+            // indexed, so a crawler retries it instead of recording an empty list (or a missing page).
             $this->app->log->exception($e, 'news list');
             $result = ['items' => [], 'total' => 0, 'page' => $page, 'pages' => 1];
             $counts = [];
             $all = 0;
             $unavailable = true;
         }
-        if ($page > $result['pages']) {
+        if (!$unavailable && $page > $result['pages']) {
             return $this->notFound();
         }
 
@@ -382,7 +387,7 @@ final class NewsController extends Controller
         if ($category !== null) {
             $seo->crumb($category['name'], $path);
         }
-        if ($q !== '' || $page > 1 || ($category !== null && $result['total'] === 0)) {
+        if ($unavailable || $q !== '' || $page > 1 || ($category !== null && $result['total'] === 0)) {
             $seo->noindexFollow();
         }
         $this->baseGraph($seo);
@@ -419,7 +424,10 @@ final class NewsController extends Controller
             'total' => $result['total'],
             'path' => $path,
             'unavailable' => $unavailable,
-        ], $seo);
+        ], $seo, 'layouts/base', $unavailable ? 503 : 200);
+        if ($unavailable) {
+            $response->header('Retry-After', (string) self::RETRY_AFTER);
+        }
         return $response->header('Cache-Control', $q !== '' || $unavailable ? 'private, no-store' : self::CACHE);
     }
 

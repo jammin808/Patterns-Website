@@ -34,16 +34,19 @@
   .news-pager { margin-top: var(--sp-6); }
 
   /* ===== The grid: one, two, then three columns; the newest article on a first page spans two columns and two
-     rows from 64rem, so the eleven beside and below it fill whole rows ===== */
+     rows from 64rem, so the eleven beside and below it fill whole rows. Its picture keeps the cards' 16:9, capped
+     below a screen's height, and its headline, standfirst and date follow it together: the height the two cards
+     beside it add is left empty at its foot, never given to the picture. ===== */
   .news-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr); }
   @media (width >= 40rem) {
     .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .news-card--lead { grid-column: 1 / -1; }
+    .news-card--lead .news-card-media { flex: none; max-height: min(30rem, 55vh); }
   }
   @media (width >= 64rem) {
     .news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .news-card--lead { grid-column: span 2; grid-row: span 2; }
-    .news-card--lead .news-card-media { flex: 1 1 auto; aspect-ratio: auto; min-height: 18rem; }
+    .news-card--lead .news-card-meta { margin-top: 0; }
   }
 
   /* ===== Cards: the title's link covers the card; the picture and the categories show first, read after ===== */

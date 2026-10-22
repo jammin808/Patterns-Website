@@ -249,24 +249,43 @@ final class NewsPagesTest extends TestCase
         self::assertSame([301, '/news/?q=wireless'], [$redirect->status, $redirect->getHeader('Location')]);
     }
 
+    /**
+     * A database that cannot be read makes each list a retryable 503 that is neither stored nor indexed, and the
+     * sitemap and llms.txt, which still answer without the articles, are not stored either: no cache holds the copy
+     * without them once the database is back.
+     */
     public function testAListThatCannotBeReadSaysSoAndIsNotCached(): void
     {
         $this->makeArticle();
         $working = $this->db;
         $this->db = Database::connect('sqlite::memory:');
         try {
-            foreach (['/news/', '/news/category/video/'] as $uri) {
+            foreach (['/news/', '/news/category/video/', '/news/?page=2', '/news/category/video/?page=3', '/news/?q=sample'] as $uri) {
                 $r = $this->request('GET', $uri);
-                self::assertSame(200, $r->status, $uri);
-                self::assertStringContainsString('The articles cannot be shown just now.', $r->body, $uri);
+                self::assertSame(503, $r->status, $uri);
+                self::assertSame((string) NewsController::RETRY_AFTER, $r->getHeader('Retry-After'), $uri);
                 self::assertSame('private, no-store', $r->getHeader('Cache-Control'), $uri);
+                self::assertSame('noindex', $r->getHeader('X-Robots-Tag'), $uri);
+                self::assertSame('noindex, follow', self::meta($r->body, 'name', 'robots'), $uri . ': the page says so too');
+                self::assertStringNotContainsString('rel="canonical"', $r->body, $uri);
+                self::assertStringNotContainsString('application/ld+json', $r->body, $uri);
+                self::assertSame([], $r->cookies(), $uri);
+                self::assertStringContainsString('The articles cannot be shown just now.', $r->body, $uri);
             }
             $sitemap = $this->request('GET', '/sitemap.xml');
             self::assertSame(200, $sitemap->status, 'the sitemap still lists the pages');
-            self::assertStringContainsString('<loc>' . self::BASE . '/news/</loc>', $sitemap->body);
+            self::assertSame('private, no-store', $sitemap->getHeader('Cache-Control'), 'but is not stored without its articles');
+            self::assertStringContainsString('<loc>' . self::BASE . '/news/</loc>' . "\n" . '    <lastmod>' . \Psc\Content\Content::page('/news/')['updated'] . '</lastmod>', $sitemap->body, 'the index keeps its own date');
+            $llms = $this->request('GET', '/llms.txt');
+            self::assertSame(200, $llms->status);
+            self::assertSame('private, no-store', $llms->getHeader('Cache-Control'), 'llms.txt is not stored without its articles');
+            self::assertStringContainsString('(' . self::BASE . '/news/): ', $llms->body);
         } finally {
             $this->db = $working;
         }
+        self::assertSame('public, max-age=3600', $this->request('GET', '/sitemap.xml')->getHeader('Cache-Control'), 'stored again once the articles are read');
+        self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
+        self::assertSame(200, $this->request('GET', '/news/')->status);
     }
 
     // --------------------------------------------------------------------------------------------- the article
@@ -635,7 +654,9 @@ final class NewsPagesTest extends TestCase
 
     public function testTheSitemapListsLiveArticlesAndTheCategoriesThatHaveThem(): void
     {
-        $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video']]);
+        $first = $this->makeArticle(['slug' => 'in-the-map', 'categories' => ['video'], 'published_at' => time() - 900]);
+        $newest = time() - 300;
+        $this->db->update('news_articles', ['updated_at' => $newest], ['id' => $first]);
         $later = $this->makeArticle(['slug' => 'also-in-the-map', 'categories' => ['audio', 'freelance'], 'published_at' => time() - 7200]);
         $changed = time() - 600;
         $this->db->update('news_articles', ['updated_at' => $changed], ['id' => $later]);
@@ -656,6 +677,11 @@ final class NewsPagesTest extends TestCase
         }
         self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $changed), $map[self::BASE . '/news/also-in-the-map/'], 'its last change');
         self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $changed), $map[self::BASE . '/news/category/freelance/'], 'its newest article\'s');
+        $since = (int) strtotime(\Psc\Content\Content::page('/news/')['updated'] . ' 00:00:00 UTC');
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', max($newest, $since)), $map[self::BASE . '/news/'], 'the index changes with its newest article');
+        self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $newest), $map[self::BASE . '/news/category/video/']);
+        $r = $this->request('GET', '/sitemap.xml');
+        self::assertSame(['public, max-age=3600', 'application/xml; charset=utf-8'], [$r->getHeader('Cache-Control'), $r->getHeader('Content-Type')]);
 
         $robots = $this->body('/robots.txt');
         self::assertStringContainsString("Disallow: /api/\nDisallow: /news/go/\n", $robots);
@@ -674,6 +700,7 @@ final class NewsPagesTest extends TestCase
         self::assertCount(11, $lines, 'the section and its ten newest articles');
         self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/llms-story-1/): ', $lines[1]);
         self::assertStringNotContainsString('llms-story-11', $llms);
+        self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
         self::assertStringNotContainsString('llms-draft', $llms);
     }
 
@@ -720,6 +747,25 @@ final class NewsPagesTest extends TestCase
             self::assertLessThanOrEqual(160, mb_strlen($description), $uri);
             self::assertStringNotContainsString(' style="', $b, $uri);
         }
+    }
+
+    /**
+     * The lead card spans two rows from 64rem, beside two cards that may be far taller than it. Its picture keeps the
+     * cards' 16:9 under a cap and never takes the height they add, so its headline, standfirst and date follow the
+     * picture together (checked at 1440, 1280, 1024 and 390 wide in a browser; this holds the rules that do it).
+     */
+    public function testTheLeadCardsPictureKeepsItsShapeBesideTallerCards(): void
+    {
+        $css = (string) preg_replace('#/\*.*?\*/#s', '', (string) file_get_contents(PSC_ROOT . '/public/assets/css/pages/news.css'));
+        self::assertSame(1, preg_match('#^\s*\.news-card-media \{([^{}]*)#m', $css, $card));
+        self::assertMatchesRegularExpression('#aspect-ratio:\s*16 / 9#', $card[1], 'every card\'s picture is 16:9');
+        self::assertGreaterThan(0, preg_match_all('#\.news-card--lead \.news-card-media\s*\{([^{}]*)\}#', $css, $lead));
+        $rules = implode(';', $lead[1]);
+        self::assertStringNotContainsString('aspect-ratio', $rules, 'the lead\'s too');
+        self::assertDoesNotMatchRegularExpression('#min-height|flex:\s*[1-9]|flex-grow:\s*[1-9]#', $rules, 'never stretched by the cards beside it');
+        self::assertMatchesRegularExpression('#flex:\s*none#', $rules);
+        self::assertMatchesRegularExpression('#max-height:\s*min\([^)]*vh\)#', $rules, 'capped below a screen\'s height');
+        self::assertMatchesRegularExpression('#\.news-card--lead \.news-card-meta\s*\{\s*margin-top:\s*0;?\s*\}#', $css, 'its date follows its standfirst');
     }
 
     public function testTheHeaderAndFooterLeadToTheSection(): void

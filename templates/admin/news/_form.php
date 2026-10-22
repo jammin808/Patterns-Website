@@ -4,12 +4,13 @@
  * summary; the headline, SEO title and meta description; the standfirst, the body, what is confirmed and what is
  * still speculation; what it means, the verdict and its note; the categories and tags; the sources; the articles it
  * follows up; the byline and the ticks; the schedule; then the buttons the article's state allows. Every button
- * saves what is in the form first.
+ * saves what is in the form first (Unpublish takes the article down even when the save is refused), and a save over
+ * a change made after the form was opened is refused.
  *
  * @var array<string, mixed>|null $article
  * @var string|null $state live | scheduled | held | draft, null for a new article
  * @var string $action the form's address
- * @var array<string, mixed> $values
+ * @var array<string, mixed> $values with loaded_at, the updated_at of the article the form was first opened on
  * @var array<string, string> $errors
  * @var bool $kept the form is shown again after a refused save
  * @var list<array{type: string, message: string}> $flashes
@@ -64,6 +65,9 @@ $buttons = match ($state) {
 ?>
 <form class="pt-form" id="article-form" method="post" action="<?= e($action) ?>" novalidate data-news-editor>
     <?= csrf_field() ?>
+    <?php if ($article !== null): ?>
+        <input type="hidden" name="loaded_at" value="<?= e((string) $values['loaded_at']) ?>">
+    <?php endif; ?>
     <?= $this->partial('error-summary', [
         'errors' => $errors,
         'fields' => $summary,
@@ -127,7 +131,7 @@ $buttons = match ($state) {
         'help' => 'Up to 8, separated by commas, for example radio mics, spectrum.', 'attrs' => ['autocomplete' => 'off']]) ?>
 
     <?= $this->render('admin/news/_rows', ['list' => 'sources', 'legend' => (string) ($sections['sources'] ?? 'Sources'), 'item' => 'Source', 'add' => 'Add a source', 'optional' => false,
-        'help' => 'The pages the article rests on, the original first: at least one to publish, up to 12. Readers get real links to them, and the clicks are counted.',
+        'help' => 'The pages the article rests on, the original first: at least one to publish, up to 12. Readers get real links to them, and the clicks on them are counted, approximately.',
         'rows' => $values['sources'], 'errors' => $errors, 'spare' => $spare, 'max' => Validator::SOURCES_MAX, 'kinds' => $kinds]) ?>
 
     <?php if ($choices !== []): ?>
@@ -165,6 +169,6 @@ $buttons = match ($state) {
         <?php endforeach; ?>
     </div>
     <?php if ($published): ?>
-        <p class="pt-small pt-muted">This article is <?= $state === 'live' ? 'live' : 'scheduled' ?>, so saving checks it against the full publishing rules.<?= $state === 'live' ? ' Unpublishing takes it off the site; it can take up to 2 minutes to leave the CDN.' : '' ?></p>
+        <p class="pt-small pt-muted">This article is <?= $state === 'live' ? 'live' : 'scheduled' ?>, so saving checks it against the full publishing rules.<?= $state === 'live' ? ' Unpublishing takes it off the site. ' . e(\Psc\Controllers\Admin\AdminNewsCommentController::TAKEDOWN) : '' ?></p>
     <?php endif; ?>
 </form>

@@ -456,6 +456,7 @@ final class AdminNewsTest extends TestCase
         self::assertStringContainsString('value="unpublish"', $edit);
         self::assertStringNotContainsString('value="publish"', $edit, 'a live article has no publish button');
         self::assertStringNotContainsString('name="publish_date"', $edit, 'nor a schedule');
+        self::assertStringContainsString('Unpublishing takes it off the site. ' . e(AdminNewsCommentController::TAKEDOWN), $edit, 'the CDN\'s time as the flash says it');
 
         $r = $this->post($path, self::form(['action' => 'save', 'dek' => 'Too short']));
         self::assertRedirect($r, $path . '#error-summary');
@@ -499,6 +500,109 @@ final class AdminNewsTest extends TestCase
         $row = $this->article($id);
         self::assertSame(['published', $first], [$row['status'], (int) $row['published_at']], 'published again at its first time');
         self::assertCount(1, $this->auditRows('news.published'));
+    }
+
+    /**
+     * A takedown is never refused: a live article whose source was banned after it went live is unpublished
+     * although the form it sends back fails that rule now, and what was typed is kept to fix.
+     */
+    public function testUnpublishingIsNeverRefusedByARuleTheStoredArticleNowFails(): void
+    {
+        $id = $this->makeArticle(['slug' => 'banned-since']);
+        $this->db->insert('news_settings', ['name' => 'banned_domains', 'value' => json_encode(['example.com']), 'updated_by' => null, 'updated_at' => time()]);
+        $this->signInAdmin();
+        $path = '/portal/admin/news/' . $id . '/';
+        $page = $this->request('GET', $path)->body;
+        self::assertSame(1, preg_match('#name="loaded_at" value="(\d+)"#', $page, $v));
+        $stored = 'https://example.com/news/story-1';
+        self::assertStringContainsString('name="sources[0][url]" value="' . $stored . '"', $page, 'the form sends the stored source back');
+
+        $r = $this->post($path, self::form([
+            'action' => 'unpublish', 'loaded_at' => $v[1], 'title' => 'Sample story number 1 from the test suite',
+            'sources' => [['url' => $stored, 'title' => 'Sample source 1', 'publisher' => 'Example News', 'kind' => 'press']],
+            'confirmed' => [['text' => 'The sample story was published.', 'url' => $stored]],
+        ]));
+        self::assertRedirect($r, $path . '#error-summary');
+        self::assertSame('draft', $this->article($id)['status'], 'it is down');
+        self::assertCount(1, $this->auditRows('news.unpublished'));
+        self::assertSame(['was' => 'live'], json_decode((string) $this->auditRows('news.unpublished')[0]['meta'], true));
+        self::assertSame([], $this->auditRows('news.updated'), 'the form was not saved');
+        self::assertArrayHasKey('sources.0.url', $_SESSION['_errors'] ?? []);
+        self::assertContains(['type' => 'success', 'message' => 'Unpublished. The article is a draft again, but your other changes were not saved. ' . AdminNewsCommentController::TAKEDOWN], self::flashes());
+        self::assertSame(404, $this->request('GET', '/news/banned-since/')->status);
+        self::assertSame(404, $this->request('GET', '/news/go/' . (int) $this->db->value('SELECT id FROM news_links WHERE article_id = ? LIMIT 1', [$id]) . '/')->status);
+
+        // The kept form is the article as it is after its own takedown, so it can be fixed and saved.
+        $kept = $this->request('GET', $path)->body;
+        self::assertStringContainsString('value="' . $stored . '"', $kept, 'what was sent is kept');
+        self::assertSame(1, preg_match('#name="loaded_at" value="(\d+)"#', $kept, $now));
+        self::assertSame((int) $this->article($id)['updated_at'], (int) $now[1]);
+        $this->post($path, self::form(['action' => 'save', 'loaded_at' => $now[1], 'title' => 'Sample story number 1 from the test suite']));
+        self::assertSame(['type' => 'success', 'message' => 'Changes saved.'], self::lastFlash());
+        self::assertSame('draft', $this->article($id)['status']);
+    }
+
+    /** A form opened before someone else's save, publish or takedown is refused whole, and what was typed is kept. */
+    public function testAFormOpenedBeforeAnotherChangeIsRefusedAndKept(): void
+    {
+        $id = $this->makeArticle(['slug' => 'two-tabs']);
+        $this->signInAdmin();
+        $path = '/portal/admin/news/' . $id . '/';
+        self::assertSame(1, preg_match('#<input type="hidden" name="loaded_at" value="(\d+)">#', $this->request('GET', $path)->body, $opened));
+        self::assertSame((int) $this->article($id)['updated_at'], (int) $opened[1], 'the form carries the version it was opened on');
+
+        // Another tab saves first: its correction stands.
+        $this->post($path, self::form(['action' => 'save', 'loaded_at' => $opened[1], 'title' => 'The corrected headline from the other tab']));
+        self::assertSame('Changes saved. It can take a few minutes for every reader to see them.', self::lastFlash()['message']);
+        $after = $this->article($id);
+        self::assertGreaterThan((int) $opened[1], (int) $after['updated_at']);
+
+        foreach (['save' => 'published', 'unpublish' => 'draft'] as $action => $status) {
+            $_SESSION['_flash'] = [];
+            $r = $this->post($path, self::form(['action' => $action, 'loaded_at' => $opened[1], 'title' => 'The stale headline from the first tab']));
+            self::assertRedirect($r, $path . '#error-summary');
+            $row = $this->article($id);
+            self::assertSame(['The corrected headline from the other tab', $status], [$row['title'], $row['status']], $action . ': nothing of the stale form is written');
+            self::assertSame(['article' => AdminNewsController::CHANGED_SINCE], $_SESSION['_errors'] ?? null, $action);
+            self::assertContains(['type' => 'danger', 'message' => AdminNewsController::CHANGED_SINCE], self::flashes(), $action);
+            if ($action === 'unpublish') {
+                self::assertContains(['type' => 'success', 'message' => 'Unpublished. The article is a draft again, but your other changes were not saved. ' . AdminNewsCommentController::TAKEDOWN], self::flashes(), 'a stale form still takes the article down');
+            }
+            $kept = $_SESSION['news_draft.' . $id] ?? [];
+            self::assertSame(['The stale headline from the first tab', $opened[1]], [$kept['title'] ?? null, $kept['loaded_at'] ?? null], $action . ': the typed copy keeps the version it was opened on');
+            $page = $this->request('GET', $path)->body;
+            self::assertStringContainsString('value="The stale headline from the first tab"', $page);
+            self::assertStringContainsString('<p>' . e(AdminNewsController::CHANGED_SINCE) . '</p>', $page, 'the summary says why');
+            self::assertStringContainsString('name="loaded_at" value="' . $opened[1] . '"', $page, 'showing it again does not make it current');
+        }
+        self::assertCount(1, $this->auditRows('news.updated'), 'only the other tab\'s save');
+        self::assertCount(1, $this->auditRows('news.unpublished'));
+
+        // Publishing from a stale form publishes nothing; a form opened now publishes.
+        $stale = (string) $this->article($id)['updated_at'];
+        $this->db->update('news_articles', ['updated_at' => (int) $stale + 5], ['id' => $id]);
+        $this->post($path, self::form(['action' => 'publish', 'loaded_at' => $stale, 'title' => 'The corrected headline from the other tab']));
+        self::assertSame('draft', $this->article($id)['status']);
+        self::assertSame([], $this->auditRows('news.published'));
+        $this->post($path, self::form(['action' => 'publish', 'loaded_at' => (string) ((int) $stale + 5), 'title' => 'The corrected headline from the other tab']));
+        self::assertSame('published', $this->article($id)['status']);
+        self::assertCount(1, $this->auditRows('news.published'));
+    }
+
+    /** Unpublishing from a current form saves what was typed too: the takedown is the form's own change. */
+    public function testUnpublishingFromACurrentFormSavesItsChanges(): void
+    {
+        $id = $this->makeArticle(['slug' => 'down-with-a-fix']);
+        $this->signInAdmin();
+        $path = '/portal/admin/news/' . $id . '/';
+        self::assertSame(1, preg_match('#name="loaded_at" value="(\d+)"#', $this->request('GET', $path)->body, $opened));
+        $r = $this->post($path, self::form(['action' => 'unpublish', 'loaded_at' => $opened[1], 'title' => 'A corrected headline, taken down']));
+        self::assertRedirect($r, $path);
+        $row = $this->article($id);
+        self::assertSame(['draft', 'A corrected headline, taken down', 'down-with-a-fix'], [$row['status'], $row['title'], $row['slug']]);
+        self::assertSame(['type' => 'success', 'message' => 'Changes saved. Unpublished. The article is a draft again. ' . AdminNewsCommentController::TAKEDOWN], self::lastFlash());
+        self::assertCount(1, $this->auditRows('news.updated'));
+        self::assertCount(1, $this->auditRows('news.unpublished'));
     }
 
     public function testADraftsAddressFollowsItsHeadlineUntilItIsFirstPublished(): void
@@ -749,6 +853,8 @@ final class AdminNewsTest extends TestCase
         $this->signInAdmin();
         $page = $this->request('GET', '/portal/admin/news/' . $ids['live'] . '/')->body;
         self::assertStringContainsString('<h2 class="pt-h2" id="clicks-title">Link clicks, approximate</h2>', $page);
+        self::assertStringContainsString('<caption class="u-visually-hidden">Approximate clicks on this article\'s links, the sources first</caption>', $page);
+        self::assertStringContainsString('<p>These counts are approximate.', $page);
         self::assertMatchesRegularExpression('#<td data-label="Where">Source 1</td>\s*<td class="pt-num" data-label="In all">7</td>\s*<td class="pt-num" data-label="Last 30 days">3</td>#', $page);
     }
 

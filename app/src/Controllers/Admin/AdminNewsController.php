@@ -34,6 +34,11 @@ use Psc\Support\Uploads;
  * (the error sources.2.url belongs to the control sources-2-url). Until an article has first been published its
  * address follows its headline; after that it never changes. A takedown (unpublish, delete, an image deleted from a
  * live article) says how long the CDN may go on showing it.
+ *
+ * The editor posts the updated_at of the article it was opened on (loaded_at), and a save over a later change is
+ * refused with the form kept, so a stale tab never overwrites someone else's work. Unpublishing is a takedown: it
+ * happens before the form is checked, so neither a rule the stored article now fails nor such a change keeps an
+ * article on the site.
  */
 final class AdminNewsController extends Controller
 {
@@ -59,6 +64,9 @@ final class AdminNewsController extends Controller
     public const TIMEZONE = 'Europe/London';
 
     public const UNKNOWN_ACTION = 'That action is not available. Use one of the buttons on this page.';
+
+    /** A save from a form opened before the article's last change (another administrator's, or another tab's). */
+    public const CHANGED_SINCE = 'Someone changed this article after you opened it, so your changes were not saved. What you typed is below: copy what you need, then reload the page to see the article as it is now.';
 
     private const ACTIONS = ['save', 'publish', 'schedule', 'unpublish', 'delete'];
     private const IMAGE_ACTIONS = ['add', 'update', 'delete', 'lead'];
@@ -179,6 +187,10 @@ final class AdminNewsController extends Controller
         $id = (int) $article['id'];
         $kept = $this->takeKept($id);
         $values = $kept ?? self::valuesOf($store->draft($id) ?? new Draft());
+        // A kept form keeps the version it was first opened on, so showing it again never makes it current.
+        if ($values['loaded_at'] === '') {
+            $values['loaded_at'] = (string) (int) $article['updated_at'];
+        }
         $run = $article['run_id'] !== null ? $this->app->db()->one('SELECT id, slot, kind, status, created_at FROM news_runs WHERE id = ?', [(int) $article['run_id']]) : null;
         $data = $this->editorData($article, $values, $kept !== null) + [
             'state' => self::state($article),
@@ -213,11 +225,36 @@ final class AdminNewsController extends Controller
         if ($action === 'schedule' && $state === 'live') {
             return $this->redirect($path, 'danger', 'This article is live, so it cannot be scheduled. Unpublish it first, then schedule it.');
         }
+        $session = $this->app->session();
+        $loaded = ctype_digit($request->input('loaded_at')) ? (int) $request->input('loaded_at') : null;
+        // A form opened before the article's last change is refused whole (ArticleStore::update() checks again as it
+        // writes, for a change made while this request runs).
+        $stale = $loaded !== null && $loaded !== (int) $article['updated_at'];
+
+        // The takedown first: nothing in the form, and no change since it was opened, can keep the article live.
+        $unpublished = false;
+        if ($action === 'unpublish' && $article['status'] === 'published') {
+            $unpublished = $store->unpublish($id);
+            if ($unpublished) {
+                Audit::log($this->app, (int) $admin['id'], 'news.unpublished', (string) $id, ['was' => $state]);
+                // The takedown is this form's own change: a form opened on the current article stays current.
+                if ($loaded !== null && !$stale) {
+                    $loaded = (int) $this->app->db()->value('SELECT updated_at FROM news_articles WHERE id = ?', [$id]);
+                }
+            }
+        }
+        $takedown = $state === 'live' ? ' ' . AdminNewsCommentController::TAKEDOWN : '';
+        $notSaved = 'Unpublished. The article is a draft again, but your other changes were not saved.' . $takedown;
 
         $values = self::formValues($request);
+        $values['loaded_at'] = $loaded !== null ? (string) $loaded : '';
         [$draft, $result, $at] = $this->check($values, $action, $article);
-        if (!$result->ok() || $at === false) {
-            return $this->keep($path, $id, $values, $draft, $result);
+        if ($stale || !$result->ok() || $at === false) {
+            $response = $stale ? $this->conflict($path, $id, $values, $draft) : $this->keep($path, $id, $values, $draft, $result);
+            if ($unpublished) {
+                $session->flash('success', $notSaved);
+            }
+            return $response;
         }
         $clean = $result->draft;
         // Never published or scheduled, the address still follows the headline (an address it already has, or the
@@ -226,12 +263,18 @@ final class AdminNewsController extends Controller
         if ($article['published_at'] === null && $slug !== '' && preg_match('/^' . preg_quote($slug, '/') . '(?:-\d+)?$/', (string) $article['slug']) !== 1) {
             $clean->slug = $slug;
         }
-        $changed = $store->update($id, $clean, (int) $admin['id']);
+        $changed = $store->update($id, $clean, (int) $admin['id'], $loaded);
+        if ($changed === null) {
+            $response = $this->conflict($path, $id, $values, $draft);
+            if ($unpublished) {
+                $session->flash('success', $notSaved);
+            }
+            return $response;
+        }
         if ($changed !== []) {
             Audit::log($this->app, (int) $admin['id'], 'news.updated', (string) $id, ['fields' => $changed]);
         }
         $saved = $changed !== [] ? 'Changes saved. ' : '';
-        $session = $this->app->session();
         if ($action === 'save') {
             if ($changed === []) {
                 $session->flash('info', 'Nothing changed, so nothing was saved.');
@@ -251,12 +294,10 @@ final class AdminNewsController extends Controller
             $store->publish($id, (int) $at);
             Audit::log($this->app, (int) $admin['id'], 'news.scheduled', (string) $id, ['at' => date(DATE_ATOM, (int) $at)]);
             $session->flash('success', $saved . 'Scheduled. The article goes live on ' . self::london((int) $at) . ' (London time).');
-        } elseif ($article['status'] !== 'published') {
-            $session->flash($changed !== [] ? 'success' : 'info', $saved . 'The article was already a draft.');
+        } elseif ($unpublished) {
+            $session->flash('success', $saved . 'Unpublished. The article is a draft again.' . $takedown);
         } else {
-            $store->unpublish($id);
-            Audit::log($this->app, (int) $admin['id'], 'news.unpublished', (string) $id, ['was' => $state]);
-            $session->flash('success', $saved . 'Unpublished. The article is a draft again.' . ($state === 'live' ? ' ' . AdminNewsCommentController::TAKEDOWN : ''));
+            $session->flash($changed !== [] ? 'success' : 'info', $saved . 'The article was already a draft.');
         }
         $this->flashWarnings($result);
         return Response::redirect($path, 303);
@@ -406,7 +447,7 @@ final class AdminNewsController extends Controller
 
     /**
      * The form's fields as the editor holds them: texts, rows of the three lists, the ticked categories, the chosen
-     * follow-ups, the ticks and the schedule.
+     * follow-ups, the ticks, the schedule and the version of the article it was opened on (loaded_at).
      *
      * @return array<string, mixed>
      */
@@ -439,6 +480,7 @@ final class AdminNewsController extends Controller
         $values['follow_up_of'] = array_slice(array_values(array_unique(array_map('intval', array_filter($strings($request->post['follow_up_of'] ?? null), 'ctype_digit')))), 0, self::FOLLOW_UP_CHOICES);
         $values['comments_open'] = $request->input('comments_open') === '1';
         $values['ai_written'] = $request->input('ai_written') === '1';
+        $values['loaded_at'] = ctype_digit($request->input('loaded_at')) ? $request->input('loaded_at') : '';
         return $values;
     }
 
@@ -450,7 +492,7 @@ final class AdminNewsController extends Controller
      */
     private static function withDefaults(array $values): array
     {
-        $defaults = array_fill_keys(['title', 'seo_title', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time'], '')
+        $defaults = array_fill_keys(['title', 'seo_title', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time', 'loaded_at'], '')
             + array_fill_keys(['confirmed', 'speculation', 'sources', 'categories', 'follow_up_of'], [])
             + ['comments_open' => true, 'ai_written' => false];
         $out = [];
@@ -599,6 +641,19 @@ final class AdminNewsController extends Controller
         $fields = array_diff(array_keys($result->errors), ['article']);
         $session->flash('danger', $fields !== [] ? self::CHECK_FIELDS : (string) ($result->errors['article'] ?? self::CHECK_FIELDS));
         return Response::redirect($path . '#error-summary', 303);
+    }
+
+    /**
+     * Back to the editor after a save from a form opened before the article's last change: nothing of it is written,
+     * published or scheduled, and what was typed is kept with the version it was opened on, so it stays refused.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function conflict(string $path, int $id, array $values, Draft $draft): Response
+    {
+        $result = new Result($draft);
+        $result->error('article', self::CHANGED_SINCE);
+        return $this->keep($path, $id, $values, $draft, $result);
     }
 
     /** @return array<string, mixed>|null the editor's kept copy after a refused save, taken once */

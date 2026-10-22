@@ -16,7 +16,8 @@ use Psc\News\Settings;
 
 /**
  * sitemap.xml, robots.txt, llms.txt, the web manifest, security.txt and a health check, built from content/ and,
- * for Industry Updates, from the live articles (read in a try, so each file still answers when the database cannot).
+ * for Industry Updates, from the live articles (read in a try, so each file still answers when the database cannot,
+ * then never stored, so the copy without the articles does not outlive the outage in a cache).
  */
 final class SeoController extends Controller
 {
@@ -32,6 +33,7 @@ final class SeoController extends Controller
     public function sitemap(Request $request): Response
     {
         $base = $this->app->baseUrl();
+        $news = self::newsUrls($this->app);
         $xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'];
         foreach (Content::pages() as $path => $page) {
             if (!empty($page['noindex'])) {
@@ -39,20 +41,25 @@ final class SeoController extends Controller
             }
             $xml[] = '  <url>';
             $xml[] = '    <loc>' . htmlspecialchars($base . $path, ENT_XML1) . '</loc>';
-            if (!empty($page['updated'])) {
+            // The news index changes with every article that goes live, so its time is the newest live article's.
+            if ($path === '/news/' && $news !== null && $news !== []) {
+                $since = !empty($page['updated']) ? (int) strtotime($page['updated'] . ' 00:00:00 UTC') : 0;
+                $xml[] = '    <lastmod>' . gmdate('Y-m-d\TH:i:s\Z', max(max($news), $since)) . '</lastmod>';
+            } elseif (!empty($page['updated'])) {
                 $xml[] = '    <lastmod>' . htmlspecialchars((string) $page['updated'], ENT_XML1) . '</lastmod>';
             }
             $xml[] = '  </url>';
         }
-        foreach (self::newsUrls($this->app) as $path => $modified) {
+        foreach ($news ?? [] as $path => $modified) {
             $xml[] = '  <url>';
             $xml[] = '    <loc>' . htmlspecialchars($base . $path, ENT_XML1) . '</loc>';
             $xml[] = '    <lastmod>' . gmdate('Y-m-d\TH:i:s\Z', $modified) . '</lastmod>';
             $xml[] = '  </url>';
         }
         $xml[] = '</urlset>';
+        // Without the articles the map is incomplete, so it is not stored anywhere to outlive the outage.
         return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')
-            ->header('Cache-Control', 'public, max-age=3600');
+            ->header('Cache-Control', $news !== null ? 'public, max-age=3600' : 'private, no-store');
     }
 
     public function robots(Request $request): Response
@@ -117,6 +124,7 @@ final class SeoController extends Controller
                 $out[] = '';
             }
         }
+        $complete = true;
         $news = Content::page('/news/');
         if ($news !== null) {
             $out[] = '## ' . (string) (Content::get('news')['name'] ?? 'Industry Updates');
@@ -128,10 +136,12 @@ final class SeoController extends Controller
                 }
             } catch (\Throwable $e) {
                 $this->app->log->exception($e, 'llms news');
+                $complete = false;
             }
             $out[] = '';
         }
-        return Response::text(implode("\n", $out))->header('Cache-Control', 'public, max-age=3600');
+        // Without the articles the file is incomplete, so it is not stored anywhere to outlive the outage.
+        return Response::text(implode("\n", $out))->header('Cache-Control', $complete ? 'public, max-age=3600' : 'private, no-store');
     }
 
     /**
@@ -267,11 +277,11 @@ final class SeoController extends Controller
     /**
      * The news addresses the sitemap adds, each with the time it last changed: every live article (its own last
      * change, or the time it went live if that is later), then each category that has one (its newest such time).
-     * None when the database cannot be read.
+     * Null when the database cannot be read, which is not the same as no live articles ([]).
      *
-     * @return array<string, int> path => Unix time
+     * @return array<string, int>|null path => Unix time
      */
-    public static function newsUrls(App $app): array
+    public static function newsUrls(App $app): ?array
     {
         $articles = [];
         $categories = [];
@@ -292,7 +302,7 @@ final class SeoController extends Controller
             }
         } catch (\Throwable $e) {
             $app->log->exception($e, 'sitemap news');
-            return [];
+            return null;
         }
         $out = $articles;
         foreach (Categories::KEYS as $key) {

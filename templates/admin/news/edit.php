@@ -125,10 +125,10 @@ $sourceNo = 0;
     <?php if ($links === []): ?>
         <p class="pt-muted">This article has no links out yet.</p>
     <?php else: ?>
-        <p>A click counts once per link per reader's address every ten minutes, never from a robot, and not at all when the reader's browser runs no scripts.</p>
+        <p>These counts are approximate. A click counts once per link per reader's address every ten minutes and never from a robot: on an article page only when the reader's browser runs scripts, from the RSS feed either way. Nothing stops someone adding to them on purpose, so read them as a rough guide.</p>
         <div class="pt-table-wrap">
             <table class="pt-table pt-table--stack">
-                <caption class="u-visually-hidden">Clicks on this article's links, the sources first</caption>
+                <caption class="u-visually-hidden">Approximate clicks on this article's links, the sources first</caption>
                 <thead>
                     <tr>
                         <th scope="col">Link</th>
