@@ -54,7 +54,8 @@ CSS. Every class here has a style; a template needs no other.
 The admin article pages (`templates/admin/news/`) push one stylesheet and one script of their own,
 `pages/admin-news.css` and `admin-news.js`, for the few parts the contract above has no class for. Each class is
 styled there, and only those pages load it. The article form itself is a plain `form.pt-form` with
-`data-news-editor` (the unsaved-changes guard), and every image form carries `data-news-image-form`.
+`data-news-editor` (the unsaved-changes guard), every image form carries `data-news-image-form`, and the warning
+that the image buttons wait for a save is `data-news-dirty`.
 
 | Class | Use |
 |---|---|
@@ -73,6 +74,7 @@ styled there, and only those pages load it.
 | Class | Use |
 |---|---|
 | `pt-desk-state`, `pt-desk-cron`, `pt-desk-next` | the desk's state with its reason, the last tick (with the stale warning) and the next sessions |
+| `pt-desk-hold` | the pause form's tick box that also holds the articles the desk has scheduled, or, while paused, how many still go live |
 | `pt-desk-slot` > `pt-desk-slot-time`, `pt-desk-days` > `pt-desk-day`, `pt-desk-slot-remove` | one session row on the settings page: its time, its seven weekday ticks and its Remove tick |
 | `pt-desk-cal` > `pt-desk-cal-day` (`-num`, `-meta`, `-mark`, `-changed`, `-past`, `-blank`, `-gone`) | the calendar's month table and its day cells: the date, the session count, the Changed marker, past and padding days |
 | `pt-desk-prompt`, `pt-desk-versions`, `pt-desk-version-meta`, `pt-desk-rules`, `pt-desk-brief` | the prompt page: the editable texts, their versions, and the fixed rules shown read-only |

@@ -13,6 +13,7 @@ the browser blocks the fonts and the module scripts.
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
 | `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `public/assets/img/news-art.svg` | Industry Updates' article pages (counting source clicks), its pages' styles and its category artwork (8.36) |
+| `public/assets/js/news-comments.js`, `public/assets/css/pages/news-comments.css` | The comments under an article and the comment page for readers without scripting (8.36) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
 | `public/assets/img/icons.svg` | The icon sprite (96 symbols, 8.30) |
 | `public/favicon.svg`, `public/favicon.ico`, `public/assets/img/brand/` | The brand mark as favicons, touch, app and logo icons (8.33) |
@@ -211,8 +212,8 @@ department and internal notes) `--focus` switches to `--text`.
 
 ## 5. Type
 
-Two OFL families, both variable and self-hosted: **Archivo** (wght 400–800, wdth 100–118) and **JetBrains Mono**
-(wght 400–800, without its programming ligatures).
+Two OFL families, both variable and self-hosted: **Archivo** (wght 400 to 800, wdth 100 to 118) and **JetBrains Mono**
+(wght 400 to 800, without its programming ligatures).
 
 - Headings run Archivo **wide** (`font-stretch: 116%`, `--wd-display`), like silkscreened equipment labels.
   Weight 680, tracking −0.022em (−0.03em for h1 and hero titles), `text-wrap: balance`. Body text is Archivo at
@@ -220,20 +221,20 @@ Two OFL families, both variable and self-hosted: **Archivo** (wght 400–800, wd
 - JetBrains Mono is only for numbers that change or line up: timecode, countdowns, cue numbers, IDs, versions,
   table values, tally labels and `kbd`/`code`. Never for prose or general labels. Prices use Archivo with
   `tabular-nums` (no dotted zeros in money).
-- Sentence case everywhere. Paragraph measure: body under 70ch, ledes 42–56ch.
+- Sentence case everywhere. Paragraph measure: body under 70ch, ledes 42 to 56ch.
 
 | Token | Size | Line height | Use |
 |---|---|---|---|
-| `--fs-0` | 13px | 1.3–1.4 | Meta, captions, badges |
+| `--fs-0` | 13px | 1.3 to 1.4 | Meta, captions, badges |
 | `--fs-1` | 14px | 1.45 | UI text, table cells, nav |
 | `--fs-2` | 16px | 1.5 | Card copy, inputs, buttons |
 | `--fs-3` | 17px | 1.55 | Body |
-| `--fs-lede` | 18–21px | 1.45 | Section ledes (`.c-lede`, `.c-hero-lede`) |
+| `--fs-lede` | 18 to 21px | 1.45 | Section ledes (`.c-lede`, `.c-hero-lede`) |
 | `--fs-4` | 21px | 1.2 | h3, FAQ questions, tier names |
-| `--fs-5` | 24–28px | 1.1 | Prose h2, sign-in title |
-| `--fs-6` | 30–44px | 1.06 | h2, portal `pt-title` |
-| `--fs-7` | 40–76px | 1.0 | h1, page heroes |
-| `--fs-hero` | 42–80px | 1.0 | Home and product hero titles (`.c-hero-title`) |
+| `--fs-5` | 24 to 28px | 1.1 | Prose h2, sign-in title |
+| `--fs-6` | 30 to 44px | 1.06 | h2, portal `pt-title` |
+| `--fs-7` | 40 to 76px | 1.0 | h1, page heroes |
+| `--fs-hero` | 42 to 80px | 1.0 | Home and product hero titles (`.c-hero-title`) |
 | confidence monitor | `23cqi` | 0.9 | `.c-cm-time` scales with its monitor |
 
 ---
@@ -241,7 +242,7 @@ Two OFL families, both variable and self-hosted: **Archivo** (wght 400–800, wd
 ## 6. Space, layout, radii, elevation, breakpoints
 
 - **Space** (4px base): `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4` 16 · `--sp-5` 24 · `--sp-6` 32 · `--sp-7` 48
-  · `--sp-8` 64 · `--sp-9` 96. Fluid: `--gutter-x` 16–56px, `--gap` 16–24px, `--section-y` 56–104px.
+  · `--sp-8` 64 · `--sp-9` 96. Fluid: `--gutter-x` 16 to 56px, `--gap` 16 to 24px, `--section-y` 56 to 104px.
 - **Container**: `.l-wrap` is `min(100% − 2 × gutter, 1320px)` (`--narrow` 860px, `--prose` 760px). Content never
   touches the viewport edge; the minimum gutter is 16px.
 - **Radii** (equipment, not app icons): `--r-1` 2px for tallies, tags and checkboxes · `--r-2` 4px for buttons,
@@ -341,6 +342,7 @@ One line, 40px tall, ellipsis when narrow, so put the key fact first.
         </li>
         <li><a class="c-nav-link" href="/workflows/" aria-current="page">Workflows</a></li>   <!-- aria-current="true" for a section -->
         <li><a class="c-nav-link" href="/licensing/">Licensing</a></li>
+        <li><a class="c-nav-link" href="/news/">News</a></li>                              <!-- Industry Updates (8.36) -->
         <li><a class="c-nav-link" href="/support/">Support</a></li>
       </ul>
       <div class="c-nav-actions">
@@ -586,7 +588,7 @@ Bento items are full width, then half, then a third; `--wide` is two thirds and 
 </ul>
 ```
 
-### 8.15 Spec and requirements lists, key–value facts, code lines
+### 8.15 Spec and requirements lists, key-value facts, code lines
 
 ```html
 <dl class="c-specs"><div><dt>Cue lights</dt><dd>Art-Net, sACN, Hue</dd></div>…</dl>      <!-- hairline grid -->
@@ -626,7 +628,7 @@ Bento items are full width, then half, then a third; `--wide` is two thirds and 
 ```
 From a container width of 56rem it is four columns with wires: operator inputs reach the vertical bus, the AI
 reaches only the amber gate, and each app feeds "To the room". Narrower, it stacks with the bus as a bar. All
-labels are HTML text, so they stay at 14–16px on a phone.
+labels are HTML text, so they stay at 14 to 16px on a phone.
 
 ### 8.17 Workflow steps: the cue ladder
 
@@ -889,7 +891,7 @@ hides the strip's copy of it, so the refusal is said once.
 </form>
 <nav class="c-pager" aria-label="Pages"><a rel="prev" href="…">Previous</a>
   <ol role="list"><li><a href="…">1</a></li><li><a href="…" aria-current="page">2</a></li><li><span>…</span></li></ol>
-  <span class="c-pager-info">7–12 of 38</span><a rel="next" href="…">Next</a></nav>          <!-- portal: pt-pager, pt-pager-info -->
+  <span class="c-pager-info">7 to 12 of 38</span><a rel="next" href="…">Next</a></nav>          <!-- portal: pt-pager, pt-pager-info -->
 <div class="c-stats"><div class="c-stat"><span class="c-stat-value">12</span><span class="c-stat-label">Open tickets</span>
   <span class="c-stat-meta"><i class="c-lamp c-lamp--standby"></i>3 waiting on you</span></div>…</div>   <!-- portal: pt-stats -->
 <button type="submit" class="pt-vote" aria-pressed="true"><span class="pt-vote-count">48</span> <span class="pt-small">votes</span><span class="u-visually-hidden">, vote for “…”</span></button>
@@ -1165,8 +1167,10 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   Industry Updates"). The section reads as one silo: every hub is a step from every other, on a phone too, where the
   bar above is a form.
 - **Cards** follow the workflow cards (`support-wfcard` in `pages/support.css`): the title's link covers the card, and the picture
-  and the categories are shown above the title but read after it. From 64rem the newest article on a first page
-  spans two columns and two rows. A card's picture has empty alt text: its title says what it is.
+  and the categories are shown above the title but read after it. The newest article on a first page is the lead
+  card: the full width from 40rem, two columns and two rows from 64rem, its picture kept at the cards' 16:9 and
+  never taller than `min(30rem, 55vh)`, with its headline, standfirst and date straight after it (the height the
+  cards beside it add is left empty at its foot). A card's picture has empty alt text: its title says what it is.
 - **The article** is one reading column (`l-wrap--prose`) in the order docs/NEWS.md §10 sets. Its hero holds the
   category tags (`news-tags`, `c-tag` links), the h1, the standfirst and `news-meta` (the London date and time,
   the read time, "Updated" when it changed after it went live, the byline). Facts are `news-facts` rows, each with
@@ -1188,6 +1192,13 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   colours, no inline styles. The motifs: a monitor wall (Video), a waveform (Audio), beams (Lighting), a truss
   (Staging), a cue stack (Production), a clock (Showcalling), a signal (Streaming), nodes (Automation), a grid
   (Interactive), a spark (AI), a network (Technology), a person (Freelance), a shield (Legal), a lightbulb (Tips).
+- **Comments** (`pages/news-comments.css`, `news-comments.js`, pushed by `partials/news/comments.php`) end the
+  article in `news-comments`: a list of `news-comment` cards (the author, a `c-tag` "Patterns team" badge for staff,
+  the time, the plain-text body, then `news-comment-actions`) and `news-comments-box`, the sign-in link, the form or
+  why comments are closed. Only its author sees a comment waiting for approval (`news-comment--pending`, amber and
+  dashed: standing by) or one a moderator hid (`news-comment--hidden`, dotted and dimmed), each beside a
+  `news-comment-note` that says so, so colour is never the only cue. The comment page for readers without
+  scripting (`news-comment-page`) uses the same classes.
 
 ## 9. Imagery: real screenshots
 
@@ -1255,7 +1266,7 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 | Support hub and four product help pages | `c-hero--page`, inline assistant (`c-chat--inline`), `c-support-links`, `c-faq`, `c-prose` |
 | FAQ | `c-hero--page`, `c-tabs` (groups) or section heads, `c-faq` |
 | Contact | `c-hero--page`, `c-callout--info` (show in 48 hours), `c-form--panel`, `c-kv` |
-| Industry Updates: the hub, the category hubs, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-more` (8.36) |
+| Industry Updates: the hub, the category hubs, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-more`; comments: `news-comments`, `news-comment`, `news-comments-box`, and `news-comment-page` without scripting (8.36) |
 | About, legal | `c-hero--page`, `c-prose` |
 | Portal: dashboard, downloads, licences, tickets, ideas board, account | `pt-shell`, `pt-header`, `pt-stats`, `pt-grid` + `pt-card--link`, `pt-table`, `pt-badge`, `pt-vote`, `pt-thread`, `pt-files`, `pt-kv`, `pt-alert`, `pt-empty`, `pt-pager` |
 | Admin tables | `pt-table` (+ `c-table--zebra c-table--compact`, `aria-sort` + `c-sort`), `pt-search`, `pt-tabs`, `pt-badge`, `c-table--stack` with `data-label` for phones |

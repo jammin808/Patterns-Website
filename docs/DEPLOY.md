@@ -112,7 +112,7 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 | Change prices, features, FAQ | Edit the files in `content/` (see `docs/CONTENT.md`), push to `main`. The assistant's knowledge updates with them. |
 | Write or correct a news article | Portal → Admin → Industry Updates → open the article (or *Write an article*). AI articles held for review wait under *Held*. |
 | Run the AI desk | Portal → Admin → Industry Updates → Open the AI desk: pause or continue it, *Run a session now* (it starts within 15 minutes), change its sessions, calendar, models, cap, banned sites and topics, and its brief and voice. Each run has a page with its steps, candidates, references and estimated cost. |
-| Moderate comments | Portal → Admin → Industry Updates → Comments (the first report on a comment is emailed). |
+| Moderate comments | Portal → Admin → Industry Updates → Moderate comments. The first report on a comment, and the report that hides it, are emailed; so is a comment waiting for approval, at most once a day. |
 | Publish an article written in a Claude Code session | Add its JSON file to `content/news/articles/` (the shape is in docs/NEWS.md §6.4) and push to `main`: the next tick imports it once. |
 
 ## 4. Settings worth knowing (`config/defaults.php`)
@@ -145,14 +145,14 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 
 ## 5. Taking an Industry Updates article down
 
-News pages are cached for 2 minutes (`public, max-age=120, stale-while-revalidate=600`) and news images for an hour
+News pages are cached for 2 minutes (`public, max-age=120, stale-while-revalidate=60`) and news images for an hour
 on the CDN (`s-maxage=3600`). Whether Hostinger's CDN honours those times is still to be confirmed on the live site,
 so to remove something at once:
 
 1. **Unpublish it** (Portal → Admin → Industry Updates → the article → *Unpublish*), or delete it, or delete just the
    image. The site stops serving it straight away; an imported article that is deleted is never imported again.
 2. **Flush the CDN**: GitHub → Actions → *Flush CDN* → *Run workflow* (or hPanel → Performance → CDN → Flush cache).
-   Without the flush a cached copy can stay at the edge for a few minutes, an image for up to an hour.
+   Without the flush a cached copy can stay at the edge for about 2 minutes, an image for up to an hour.
 3. If the request came from outside (a correction, a complaint), note what was changed and when; the audit log
    (Portal → Admin → Audit log, `news.`) has the record.
 
