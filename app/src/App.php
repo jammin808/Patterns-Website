@@ -398,7 +398,7 @@ final class App
     public function contentSecurityPolicy(Request $request, array $extra = []): string
     {
         $ga = Analytics::id($this->config->string('analytics.ga_id'));
-        $tag = $ga !== '' ? Analytics::csp($ga) : ['script' => '', 'img' => '', 'connect' => ''];
+        $tag = $ga !== '' ? Analytics::csp($ga, Analytics::asksFirst($this)) : ['script' => '', 'img' => '', 'connect' => ''];
         $policy = [
             'default-src' => "'self'",
             'script-src' => trim("'self' " . $tag['script']),

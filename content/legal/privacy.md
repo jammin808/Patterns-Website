@@ -11,7 +11,7 @@ Patterns Show Control is run by Ben Rohleder in the United Kingdom, who is the c
 - **Bug reports, questions, feature requests, comments, votes and attachments**: to support the software and plan improvements. Feature requests and their comments are visible to other signed-in clients; bug reports and questions are private to you and us unless we agree otherwise. Lawful basis: contract and our legitimate interest in improving the products.
 - **Contact form messages** (name, email, optional company, your message): to reply to you. Lawful basis: legitimate interest in answering enquiries, or steps before a contract.
 - **Support assistant conversations** (the questions you type and the answers): to answer you and to improve the assistant. Lawful basis: legitimate interest. Please do not type personal or confidential information into the assistant.
-- **Site analytics** (the pages viewed, the referring site, device and browser type and an approximate location, collected by Google Analytics cookies, only if you accept statistics cookies): to understand which pages help people and to improve the site. Lawful basis: your consent, which you can withdraw at any time with **Cookie settings** at the foot of any page. We cannot identify you from it and do not link it to your account.
+- **Site analytics** (the pages viewed, the referring site, device and browser type and an approximate location, collected by Google Analytics cookies on the pages you read): to understand which pages help people and to improve the site. Lawful basis: legitimate interest in running a useful website. We cannot identify you from it and do not link it to your account. The [cookie notice](/legal/cookies/) explains how to refuse these cookies.
 - **Security and service records** (a keyed hash of your IP address for rate limits and fraud prevention, sign-in events, download counts, server logs): to keep the site secure and working. Lawful basis: legitimate interest.
 
 We use no advertising trackers, and we do not sell personal data.
@@ -39,7 +39,7 @@ Under UK data protection law you can ask for a copy of your data, ask us to corr
 
 ## Cookies
 
-See the [cookie notice](/legal/cookies/). Google Analytics sets cookies only if you accept them; the contact form, the client portal and the support assistant set essential ones.
+See the [cookie notice](/legal/cookies/). Google Analytics sets cookies on the pages you read; the contact form, the client portal and the support assistant set essential ones.
 
 ## Changes
 

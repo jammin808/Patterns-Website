@@ -70,6 +70,8 @@ return [
     'analytics' => [
         // Google Analytics 4 measurement ID, tagged on every page right after <head>; '' turns it off.
         'ga_id' => 'G-0C7QKZTNF7',
+        // true: the tag waits for consent and the cookie banner asks first; false: every visit is tracked, no banner.
+        'consent' => false,
     ],
 
     'chat' => [

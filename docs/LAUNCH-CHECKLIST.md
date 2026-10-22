@@ -25,10 +25,12 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 - [ ] **Today's free downloads need terms that apply to them.** The licence terms say they will apply "when" each
       app is sold; reword the opening so it also covers the free early-access and evaluation builds of Patterns and
       PlayMap, and link the terms from `/downloads/` and the Patterns and PlayMap licensing pages.
-- [ ] **Google Analytics consent** is asked for by a cookie banner (Google Consent Mode, basic: nothing reaches
-      Google before a visitor accepts). Confirm the banner's wording and that the cookie notice and privacy policy
-      match your Google Analytics settings: Google signals and data sharing off unless the notice says otherwise,
-      and the retention period.
+- [ ] **Google Analytics runs on every visit without asking** (`analytics.consent` is off: the owner's choice). Under
+      UK PECR analytics cookies have needed consent; the Data (Use and Access) Act 2025 relaxes this only for
+      statistics-only cookies with clear information and a simple way to object. The consent banner is built and
+      tested: set `'analytics' => ['consent' => true]` in the server config to switch it on, and restore the consent
+      wording of the cookie notice and privacy policy (commit e6a3074). Either way, keep Google signals and data sharing
+      off in Google Analytics unless the notice says otherwise.
 - [ ] Privacy policy items: name the payment provider if payment links are switched on; say that a signed-in
       visitor's assistant conversations are linked to their account and may be read to improve answers; confirm the
       Anthropic processing, training and retention wording against the commercial terms in force.
