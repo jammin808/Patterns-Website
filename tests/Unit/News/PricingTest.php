@@ -62,6 +62,9 @@ final class PricingTest extends TestCase
         self::assertLessThanOrEqual(2.5, $e['high']);
         self::assertLessThan($e['high'], $e['low']);
         self::assertEqualsWithDelta($e['research']['low'] + $e['writing']['low'], $e['low'], 1e-9);
+        // The compose calls after the first read the part they share from the cache.
+        self::assertEqualsWithDelta(Pricing::cost(['usage_in' => 20000, 'cache_write' => 10000, 'cache_read' => 10000, 'usage_out' => 20000], $d['compose_model']), $e['writing']['low'], 1e-9);
+        self::assertEqualsWithDelta(Pricing::cost(['usage_in' => 40000, 'cache_write' => 20000, 'cache_read' => 20000, 'usage_out' => 40000], $d['compose_model']), $e['writing']['high'], 1e-9);
         $opus = Pricing::session('claude-opus-5-5', 'claude-opus-5-5', 12);
         self::assertGreaterThan($e['research']['high'], $opus['research']['high'], 'research on Opus costs more');
         self::assertGreaterThan(Pricing::session('claude-sonnet-5-5', 'claude-opus-5-5', 1)['low'], $e['low'], 'more searches cost more');

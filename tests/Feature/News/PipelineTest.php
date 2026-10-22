@@ -65,6 +65,17 @@ final class PipelineTest extends TestCase
         return new \DateTimeImmutable('now');
     }
 
+    /**
+     * A call's message as text: a string, or its text blocks joined.
+     *
+     * @param array<string, mixed> $call
+     */
+    private static function turn(array $call, int $i = 0): string
+    {
+        $content = $call['messages'][$i]['content'];
+        return is_string($content) ? $content : implode("\n\n", array_column($content, 'text'));
+    }
+
     /** @param array<string, mixed> $fields */
     private function save(array $fields): void
     {
@@ -203,7 +214,7 @@ final class PipelineTest extends TestCase
         ], $research['tools']);
         $turn = $research['messages'][0]['content'];
         self::assertStringContainsString('Today is Thursday 22 October 2026, 06:02 in London.', $turn);
-        self::assertStringContainsString($earlier . ' | ' . date('Y-m-d') . ' | earlier-stage-timers | An earlier story about stage timers for the record', $turn);
+        self::assertStringContainsString($earlier . ' | ' . date('Y-m-d') . ' | earlier-stage-timers | live | An earlier story about stage timers for the record', $turn);
         self::assertStringContainsString("Pages to check this session (read them with web fetch):\n- https://vendor.example/releases", $turn);
         self::assertStringContainsString('- celebrity gossip', $turn);
         self::assertStringContainsString('Find up to 5 candidate developments from the last 7 days (14 days for legal', $turn);
@@ -213,8 +224,12 @@ final class PipelineTest extends TestCase
         $select = $model->callsOf('select')[0];
         self::assertSame(['claude-opus-5-5', 'medium'], [$select['model'], $select['effort']]);
         self::assertSame(\Psc\News\Prompts::selectSchema(), $select['schema']);
-        self::assertStringContainsString('[S1] Firmware 4.2 adds frame-accurate genlock | vendor.example | 1 day ago | read', $select['messages'][0]['content']);
-        self::assertStringContainsString('[S2] Hands on with the new genlock firmware | trade.example | 2 days ago | search result, cited', $select['messages'][0]['content']);
+        self::assertSame(['type' => 'string', 'enum' => \Psc\News\Categories::KEYS], $select['schema']['properties']['considered']['items']['properties']['category']);
+        self::assertSame(['type' => 'boolean'], $select['schema']['properties']['considered']['items']['properties']['standards']);
+        // Each reference with the address it stands for, so the brief's addresses map to names exactly.
+        self::assertStringContainsString('[S1] https://vendor.example/news/genlock-firmware | Firmware 4.2 adds frame-accurate genlock | vendor.example | 1 day ago | read | not cited', $select['messages'][0]['content']);
+        self::assertStringContainsString('[S2] https://trade.example/2026/10/led-genlock-review | Hands on with the new genlock firmware | trade.example | 2 days ago | search result | cited', $select['messages'][0]['content']);
+        self::assertStringContainsString("Today is Thursday 22 October 2026 in London. The window: a story's newest source is at most 7 days old, 14 for legal, regulatory and standards news.", $select['messages'][0]['content']);
         self::assertStringContainsString('Decide write for at most 2, each with an importance of 3 or more.', $select['messages'][0]['content']);
 
         $compose = $model->callsOf('compose')[0];
@@ -222,12 +237,65 @@ final class PipelineTest extends TestCase
         self::assertStringStartsWith('You write one article for Industry Updates', $compose['system']);
         self::assertStringContainsString('Write like someone who has spent years on show floors', $compose['system'], 'the voice');
         self::assertStringContainsString("- delve\n", $compose['system'], 'the phrases to avoid');
-        self::assertStringContainsString('References: S1, S2', $compose['messages'][0]['content']);
+        self::assertStringContainsString('verdict_note: up to 320. impact: up to 6,000. Up to 12 confirmed and 12 speculation items, each up to 400 characters, and up to 12 sources.', $compose['system'], 'every hard limit is stated');
+        // What every compose call shares comes first, marked for the cache; the story comes after it.
+        [$shared, $story] = $compose['messages'][0]['content'];
+        self::assertSame(['type' => 'ephemeral'], $shared['cacheControl']);
+        self::assertStringStartsWith("The research brief:\n\n" . FakeNewsModel::BRIEF . "\n\nThe references", $shared['text']);
+        self::assertStringContainsString('- celebrity gossip', $shared['text'], 'the context is in the shared part');
+        self::assertArrayNotHasKey('cacheControl', $story);
+        self::assertStringStartsWith("Write the article for this story.\nHeadline: Vendor ships LED processor firmware", $story['text']);
+        self::assertStringContainsString('References: S1, S2', $story['text']);
 
         $check = $model->callsOf('check')[0];
         self::assertSame(['claude-haiku-5-5', 'low'], [$check['model'], $check['effort']]);
         self::assertStringContainsString("Banned topics:\n- celebrity gossip", $check['messages'][0]['content']);
-        self::assertStringContainsString('Title: LED processor firmware 4.2 brings frame-accurate genlock', $check['messages'][0]['content']);
+        self::assertStringContainsString("<article>\nTitle: LED processor firmware 4.2 brings frame-accurate genlock", $check['messages'][0]['content']);
+        self::assertStringEndsWith('</article>', $check['messages'][0]['content']);
+
+        // Every step's rules say the web's words are data, never instructions.
+        foreach ([$research, $select, $compose, $check] as $call) {
+            self::assertStringContainsString('untrusted data', $call['system']);
+        }
+        self::assertStringContainsString('untrusted data', \Psc\News\Prompts::repairRules());
+    }
+
+    public function testTheCheckReadsEveryPartOfTheArticle(): void
+    {
+        $model = (new FakeNewsModel())
+            ->queue('compose', ['data' => FakeNewsModel::article([
+                'confirmed' => [['text' => 'Firmware 4.2 adds frame-accurate genlock, says Joe Bloggs of Acme Rentals.', 'ref' => 'S1']],
+                'speculation' => [['text' => 'A reseller forum claims the vendor hid faulty units from buyers.', 'ref' => 'S2']],
+                'verdict_note' => 'Test it before Acme Rentals does, whatever they are said to have done.',
+            ])])
+            ->queue('check', ['data' => ['banned_topics' => [], 'names_private_individual' => true, 'alleges_wrongdoing' => true, 'reason' => 'An item names Joe Bloggs and alleges a cover-up.']]);
+        $id = $this->queued();
+        $this->pipeline()->run($id, $model, $this->now());
+
+        $check = $model->callsOf('check')[0]['messages'][0]['content'];
+        self::assertStringContainsString("What's confirmed:\n- Firmware 4.2 adds frame-accurate genlock, says Joe Bloggs of Acme Rentals.", $check);
+        self::assertStringContainsString("Still speculation:\n- A reseller forum claims the vendor hid faulty units from buyers.", $check);
+        self::assertStringContainsString('Verdict: test. Test it before Acme Rentals does, whatever they are said to have done.', $check);
+        self::assertStringContainsString("Sources:\n- Firmware 4.2 adds frame-accurate genlock (Vendor)", $check);
+        self::assertStringContainsString('SEO title: LED processor firmware adds frame-accurate genlock', $check);
+        $a = $this->articles()[0];
+        self::assertSame('draft', $a['status'], 'a name or an allegation in an item is held like one in the body');
+        self::assertStringContainsString('It may name a private individual', (string) $a['review_reason']);
+        self::assertSame(1, (int) $this->runRow($id)['held']);
+    }
+
+    public function testTwoUntitledReferencesOnOneSiteAreToldApartByTheirAddresses(): void
+    {
+        $refs = FakeNewsModel::refs() + [
+            'S4' => ['url' => 'https://assets.publishing.service.gov.uk/aaa/guidance-a.pdf', 'title' => '', 'via' => 'fetch', 'page_age' => null, 'cited' => false],
+            'S5' => ['url' => 'https://assets.publishing.service.gov.uk/bbb/guidance-b.pdf', 'title' => '', 'via' => 'fetch', 'page_age' => null, 'cited' => false],
+        ];
+        $model = (new FakeNewsModel())->queue('research', ['refs' => $refs]);
+        $this->pipeline()->run($this->queued(), $model, $this->now());
+        foreach ([self::turn($model->callsOf('select')[0]), self::turn($model->callsOf('compose')[0])] as $turn) {
+            self::assertStringContainsString('[S4] https://assets.publishing.service.gov.uk/aaa/guidance-a.pdf | (no title) | assets.publishing.service.gov.uk | age unknown | read', $turn);
+            self::assertStringContainsString('[S5] https://assets.publishing.service.gov.uk/bbb/guidance-b.pdf | (no title) | assets.publishing.service.gov.uk | age unknown | read', $turn);
+        }
     }
 
     // ------------------------------------------------------------------------------------------ slow news
@@ -250,6 +318,25 @@ final class PipelineTest extends TestCase
         self::assertSame('Slow news: 3 candidates considered, 2 below the importance bar, 1 too old.', $run['summary']);
         self::assertSame([], $this->articles());
         self::assertGreaterThan(0, (int) $run['cost_micros'], 'the research was still paid for');
+    }
+
+    public function testTheWindowIsSevenDaysUnlessTheStoryIsLegalOrStandards(): void
+    {
+        $tenDays = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/London')))->modify('-10 days')->format('Y-m-d');
+        $id = $this->queued();
+        $model = (new FakeNewsModel())
+            ->queue('research', ['refs' => self::refs()])
+            ->queue('select', ['data' => ['considered' => [
+                FakeNewsModel::candidate(['newest_source_date' => $tenDays, 'refs' => ['S1']]),
+                FakeNewsModel::candidate(['headline' => 'A new event safety duty for venues', 'story_key' => 'venue-safety-duty', 'category' => 'legal', 'newest_source_date' => $tenDays, 'refs' => ['S2']]),
+                FakeNewsModel::candidate(['headline' => 'A timing standard reaches its final draft', 'story_key' => 'timing-standard-draft', 'category' => 'technology', 'standards' => true, 'newest_source_date' => $tenDays, 'refs' => ['S4']]),
+            ]]]);
+        $this->pipeline()->run($id, $model, $this->now());
+
+        $considered = $this->runRow($id)['considered'];
+        self::assertSame(['out_of_window', 'write', 'write'], array_column($considered, 'server'));
+        self::assertSame('Its newest source is not dated within the last 7 days.', $considered[0]['server_note']);
+        self::assertSame([['video', false], ['legal', false], ['technology', true]], array_map(static fn (array $c): array => [$c['category'], $c['standards']], $considered));
     }
 
     // ---------------------------------------------------------------------------------------------- the refs
@@ -355,7 +442,50 @@ final class PipelineTest extends TestCase
         $a = $this->articles()[0];
         self::assertSame('published', $a['status']);
         self::assertSame([['article_id' => (int) $a['id'], 'related_id' => $earlier]], array_map(static fn (array $r): array => array_map('intval', $r), $this->db->all('SELECT article_id, related_id FROM news_related')));
-        self::assertStringContainsString('Follows up: ' . $earlier . ' (/news/', $model->callsOf('compose')[0]['messages'][0]['content']);
+        self::assertStringContainsString('Follows up: ' . $earlier . ' (/news/', self::turn($model->callsOf('compose')[0]));
+    }
+
+    public function testOnlyALiveArticleIsFollowedUpOrLinked(): void
+    {
+        // A held draft on the same story: it counts for duplicates, but it cannot be followed up while unpublished.
+        $held = $this->makeArticle(['title' => 'The genlock firmware story held for review', 'story_key' => 'vendor-led-processor-genlock-firmware', 'status' => 'draft', 'origin' => 'ai',
+            'sources' => [['url' => 'https://vendor.example/news/genlock-announced', 'title' => 'Announced', 'publisher' => 'Vendor', 'kind' => 'primary']], 'confirmed' => [['text' => 'It was announced.', 'url' => 'https://vendor.example/news/genlock-announced']]]);
+        $scheduled = $this->makeArticle(['title' => 'A switcher story that goes live tomorrow', 'story_key' => 'switcher-tomorrow', 'published_at' => time() + 86400]);
+        $id = $this->queued();
+        $model = (new FakeNewsModel())->queue('select', ['data' => ['considered' => [FakeNewsModel::candidate(['follow_up_of' => [$held]])]]]);
+        $report = $this->pipeline()->run($id, $model, $this->now());
+
+        $turn = $model->callsOf('research')[0]['messages'][0]['content'];
+        self::assertStringContainsString($held . ' | ' . date('Y-m-d') . ' | vendor-led-processor-genlock-firmware | not published | The genlock firmware story held for review', $turn);
+        self::assertStringContainsString(' | switcher-tomorrow | not published | ', $turn, 'scheduled for later is not live yet');
+        $c = $this->runRow($id)['considered'][0];
+        self::assertSame([[], 'duplicate'], [$c['follow_up_of'], $c['server']], 'the follow-up of a draft is not accepted, so the story waits as a duplicate');
+        self::assertSame('skipped', $report['status']);
+        self::assertSame(['research', 'select'], $model->kinds(), 'nothing is composed, so no slug of the draft is handed over');
+
+        // A follow-up the model writes in the article itself is kept only when its article is live.
+        $live = $this->makeArticle(['title' => 'A live story about stage timers', 'story_key' => 'stage-timers-live']);
+        $model = (new FakeNewsModel())->queue('compose', ['data' => FakeNewsModel::article(['story_key' => 'genlock-firmware-shipped', 'follow_up_of' => [$scheduled, $live]])]);
+        $this->db->exec('UPDATE news_articles SET story_key = ? WHERE id = ?', ['genlock-held', $held]);
+        $this->pipeline()->run($this->queued(), $model, $this->now());
+        $a = $this->articles()[1];
+        self::assertSame('published', $a['status']);
+        self::assertSame([$live], array_map('intval', array_column($this->db->all('SELECT related_id FROM news_related WHERE article_id = ?', [(int) $a['id']]), 'related_id')));
+    }
+
+    public function testAnArticleThatFollowsUpOneNotPublishedIsHeld(): void
+    {
+        // An old draft on the same story, past the 120 days the desk is shown: the validator keeps the new article as
+        // its follow-up (it brings a new source), and a follow-up never goes out before the article it follows.
+        $old = $this->makeArticle(['title' => 'An old genlock draft nobody published', 'story_key' => 'vendor-led-processor-genlock-firmware', 'status' => 'draft']);
+        $this->db->exec('UPDATE news_articles SET created_at = ? WHERE id = ?', [time() - 200 * 86400, $old]);
+        $id = $this->queued();
+        $this->pipeline()->run($id, new FakeNewsModel(), $this->now());
+
+        $a = $this->articles()[0];
+        self::assertSame(['draft', null], [$a['status'], $a['published_at']]);
+        self::assertSame('It follows up article ' . $old . ', which is not published.', $a['review_reason']);
+        self::assertSame(1, (int) $this->runRow($id)['held']);
     }
 
     public function testAFollowUpWithoutANewSourceIsRefused(): void
@@ -389,6 +519,35 @@ final class PipelineTest extends TestCase
         $a = $this->articles()[0];
         self::assertSame('published', $a['status']);
         self::assertStringNotContainsString('seamlessly', (string) $a['dek']);
+    }
+
+    public function testALengthOnlyARewriteCanFixGoesToTheRepairWithThePhrases(): void
+    {
+        $long = FakeNewsModel::article(['dek' => str_repeat('The 4.2 release seamlessly locks the wall to house sync on every frame. ', 5)]);
+        $model = (new FakeNewsModel())->queue('compose', ['data' => $long])->queue('repair', ['data' => FakeNewsModel::article()]);
+        $id = $this->queued();
+        $this->pipeline()->run($id, $model, $this->now());
+
+        self::assertSame(['research', 'select', 'compose', 'repair', 'check'], $model->kinds(), 'one repair for both');
+        $ask = self::turn($model->callsOf('repair')[0]);
+        self::assertStringContainsString('The phrases to avoid it uses: seamlessly.', $ask);
+        self::assertStringContainsString("What it must fix:\n- ", $ask);
+        self::assertStringContainsString('dek', $ask);
+        self::assertSame('published', $this->articles()[0]['status']);
+
+        // A repair that does not fix it drops the article, with the rule it still breaks.
+        $longer = self::secondArticle();
+        $longer['dek'] = str_repeat('Version 9 splits the multiview in two, so the director and the engineer stop fighting. ', 5);
+        $model = (new FakeNewsModel())
+            ->queue('research', ['refs' => self::refs()])
+            ->queue('select', ['data' => ['considered' => [self::secondCandidate()]]])
+            ->queue('compose', ['data' => $longer])->queue('repair', ['data' => $longer]);
+        $id = $this->queued();
+        $this->pipeline()->run($id, $model, $this->now());
+        $outcome = $this->runRow($id)['considered'][0]['outcome'];
+        self::assertSame('dropped', $outcome['status']);
+        self::assertContains('dek', array_column($outcome['rules'], 'rule'));
+        self::assertNotContains('check', $model->kinds());
     }
 
     public function testAnArticleStillUsingAPhraseAfterItsRepairIsHeld(): void
@@ -525,7 +684,21 @@ final class PipelineTest extends TestCase
     {
         $id = $this->queued();
         $this->pipeline()->run($id, (new FakeNewsModel())->queue('research', ['text' => '', 'stop' => 'max_tokens']), $this->now());
-        self::assertSame('Failed: The research ended without a brief (it stopped with max_tokens).', $this->runRow($id)['summary']);
+        self::assertSame('Failed: The research ended without a finished brief (it stopped with max_tokens).', $this->runRow($id)['summary']);
+    }
+
+    public function testARefusedResearchIsDiscardedEvenWithText(): void
+    {
+        $id = $this->queued();
+        $model = (new FakeNewsModel())->queue('research', ['stop' => 'refusal']);
+        $report = $this->pipeline()->run($id, $model, $this->now());
+
+        self::assertSame('failed', $report['status']);
+        $run = $this->runRow($id);
+        self::assertSame('Failed: The research was declined (it stopped with refusal), so its answer was discarded.', $run['summary']);
+        self::assertNull($run['brief'], 'the partial answer is not kept as a brief');
+        self::assertSame(['research'], $model->kinds());
+        self::assertGreaterThan(0, (int) $run['cost_micros'], 'what it spent is kept');
     }
 
     public function testThreeEmptySessionsInARowEmailOnce(): void
@@ -558,6 +731,7 @@ final class PipelineTest extends TestCase
         self::assertSame([], $model->calls, 'nothing was spent');
         self::assertSame('Failed: another session held the desk, so this one did not start.', $this->runRow($id)['summary']);
         self::assertSame($holder, $this->settings()->leaseHolder()['run'], 'the holder keeps the lease');
+        self::assertSame([['failed', '/portal/admin/news/desk/runs/' . $id . '/']], array_map(static fn (array $m): array => [$m['data']['kind'], $m['data']['run']], $this->mails()), 'a run that could not start failed, and says so');
     }
 
     public function testARunThatIsNotQueuedIsLeftAlone(): void

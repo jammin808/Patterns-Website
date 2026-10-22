@@ -6,8 +6,9 @@ declare(strict_types=1);
  * The Industry Updates desk (docs/NEWS.md §6), run by a Hostinger cron job every 15 minutes:
  *   /usr/bin/php /home/<user>/domains/<domain>/public_html/tools/news.php tick
  *
- *   tick    reap runs whose process died, import content/news/articles/*.json, run the queued or due session,
- *           write the heartbeat (each step on its own, so one failing never stops the others)
+ *   tick    write the heartbeat, reap runs whose process died (and tell the admins), import
+ *           content/news/articles/*.json, run the queued or due session (which keeps the heartbeat fresh), write the
+ *           heartbeat again (each step on its own, so one failing never stops the others)
  *   run     run a session now (refused while one is queued or running)
  *   import  only import the article files
  *

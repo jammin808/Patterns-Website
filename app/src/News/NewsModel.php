@@ -10,10 +10,12 @@ namespace Psc\News;
  *
  * A call is an array: model, system (text), messages (the API's shape), maxTokens, effort, and optionally tools (the
  * server tools, SDK-shaped: web_search and web_fetch with maxUses, blockedDomains ...) and schema (a JSON schema the
- * answer must follow). Two hooks keep the pipeline in charge of the money: before (callable(): void) runs before
- * every request the call makes, a research call's continuations included, and throws to stop it; after
+ * answer must follow); a message's content is a string or text blocks, a block marked for the cache with cacheControl.
+ * Two hooks keep the pipeline in charge of the money: before (callable(): void) runs before every request the call
+ * makes, a research call's continuations and a resend included, and throws to stop it; after
  * (callable(array $usage, string $model): void) runs after every response with that response's usage and the model
- * that served it, so the spend is recorded even when a later request fails.
+ * that served it, so the spend is recorded even when a later request fails, and for a stream that broke what it had
+ * reported by then.
  *
  * Usage is an array of usage_in, usage_out, cache_write, cache_read, searches and fetches (never "tokens": the
  * log masks keys that look like secrets).
@@ -21,7 +23,9 @@ namespace Psc\News;
 interface NewsModel
 {
     /**
-     * A research call with the web tools: it runs until the model ends its turn, resuming a paused one.
+     * A research call with the web tools: it runs until the model ends its turn, resuming a paused one as it is; once
+     * the tools' allowance (or the continuations) are used up, a last call without tools writes the brief from the
+     * research so far.
      *
      * @param array<string, mixed> $call
      * @return array{
@@ -31,8 +35,8 @@ interface NewsModel
      *     stop: string,
      *     model: string,
      *     container: ?string
-     * } text is the brief (between the markers, joined across continuations); refs are numbered S1, S2 ... in the
-     *   order the research first saw each address
+     * } text is the brief (each part between both marker lines, joined; a part without its end line is left out); refs
+     *   are numbered S1, S2 ... in the order the research first saw each address; stop is the last response's
      */
     public function research(array $call): array;
 

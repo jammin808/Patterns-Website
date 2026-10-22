@@ -12,9 +12,10 @@ use Psc\Tests\Fakes\FakeNewsModel;
 use Psc\Tests\TestCase;
 
 /**
- * The cron tick (docs/NEWS.md §4 CLI, §6.1): each step on its own, a slot claimed exactly once, the hour between
- * sessions, a paused desk's slots recorded as skipped, stale runs reaped, the heartbeat, the log line, and
- * tools/news.php itself with its lock.
+ * The cron tick (docs/NEWS.md §4 CLI, §6.1): each step on its own, a slot claimed exactly once, an older due slot
+ * lapsing beside a later one, the hour between sessions, a paused desk's slots recorded as skipped, stale runs reaped
+ * and reported, the heartbeat at both ends of a tick and through a long session, the log line, and tools/news.php
+ * itself with its lock.
  */
 final class TickTest extends TestCase
 {
@@ -100,6 +101,26 @@ final class TickTest extends TestCase
         self::assertSame('2026-10-22 06:00', $this->tick('2026-10-22 07:10')['slot'], 'and then runs, still in its window');
     }
 
+    public function testAnOlderDueSlotLapsesWhenALaterOneRuns(): void
+    {
+        self::assertSame([], (new Settings($this->app))->save(['slots' => [['time' => '06:00', 'days' => [1, 2, 3, 4, 5, 6, 7]], ['time' => '06:30', 'days' => [1, 2, 3, 4, 5, 6, 7]]]], null)['errors']);
+        $runs = new Runs($this->app);
+        $manual = (int) $runs->queueManual(null);
+        $this->db->exec("UPDATE news_runs SET status = 'done', started_at = ? WHERE id = ?", [$this->at('2026-10-22 05:30')->getTimestamp(), $manual]);
+
+        // At 06:30 both slots are due: the later runs, and the older one lapses for good.
+        $report = $this->tick('2026-10-22 06:30');
+        self::assertSame(['done', '2026-10-22 06:30'], [$report['status'], $report['slot']]);
+        $rows = $this->db->all("SELECT slot, status, summary FROM news_runs WHERE kind = 'scheduled' ORDER BY slot");
+        self::assertSame([['2026-10-22 06:00', 'skipped', Pipeline::SKIPS['lapsed']], ['2026-10-22 06:30', 'done']], array_map(static fn (array $r): array => $r['status'] === 'skipped' ? [$r['slot'], $r['status'], $r['summary']] : [$r['slot'], $r['status']], $rows));
+
+        // An hour and a quarter later the 06:00 slot is still inside its window, but it never runs late.
+        $this->db->exec("UPDATE news_runs SET started_at = ? WHERE slot = '2026-10-22 06:30'", [$this->at('2026-10-22 06:30')->getTimestamp()]);
+        $model = new FakeNewsModel();
+        self::assertSame('idle', $this->tick('2026-10-22 07:45', $model)['status']);
+        self::assertSame([], $model->calls);
+    }
+
     public function testASlotClaimedByATickThatDiedIsNotRunLate(): void
     {
         $runs = new Runs($this->app);
@@ -143,6 +164,56 @@ final class TickTest extends TestCase
         self::assertSame('failed', $row['status']);
         self::assertStringStartsWith('Stopped: the session passed its deadline', (string) $row['summary']);
         self::assertNotNull($row['finished_at']);
+    }
+
+    public function testAReapedRunEmailsTheAdminsOnceADay(): void
+    {
+        $runs = new Runs($this->app);
+        $id = (int) $runs->claim('2026-10-21 14:30', 'scheduled', null);
+        self::assertTrue($runs->start($id, time() - 1000));
+        $this->tick('2026-10-22 12:00');
+
+        self::assertSame([['failed', Runs::REAPED, '/portal/admin/news/desk/runs/' . $id . '/']], array_map(static fn (array $m): array => [$m['data']['kind'], $m['data']['summary'], $m['data']['run']], $this->mails()));
+        self::assertSame('news-desk-admin', $this->mails()[0]['template']);
+
+        $again = (int) $runs->claim('2026-10-22 06:00', 'scheduled', null);
+        self::assertTrue($runs->start($again, time() - 1000));
+        self::assertSame(1, $this->tick('2026-10-22 12:15')['reaped']);
+        self::assertCount(1, $this->mails(), 'one failure email a day');
+    }
+
+    public function testSessionsThatDiedCountTowardTheEmptyStreak(): void
+    {
+        $runs = new Runs($this->app);
+        foreach (['2026-10-21 06:00', '2026-10-21 14:30', '2026-10-22 06:00'] as $slot) {
+            self::assertTrue($runs->start((int) $runs->claim($slot, 'scheduled', null), time() - 1000));
+        }
+        self::assertSame(3, $this->tick('2026-10-22 12:00')['reaped']);
+        self::assertSame(3, $runs->consecutiveEmpty());
+        self::assertSame(['failed', 'empty'], array_map(static fn (array $m): string => $m['data']['kind'], $this->mails()), 'no session reached its end, and the admin still hears of it');
+        self::assertSame(3, $this->mails()[1]['data']['count']);
+    }
+
+    public function testTheHeartbeatIsWrittenWhenATickStartsAndKeptFreshThroughItsSession(): void
+    {
+        $settings = new Settings($this->app);
+        $seen = [];
+        $model = new FakeNewsModel();
+        $model->afterCall = function (string $kind) use ($settings, &$seen): void {
+            $seen[$kind] = $settings->lastTick();
+            if ($kind === 'research') {
+                // The research took longer than the refresh interval: the next call writes the heartbeat again.
+                $this->db->exec("UPDATE news_settings SET value = ? WHERE name = 'heartbeat'", [json_encode(['t' => time() - Pipeline::HEARTBEAT_EVERY - 1, 'run' => null, 'status' => 'started'])]);
+            }
+        };
+        $before = time();
+        $report = $this->tick('2026-10-22 06:05', $model);
+
+        self::assertSame('started', $seen['research']['status'], 'written before the session began');
+        self::assertGreaterThanOrEqual($before, $seen['research']['t']);
+        self::assertSame(['running', $report['run']], [$seen['select']['status'], $seen['select']['run']], 'refreshed before the next model call');
+        self::assertGreaterThanOrEqual($before, $seen['select']['t']);
+        self::assertSame('done', $settings->lastTick()['status'], 'and written again when the tick ends');
     }
 
     public function testOneFailingStepDoesNotStopTheOthers(): void

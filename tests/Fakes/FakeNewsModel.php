@@ -132,6 +132,8 @@ final class FakeNewsModel implements NewsModel
             'importance' => 4,
             'newest_source_date' => (new \DateTimeImmutable('now', new \DateTimeZone('Europe/London')))->format('Y-m-d'),
             'decision' => 'write',
+            'category' => 'video',
+            'standards' => false,
             'duplicate_of' => [],
             'follow_up_of' => [],
             'refs' => ['S1', 'S2'],

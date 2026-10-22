@@ -10,17 +10,23 @@ use Psc\Db\Database;
 /**
  * The AI desk's tick and session (docs/NEWS.md §6).
  *
- * A tick (tools/news.php, every 15 minutes) reaps runs whose process died, imports the repository's article files,
- * runs the session that is queued or due, and writes the heartbeat, each step on its own so one failing never stops
- * the others. A due slot is claimed once; when the desk is paused, has no key or SDK, or the session could take the
- * month past its cap, the claimed run is recorded as skipped with the reason and nothing is spent.
+ * A tick (tools/news.php, every 15 minutes) writes the heartbeat, reaps runs whose process died (a failed run, so
+ * the admin is told), imports the repository's article files, runs the session that is queued or due, and writes the
+ * heartbeat again, each step on its own so one failing never stops the others; a session the tick runs refreshes the
+ * heartbeat before its model calls, so a long one never reads as a stopped cron. A due slot is claimed once, and an
+ * older slot due beside it lapses (claimed and skipped), so it never runs late after it; when the desk is paused, has
+ * no key or SDK, or the session could take the month past its cap, the claimed run is recorded as skipped with the
+ * reason and nothing is spent.
  *
  * A session holds the lease until its deadline and runs: context, research (web tools, free text, the brief and its
  * numbered references stored as soon as it ends), select (every candidate with a decision; the server applies the
  * count, the importance bar, the window and dedup itself), compose (one call per story, so one bad article never
- * sinks the others), validate (the shared Validator, one repair for the phrases to avoid), check (Claude Haiku 5.5;
- * a flag or no answer holds the article for a person) and publish (one transaction under the lease, dedup checked
- * again against the database, published times 10 to 30 minutes apart).
+ * sinks the others), validate (the shared Validator, one repair for the phrases to avoid and the limits it can fix),
+ * check (Claude Haiku 5.5 reads all of the article's public text; a flag or no answer holds the article for a person)
+ * and publish (one transaction under the lease, dedup checked again against the database, published times 10 to 30
+ * minutes apart). Only a live article is offered or accepted as a follow-up; drafts and held articles stay in the
+ * context, marked, so their stories still count as duplicates. A research answer that was refused, or whose brief has
+ * no end line, is never used.
  *
  * Money: before every model call the deadline, the session's spending ceiling and the lease are checked; after
  * every response its usage and estimated cost are written to the run, so a run that fails still shows what it spent.
@@ -43,6 +49,9 @@ final class Pipeline
     public const NEWS_DAYS = 7;
     public const WINDOW_DAYS = 14;
 
+    /** A session in a tick refreshes the heartbeat before a model call once this many seconds have passed since it was written. */
+    public const HEARTBEAT_EVERY = 300;
+
     /** The references kept from one research call, the first seen first. */
     public const MAX_REFS = 120;
 
@@ -55,6 +64,7 @@ final class Pipeline
         'no_key' => 'Skipped: no Anthropic key is set for the desk (news.api_key, or chat.api_key).',
         'sdk_missing' => 'Skipped: the Anthropic SDK is not installed on the server.',
         'budget' => "Skipped: this session could take the month's estimated spend past its cap.",
+        'lapsed' => 'Skipped: a later session was due at the same time and ran in its place.',
     ];
 
     private Settings $settings;
@@ -64,6 +74,8 @@ final class Pipeline
 
     // The session being run.
     private int $runId = 0;
+    /** Whether the session runs inside a cron tick, whose heartbeat it keeps fresh. */
+    private bool $ticking = false;
     private int $deadline = 0;
     /** @var array<string, int> */
     private array $usage = [];
@@ -106,9 +118,14 @@ final class Pipeline
     public function tick(\DateTimeImmutable $now, ?NewsModel $model): array
     {
         $report = self::emptyTick();
+        $this->beat($report, ['run' => null, 'status' => 'started']);
         try {
             // Deadlines are real times, whatever time the tick is asked about.
-            $report['reaped'] = $this->runs->reapStale(time());
+            $reaped = $this->runs->reapStale(time());
+            $report['reaped'] = count($reaped);
+            if ($reaped !== []) {
+                $this->afterwards(['status' => 'failed', 'summary' => Runs::REAPED], max($reaped));
+            }
         } catch (\Throwable $e) {
             $this->tickFailed($report, 'reap', $e);
         }
@@ -128,21 +145,32 @@ final class Pipeline
                 $id = null;
             }
             if ($id === null) {
-                $due = Schedule::slotDue($now, $this->settings, $this->runs->lastStarted(), $this->runs->slotsSince($now->getTimestamp() - 2 * 86400));
+                $last = $this->runs->lastStarted();
+                $taken = $this->runs->slotsSince($now->getTimestamp() - 2 * 86400);
+                $due = Schedule::slotDue($now, $this->settings, $last, $taken);
                 $id = $due !== null ? $this->runs->claim($due, 'scheduled', null) : null;
+                // The latest due slot runs; every older one still due lapses, claimed and skipped, so it never runs late.
+                while ($due !== null) {
+                    $taken[] = $due;
+                    $due = Schedule::slotDue($now, $this->settings, $last, $taken);
+                    $lapsed = $due !== null ? $this->runs->claim($due, 'scheduled', null) : null;
+                    if ($lapsed !== null) {
+                        $this->runs->skip($lapsed, self::SKIPS['lapsed']);
+                    }
+                }
             }
             if ($id !== null) {
-                $report = $this->startRun($id, $model, $now) + $report;
+                $this->ticking = true;
+                try {
+                    $report = $this->startRun($id, $model, $now) + $report;
+                } finally {
+                    $this->ticking = false;
+                }
             }
         } catch (\Throwable $e) {
             $this->tickFailed($report, 'session', $e);
         }
-        try {
-            $this->app->dbAlive();
-            $this->settings->heartbeat(['run' => $report['run'], 'status' => $report['status']]);
-        } catch (\Throwable $e) {
-            $this->tickFailed($report, 'heartbeat', $e);
-        }
+        $this->beat($report, ['run' => $report['run'], 'status' => $report['status']]);
         $this->app->log->info('news tick', $report);
         return $report;
     }
@@ -181,7 +209,9 @@ final class Pipeline
         if (!$this->settings->lease($runId, $this->deadline)) {
             $summary = 'Failed: another session held the desk, so this one did not start.';
             $this->runs->finish($runId, 'failed', ['summary' => $summary]);
-            return $this->report('failed', $summary);
+            $outcome = $this->report('failed', $summary);
+            $this->afterwards($outcome, $runId);
+            return $outcome;
         }
         $this->step('start', microtime(true), $row['kind'] === 'manual' ? 'Started by hand.' : 'The ' . Schedule::label((string) $row['slot']) . ' session.');
         try {
@@ -195,7 +225,7 @@ final class Pipeline
                 $this->app->log->exception($e, 'news lease release');
             }
         }
-        $this->afterwards($outcome);
+        $this->afterwards($outcome, $runId);
         return $outcome;
     }
 
@@ -229,13 +259,18 @@ final class Pipeline
         ));
         $this->app->dbAlive();
         $refs = array_slice($research['refs'], 0, self::MAX_REFS, true);
-        $brief = trim((string) $research['text']);
+        // A refused answer is discarded whole; a brief is only ever its finished parts (between both marker lines).
+        $refused = $research['stop'] === 'refusal';
+        $brief = $refused ? '' : trim((string) $research['text']);
         $this->runs->record($this->runId, ['brief' => $brief !== '' ? $brief : null, 'refs' => $refs] + $this->totals());
         $this->step('research', $t, 'Stopped with ' . $research['stop'] . ' on ' . $research['model'] . '.', [
             'refs' => count($refs), 'searches' => $this->usage['searches'], 'fetches' => $this->usage['fetches'],
         ]);
+        if ($refused) {
+            throw new \RuntimeException('The research was declined (it stopped with refusal), so its answer was discarded.');
+        }
         if ($brief === '') {
-            throw new \RuntimeException('The research ended without a brief (it stopped with ' . $research['stop'] . ').');
+            throw new \RuntimeException('The research ended without a finished brief (it stopped with ' . $research['stop'] . ').');
         }
 
         // 3. Select.
@@ -243,7 +278,7 @@ final class Pipeline
         $select = $model->structured($this->call(
             (string) $this->settings->get('compose_model'),
             Prompts::selectRules(),
-            [['role' => 'user', 'content' => $this->selectTurn($brief, $refs, $context, $n, $min)]],
+            [['role' => 'user', 'content' => $this->selectTurn($brief, $refs, $context, $n, $min, $now)]],
             self::SELECT_TOKENS,
             'medium',
             schema: Prompts::selectSchema(),
@@ -326,28 +361,38 @@ final class Pipeline
                 default => 'The answer was not the article asked for.',
             });
         }
-        $data = self::withFollowUps($compose['data'], $candidate);
+        $data = $this->withFollowUps($compose['data'], $candidate);
         $result = $this->validator->check(Draft::fromArray($data, 'ai', $refs), $ctx);
-        if (!$result->ok()) {
+        if (!$result->ok() && !$result->onlyRepairable()) {
             return $drop('Refused by the rules.', self::rules($result));
         }
 
-        // The phrases to avoid: one repair, then the article is held if it still uses them.
-        if ($result->tells !== []) {
+        // One repair for the phrases to avoid and for what only a rewrite can fix: an article it leaves refused is
+        // dropped, one that still uses a phrase is held.
+        $fix = $result->ok() ? [] : $result->repairable();
+        if ($result->tells !== [] || $fix !== []) {
+            $ask = [];
+            if ($result->tells !== []) {
+                $ask[] = 'The phrases to avoid it uses: ' . implode(', ', $result->tells) . '.';
+            }
+            if ($fix !== []) {
+                $ask[] = "What it must fix:\n- " . implode("\n- ", $fix);
+            }
             $repair = $model->structured($this->call(
                 $composeModel,
                 Prompts::repairRules(),
-                [['role' => 'user', 'content' => "The phrases to avoid it uses: " . implode(', ', $result->tells) . ".\n\nThe article:\n" . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)]],
+                [['role' => 'user', 'content' => implode("\n\n", $ask) . "\n\nThe article:\n" . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)]],
                 self::COMPOSE_TOKENS,
                 'medium',
                 schema: Prompts::articleSchema(),
             ));
             $this->app->dbAlive();
-            if ($repair['data'] !== null) {
-                $again = $this->validator->check(Draft::fromArray(self::withFollowUps($repair['data'], $candidate), 'ai', $refs), $ctx);
-                if ($again->ok()) {
-                    $result = $again;
-                }
+            $again = $repair['data'] !== null ? $this->validator->check(Draft::fromArray($this->withFollowUps($repair['data'], $candidate), 'ai', $refs), $ctx) : null;
+            if ($again !== null && $again->ok()) {
+                $result = $again;
+            }
+            if (!$result->ok()) {
+                return $drop('Refused by the rules, and its repair did not fix it.', self::rules($again ?? $result));
             }
             $this->step('repair', $t, $result->tells === [] ? 'Repaired.' : 'Still uses: ' . implode(', ', $result->tells) . '.');
         }
@@ -412,10 +457,15 @@ final class Pipeline
                 $d->origin = 'ai';
                 $d->aiWritten = true;
                 $d->byline = Draft::deskByline();
-                if ($item['hold'] !== [] || !$auto) {
+                // A follow-up goes out only after the article it follows: one that is not live holds it for a person.
+                $hold = $item['hold'];
+                foreach (array_diff($d->followUps, $this->liveOnly(array_map('intval', $d->followUps))) as $earlier) {
+                    $hold[] = 'It follows up article ' . $earlier . ', which is not published.';
+                }
+                if ($hold !== [] || !$auto) {
                     $d->status = 'draft';
                     $d->publishAt = null;
-                    $d->reviewReason = $item['hold'] !== [] ? Prose::cut(implode(' ', $item['hold']), 300) : null;
+                    $d->reviewReason = $hold !== [] ? Prose::cut(implode(' ', $hold), 300) : null;
                 } else {
                     $at = $at === null ? time() : $at + random_int(10, 30) * 60;
                     $d->status = 'published';
@@ -427,10 +477,10 @@ final class Pipeline
                 } else {
                     $drafts[] = $id;
                 }
-                if ($item['hold'] !== []) {
+                if ($hold !== []) {
                     $held[] = $id;
                 }
-                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($item['hold'] !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason, 'rules' => []];
+                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($hold !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason, 'rules' => []];
             }
             return [$published, $drafts, $held, $outcomes];
         });
@@ -472,15 +522,15 @@ final class Pipeline
     }
 
     /**
-     * The admin emails after a run, each kind at most once a day: a failed run, an article held for review, and three
-     * sessions in a row that wrote nothing.
+     * The admin emails after a run, each kind at most once a day: a failed run (a reaped one too), an article held for
+     * review, and three sessions in a row that wrote nothing (failed ones included).
      *
      * @param array<string, mixed> $outcome
      */
-    private function afterwards(array $outcome): void
+    private function afterwards(array $outcome, int $runId): void
     {
         try {
-            $run = '/portal/admin/news/desk/runs/' . $this->runId . '/';
+            $run = '/portal/admin/news/desk/runs/' . $runId . '/';
             if ($outcome['status'] === 'failed' && $this->settings->claimEmail('failed')) {
                 $this->email('A desk session failed', ['kind' => 'failed', 'summary' => (string) $outcome['summary'], 'run' => $run]);
             }
@@ -547,7 +597,11 @@ final class Pipeline
         return $call;
     }
 
-    /** Before a model call: within the deadline and the ceiling, and still holding the lease. */
+    /**
+     * Before a model call: within the deadline and the ceiling, and still holding the lease. A session in a tick also
+     * refreshes the heartbeat every HEARTBEAT_EVERY seconds, so a long one never reads as a stopped cron (a call lasts
+     * at most news.timeout_seconds, well inside the 35 minutes the readers allow).
+     */
     private function guard(): void
     {
         if (time() >= $this->deadline) {
@@ -560,6 +614,15 @@ final class Pipeline
         $this->app->dbAlive();
         if (!$this->settings->lease($this->runId, $this->deadline)) {
             throw new \RuntimeException('The session lost the desk to another run.');
+        }
+        if ($this->ticking) {
+            try {
+                if ((int) ($this->settings->lastTick()['t'] ?? 0) <= time() - self::HEARTBEAT_EVERY) {
+                    $this->settings->heartbeat(['run' => $this->runId, 'status' => 'running']);
+                }
+            } catch (\Throwable $e) {
+                $this->app->log->exception($e, 'news heartbeat');
+            }
         }
     }
 
@@ -615,9 +678,12 @@ final class Pipeline
                 'importance' => max(1, min(5, (int) ($c['importance'] ?? 1))),
                 'newest_source_date' => $line($c['newest_source_date'] ?? '', 20),
                 'decision' => in_array($decision, Prompts::DECISIONS, true) ? $decision : 'not_relevant',
+                // The window: 14 days for legal or standards news, 7 for the rest (a missing answer gets 7).
+                'category' => is_string($c['category'] ?? null) && Categories::has($c['category']) ? $c['category'] : '',
+                'standards' => ($c['standards'] ?? false) === true,
                 'duplicate_of' => $ids($c['duplicate_of'] ?? []),
-                // Only articles that exist: the article it leads to is refused for a follow-up that does not.
-                'follow_up_of' => array_values(array_filter($ids($c['follow_up_of'] ?? []), fn (int $id): bool => $this->store->find($id) !== null)),
+                // Only live articles: a follow-up of one not published yet would link to a page nobody can open.
+                'follow_up_of' => $this->liveOnly($ids($c['follow_up_of'] ?? [])),
                 'refs' => array_values(array_unique(array_filter(array_map(static fn (mixed $r): string => strtoupper(trim(is_string($r) ? $r : '')), is_array($c['refs'] ?? null) ? $c['refs'] : []), static fn (string $r): bool => isset($refs[$r])))),
                 'reason' => Prose::undash($line($c['reason'] ?? '', 300)),
             ];
@@ -649,13 +715,14 @@ final class Pipeline
                     $sources[] = $key;
                 }
             }
-            // Days from today to the newest source: a story older than the window, or dated after tomorrow, is out.
+            // Days from today to the newest source: a story older than its window, or dated after tomorrow, is out.
             $date = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $c['newest_source_date'], Schedule::zone());
             $days = $date !== false && $date->format('Y-m-d') === $c['newest_source_date'] ? (int) $today->diff($date)->format('%r%a') : null;
+            $window = self::windowDays($c);
             [$server, $why] = match (true) {
                 $c['decision'] !== 'write' => [$c['decision'], ''],
                 $c['importance'] < $min => ['low_importance', 'Below the importance the desk needs (' . $min . ').'],
-                $days === null || $days > 1 || $days < -self::WINDOW_DAYS => ['out_of_window', 'Its newest source is not dated within the last ' . self::WINDOW_DAYS . ' days.'],
+                $days === null || $days > 1 || $days < -$window => ['out_of_window', 'Its newest source is not dated within the last ' . $window . ' days.'],
                 $sources === [] => ['no_sources', 'It names no reference the research returned.'],
                 default => $this->duplicate($c, $sources, $ctx, $seen),
             };
@@ -744,9 +811,13 @@ final class Pipeline
     /** @param list<array<string, mixed>> $recent */
     private function context(array $recent, int $n, int $min): string
     {
-        $lines = ['Articles already published, scheduled or in draft, the newest first, as id | date | story key | title:'];
+        $lines = [
+            'Articles already published, scheduled or in draft, the newest first, as id | date | story key | live or not published | title.'
+                . ' Only a live article may be followed up or linked to; one not published yet still counts for duplicates:',
+        ];
         foreach ($recent as $a) {
-            $lines[] = (int) $a['id'] . ' | ' . date('Y-m-d', (int) $a['date']) . ' | ' . ((string) ($a['story_key'] ?? '') !== '' ? $a['story_key'] : '-') . ' | ' . $a['title'];
+            $lines[] = (int) $a['id'] . ' | ' . date('Y-m-d', (int) $a['date']) . ' | ' . ((string) ($a['story_key'] ?? '') !== '' ? $a['story_key'] : '-')
+                . ' | ' . ($this->store->isLive($a) ? 'live' : 'not published') . ' | ' . $a['title'];
         }
         if ($recent === []) {
             $lines[] = '(none yet)';
@@ -804,9 +875,11 @@ final class Pipeline
     }
 
     /** @param array<string, array<string, mixed>> $refs */
-    private function selectTurn(string $brief, array $refs, string $context, int $n, int $min): string
+    private function selectTurn(string $brief, array $refs, string $context, int $n, int $min, \DateTimeImmutable $now): string
     {
         return "The research brief:\n\n" . $brief . "\n\n" . self::refList($refs) . "\n\n" . $context
+            . "\n\nToday is " . $now->setTimezone(Schedule::zone())->format('l j F Y') . ' in London. The window: a story\'s newest source is at most '
+            . self::NEWS_DAYS . ' days old, ' . self::WINDOW_DAYS . ' for legal, regulatory and standards news.'
             . "\n\nReturn every candidate in the brief. Decide write for at most " . $n . ', each with an importance of ' . $min . ' or more.';
     }
 
@@ -818,40 +891,64 @@ final class Pipeline
     }
 
     /**
+     * The compose call's message as two blocks: first what every compose call of the session shares (the brief, the
+     * references and the context), marked for the cache so the calls after the first read it (and the system prompt
+     * before it) from there; then this story.
+     *
      * @param array<string, array<string, mixed>> $refs
      * @param array<string, mixed> $candidate
+     * @return list<array<string, mixed>>
      */
-    private function composeTurn(string $brief, array $refs, array $candidate, string $context): string
+    private function composeTurn(string $brief, array $refs, array $candidate, string $context): array
     {
         $follows = [];
         foreach ($candidate['follow_up_of'] as $id) {
             $a = $this->store->find((int) $id);
-            if ($a !== null) {
+            if ($a !== null && $this->store->isLive($a)) {
                 $follows[] = $id . ' (/news/' . $a['slug'] . '/): ' . $a['title'];
             }
         }
-        return "The research brief:\n\n" . $brief . "\n\n" . self::refList($refs) . "\n\nWrite the article for this story.\n"
-            . 'Headline: ' . $candidate['headline'] . "\n"
-            . 'Story key: ' . $candidate['story_key'] . "\n"
-            . 'References: ' . implode(', ', $candidate['refs']) . "\n"
-            . 'Follows up: ' . ($follows !== [] ? implode('; ', $follows) : 'none') . "\n\n" . $context;
+        return [
+            ['type' => 'text', 'text' => "The research brief:\n\n" . $brief . "\n\n" . self::refList($refs) . "\n\n" . $context, 'cacheControl' => ['type' => 'ephemeral']],
+            ['type' => 'text', 'text' => "Write the article for this story.\n"
+                . 'Headline: ' . $candidate['headline'] . "\n"
+                . 'Story key: ' . $candidate['story_key'] . "\n"
+                . 'References: ' . implode(', ', $candidate['refs']) . "\n"
+                . 'Follows up: ' . ($follows !== [] ? implode('; ', $follows) : 'none')],
+        ];
     }
 
+    /**
+     * The check's message: the banned topics, then every part of the article a reader sees, between the article
+     * markers (a marker inside the text is removed, so nothing in it can close them).
+     */
     private function checkTurn(Draft $d): string
     {
         $topics = (array) $this->settings->get('banned_topics');
+        $clean = static fn (string $text): string => trim(str_ireplace(['<article>', '</article>'], '', $text));
+        $items = static fn (array $list): string => $list !== [] ? '- ' . implode("\n- ", array_map(static fn (array $i): string => $clean((string) $i['text']), $list)) : '(none)';
+        $sources = array_map(static fn (array $s): string => $clean(trim($s['title'] . ' (' . $s['publisher'] . ')')), $d->sources);
         return "Banned topics:\n" . ($topics !== [] ? '- ' . implode("\n- ", $topics) : '(none)')
-            . "\n\nThe article\n\nTitle: " . $d->title . "\n\nStandfirst: " . $d->dek . "\n\nBody:\n" . $d->body . "\n\nWhat it means:\n" . $d->impact;
+            . "\n\n<article>\nTitle: " . $clean($d->title) . "\n\nSEO title: " . $clean($d->seoTitle) . "\n\nStandfirst: " . $clean($d->dek)
+            . "\n\nSummary: " . $clean($d->summary) . "\n\nBody:\n" . $clean($d->body) . "\n\nWhat it means:\n" . $clean($d->impact)
+            . "\n\nWhat's confirmed:\n" . $items($d->confirmed) . "\n\nStill speculation:\n" . $items($d->speculation)
+            . "\n\nVerdict: " . $d->verdict . '. ' . $clean($d->verdictNote)
+            . "\n\nSources:\n" . ($sources !== [] ? '- ' . implode("\n- ", $sources) : '(none)') . "\n</article>";
     }
 
-    /** @param array<string, array<string, mixed>> $refs */
+    /**
+     * Every reference with the address it stands for, so a fact the brief rests on an address gets that address's
+     * name; the models still answer with names only, and the server writes the addresses.
+     *
+     * @param array<string, array<string, mixed>> $refs
+     */
     private static function refList(array $refs): string
     {
-        $lines = ['The references, as name, title | site | page age | how it was found:'];
+        $lines = ['The references, as [name] address | title | site | page age | how it was found | cited (refer to them by name only):'];
         foreach ($refs as $name => $r) {
             $how = ($r['via'] ?? '') === 'fetch' ? 'read' : 'search result';
-            $lines[] = '[' . $name . '] ' . ((string) ($r['title'] ?? '') !== '' ? $r['title'] : '(no title)') . ' | ' . (Urls::host((string) $r['url']) ?? '') . ' | '
-                . ((string) ($r['page_age'] ?? '') !== '' ? $r['page_age'] : 'age unknown') . ' | ' . $how . (!empty($r['cited']) ? ', cited' : '');
+            $lines[] = '[' . $name . '] ' . $r['url'] . ' | ' . ((string) ($r['title'] ?? '') !== '' ? $r['title'] : '(no title)') . ' | ' . (Urls::host((string) $r['url']) ?? '') . ' | '
+                . ((string) ($r['page_age'] ?? '') !== '' ? $r['page_age'] : 'age unknown') . ' | ' . $how . ' | ' . (!empty($r['cited']) ? 'cited' : 'not cited');
         }
         if ($refs === []) {
             $lines[] = '(none)';
@@ -877,17 +974,46 @@ final class Pipeline
     // ------------------------------------------------------------------------------------------- the rest
 
     /**
-     * The article's follow-ups: what the model wrote and what the candidate declared.
+     * The article's follow-ups: what the model wrote and what the candidate declared, live articles only.
      *
      * @param array<string, mixed> $data
      * @param array<string, mixed> $candidate
      * @return array<string, mixed>
      */
-    private static function withFollowUps(array $data, array $candidate): array
+    private function withFollowUps(array $data, array $candidate): array
     {
         $mine = array_map('intval', is_array($data['follow_up_of'] ?? null) ? $data['follow_up_of'] : []);
-        $data['follow_up_of'] = array_values(array_unique(array_filter(array_merge($mine, $candidate['follow_up_of']), static fn (int $id): bool => $id > 0)));
+        $data['follow_up_of'] = $this->liveOnly(array_merge($mine, $candidate['follow_up_of']));
         return $data;
+    }
+
+    /**
+     * The ids of live articles among $ids (published, and due by now), each once.
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    private function liveOnly(array $ids): array
+    {
+        $out = [];
+        foreach (array_unique($ids) as $id) {
+            $a = $id > 0 ? $this->store->find($id) : null;
+            if ($a !== null && $this->store->isLive($a)) {
+                $out[] = $id;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * How old, in days, a candidate's newest source may be: WINDOW_DAYS for legal or standards news, NEWS_DAYS for
+     * every other story.
+     *
+     * @param array<string, mixed> $c
+     */
+    private static function windowDays(array $c): int
+    {
+        return ($c['category'] ?? '') === 'legal' || ($c['standards'] ?? false) === true ? self::WINDOW_DAYS : self::NEWS_DAYS;
     }
 
     /** @return list<array{rule: string, detail: string}> */
@@ -936,6 +1062,22 @@ final class Pipeline
             'usage_in' => 0, 'usage_out' => 0, 'cache_write' => 0, 'cache_read' => 0, 'searches' => 0, 'fetches' => 0,
             'cost_usd' => 0.0, 'errors' => [],
         ];
+    }
+
+    /**
+     * Writes the heartbeat; a failure is one of the tick's errors, never the end of the tick.
+     *
+     * @param array<string, mixed> $report
+     * @param array<string, mixed> $tick
+     */
+    private function beat(array &$report, array $tick): void
+    {
+        try {
+            $this->app->dbAlive();
+            $this->settings->heartbeat($tick);
+        } catch (\Throwable $e) {
+            $this->tickFailed($report, 'heartbeat', $e);
+        }
     }
 
     /** @param array<string, mixed> $report */

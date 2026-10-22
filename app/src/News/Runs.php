@@ -23,6 +23,7 @@ final class Runs
 
     /** A running run is reaped this long after its deadline: its process has gone. */
     public const REAP_AFTER = 900;
+    public const REAPED = 'Stopped: the session passed its deadline without finishing, so its process had ended.';
 
     /** What a session is assumed to cost until there are enough sessions to measure (P90_FROM). */
     public const P90_DEFAULT = 2.50;
@@ -121,13 +122,22 @@ final class Runs
         return $this->db()->update('news_runs', ['status' => 'skipped', 'finished_at' => time(), 'summary' => self::cut($summary, 500)], ['id' => $id, 'status' => 'queued']) === 1;
     }
 
-    /** Marks runs still running a quarter of an hour past their deadline as failed; returns how many. */
-    public function reapStale(int $now): int
+    /**
+     * Marks runs still running a quarter of an hour past their deadline as failed (REAPED); returns the ids this call
+     * moved. Each is one conditional UPDATE from running, so two ticks never both reap (and report) one run.
+     *
+     * @return list<int>
+     */
+    public function reapStale(int $now): array
     {
-        return $this->db()->exec(
-            "UPDATE news_runs SET status = 'failed', finished_at = ?, summary = ? WHERE status = 'running' AND deadline_at < ?",
-            [$now, 'Stopped: the session passed its deadline without finishing, so its process had ended.', $now - self::REAP_AFTER]
-        );
+        $db = $this->db();
+        $ids = [];
+        foreach ($db->all("SELECT id FROM news_runs WHERE status = 'running' AND deadline_at < ? ORDER BY id", [$now - self::REAP_AFTER]) as $row) {
+            if ($db->exec("UPDATE news_runs SET status = 'failed', finished_at = ?, summary = ? WHERE id = ? AND status = 'running'", [$now, self::REAPED, (int) $row['id']]) === 1) {
+                $ids[] = (int) $row['id'];
+            }
+        }
+        return $ids;
     }
 
     /** The estimated spend of this London month's sessions, in USD. */
@@ -164,7 +174,9 @@ final class Runs
     }
 
     /**
-     * How many of the latest sessions that ran wrote nothing, counting back to the last one that did.
+     * How many of the latest sessions that ran wrote nothing, counting back to the last one that did: a session that
+     * failed (reaped, refused the lease, or stopped by an error) ran and wrote nothing, so it counts; one skipped before
+     * it started never ran.
      */
     public function consecutiveEmpty(): int
     {

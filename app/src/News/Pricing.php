@@ -33,7 +33,9 @@ final class Pricing
 
     /**
      * The usage of a session the estimates assume: research reads 0.4 to 1M tokens, mostly from the cache; selecting
-     * and writing read 30 to 60k and write 20 to 40k (docs/NEWS.md §2.9).
+     * and writing read 30 to 60k and write 20 to 40k (docs/NEWS.md §2.9). The first compose call writes the part the
+     * session's compose calls share (the brief, the references, the context) to the cache and the others read it
+     * back, 10 to 20k more read from the cache.
      */
     private const PROFILE = [
         'research' => [
@@ -41,8 +43,8 @@ final class Pricing
             'high' => ['usage_in' => 100000, 'cache_write' => 100000, 'cache_read' => 800000, 'usage_out' => 25000],
         ],
         'writing' => [
-            'low' => ['usage_in' => 20000, 'cache_write' => 10000, 'cache_read' => 0, 'usage_out' => 20000],
-            'high' => ['usage_in' => 40000, 'cache_write' => 20000, 'cache_read' => 0, 'usage_out' => 40000],
+            'low' => ['usage_in' => 20000, 'cache_write' => 10000, 'cache_read' => 10000, 'usage_out' => 20000],
+            'high' => ['usage_in' => 40000, 'cache_write' => 20000, 'cache_read' => 20000, 'usage_out' => 40000],
         ],
     ];
 
