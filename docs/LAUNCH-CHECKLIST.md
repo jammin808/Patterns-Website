@@ -13,6 +13,26 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 - [ ] Connect GitHub in hPanel → Git (branch `deploy`), or deploy the release zip by hand.
 - [ ] Add the `HOSTINGER_API_TOKEN` repository secret so every deploy flushes the CDN (docs/DEPLOY.md §2).
 
+## Industry Updates
+
+- [ ] An Anthropic key for the AI desk in a workspace of its own, with a monthly spend limit, set as `news.api_key`
+      in the server config (without it the desk uses `chat.api_key` and shares the assistant's limit).
+- [ ] Allow web search and web fetch in the Anthropic Console (an organisation administrator, in the privacy
+      settings); without them every research session fails.
+- [ ] Add the second cron job, every 15 minutes: `tools/news.php tick` (docs/DEPLOY.md §1 step 9). Then check the desk
+      page shows a recent tick and `/health` says `"news": "ok"`.
+- [ ] Check `/health` says `"images": true` (GD with WebP), or article images cannot be uploaded.
+- [ ] The desk's monthly cap: 100 USD by default (estimated, on the desk's settings page). Pick yours, and keep the
+      Console's limit as the hard stop.
+- [ ] AI articles go live without a person reading them first, as you asked; anything that names a private person,
+      alleges wrongdoing or trips a check is held for review instead. To read everything first, untick *Publish
+      articles automatically* in the desk's settings.
+- [ ] Read the research brief and the voice on the desk's prompt page, and add any banned websites and topics.
+- [ ] Read the eight launch articles: the first tick imports them and they go live 10 to 30 minutes apart.
+- [ ] Check on the live site whether Hostinger's CDN keeps news pages for only the 2 minutes they ask for
+      (`curl -I` an article twice and compare the `age` header). Until that is known, a takedown needs the Flush CDN
+      workflow (docs/DEPLOY.md §5).
+
 ## Legal (drafts in `content/legal/`, need your review)
 
 - [ ] Privacy policy, cookie notice, website terms, software licence terms.

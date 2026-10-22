@@ -11,7 +11,7 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 │   └── downloads-vault/      ← release files (served only through the portal)
 └── patterns-data/            ← created on first request; never deployed over
     ├── config.php            ← the server configuration (secrets)
-    └── storage/              ← sessions, logs, cache, uploads, licence files
+    └── storage/              ← sessions, logs, cache, uploads (news images too), licence files
 ```
 
 ## 1. One-time setup
@@ -22,7 +22,9 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
    `patternsshowcontrol.co.uk`. Wait for the free SSL to show *Active*; turn on **Force HTTPS**.
    Delete the placeholder files in `public_html` (the first Git deploy needs an empty folder).
 3. **PHP.** hPanel → Advanced → PHP Configuration: 8.3 (the version is shared by every site on the plan, including
-   agmessage.com). Keep `pdo_mysql`, `curl`, `intl`, `mbstring`, `fileinfo` on; set `expose_php` Off.
+   agmessage.com). Keep `pdo_mysql`, `curl`, `intl`, `mbstring`, `fileinfo` and `gd` on; set `expose_php` Off. GD
+   must be built with WebP and JPEG support: Industry Updates re-encodes every uploaded image to WebP, with a JPEG
+   share card. `/health` reports `"images": true` when it can.
 4. **Database.** hPanel → Databases → MySQL: create a database and user (long random password). The site connects to
    `127.0.0.1:3306` and creates its tables itself on the first request (migrations run under a lock).
 5. **Email.** hPanel → Emails: create `support@` and `no-reply@` mailboxes, click *Connect automatically* (MX, SPF,
@@ -33,6 +35,14 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
    its scope check; the site also stops by itself at `chat.daily_token_budget` tokens a day. The budget counts every
    answer, including one withdrawn or cut off, and the long cached system prompt at its billed weight: prompt tokens
    written to the cache at 1.25 and tokens read from it at 0.1 of an input token.
+   **Industry Updates' AI desk** (docs/NEWS.md §6) uses `news.api_key`, or `chat.api_key` when that is empty. Create
+   a separate key in a workspace of its own, with its own monthly spend limit, so a busy news month can never use
+   up the assistant's limit (and the assistant cannot starve the desk). The desk uses the server-side web search and
+   web fetch tools: in the Anthropic Console, an organisation administrator must allow web search and web fetch
+   (the organisation's privacy settings), or every research call is refused. Research runs on Claude Sonnet 5.5,
+   choosing and writing on Claude Opus 5.5, and the check before publishing on Claude Haiku 5.5. The desk's own cap
+   (`monthly_budget_usd`, 100 USD by default, on the desk's settings page) is an estimate from the usage the API
+   reports; the Console's limit is the hard stop.
 7. **Configuration.** Copy `config/config.example.php`, fill it in (database, SMTP, Anthropic key,
    `app.secret` = 64 random hex characters, `app.admin_emails` = your address) and create it with File Manager at
    `/home/<user>/domains/patternsshowcontrol.co.uk/patterns-data/config.php` (create the folder; `public_html` stays
@@ -52,9 +62,15 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
    that on your computer first), or run `tools/build-release.sh`. Upload the `patterns-site-<version>.zip` inside
    it to `public_html` with File Manager and extract it there. The data folder outside `public_html` is never
    touched by either route.
-9. **Cron.** hPanel → Advanced → Cron Jobs, daily (UTC):
-   `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php` (`/usr/bin/php` is the
-   account's PHP CLI, 8.3 today)
+9. **Cron.** hPanel → Advanced → Cron Jobs. Two jobs (`/usr/bin/php` is the account's PHP CLI, 8.3 today):
+   - Housekeeping, daily (UTC):
+     `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php`
+   - Industry Updates, every 15 minutes (`*/15 * * * *`):
+     `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/news.php tick`
+     Each tick imports any new article files, runs the session that is due (the sessions are London times set on
+     the desk's settings page, so the clock change needs no new cron line) and records a heartbeat. A tick that
+     finds another still running exits at once. The desk page (Portal → Admin → Industry Updates → Open the AI
+     desk) warns when the last tick is more than 35 minutes old, and `/health` reports `"news": "stale"`.
 10. **Your admin account.** Register at `/portal/register/` with an address listed in `app.admin_emails` and
     confirm the email: that account is an administrator.
 
@@ -77,7 +93,8 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
   assistant switched on and a key set, a missing `vendor/` makes it `degraded`); a signed-out request to
   `/portal/downloads/1/` redirects to the login page; `curl -N -X POST https://…/api/chat` from another origin is
   refused with 403; `curl -I https://patternsshowcontrol.co.uk/.well-known/security.txt` answers 200 `text/plain`
-  (only the live LiteSpeed server can confirm the `.htaccess` lets it through).
+  (only the live LiteSpeed server can confirm the `.htaccess` lets it through); `/health` reports `"news": "ok"`
+  once the news cron is ticking and a key is set (`"off"` while the desk is paused or has no key).
 - If the assistant's answers arrive all at once instead of streaming, the CDN is buffering the stream: turn the CDN
   off for the domain, or exclude `/api/chat`.
 
@@ -91,6 +108,10 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 | Read contact messages | Portal → Admin → Messages (also emailed to `mail.admin_to`). |
 | Review the assistant | Portal → Admin → Assistant chats: every conversation, its scope verdicts and thumbs up/down. |
 | Change prices, features, FAQ | Edit the files in `content/` (see `docs/CONTENT.md`), push to `main`. The assistant's knowledge updates with them. |
+| Write or correct a news article | Portal → Admin → Industry Updates → open the article (or *Write an article*). AI articles held for review wait under *Held*. |
+| Run the AI desk | Portal → Admin → Industry Updates → Open the AI desk: pause or continue it, *Run a session now* (it starts within 15 minutes), change its sessions, calendar, models, cap, banned sites and topics, and its brief and voice. Each run has a page with its steps, candidates, references and estimated cost. |
+| Moderate comments | Portal → Admin → Industry Updates → Comments (the first report on a comment is emailed). |
+| Publish an article written in a Claude Code session | Add its JSON file to `content/news/articles/` (the shape is in docs/NEWS.md §6.4) and push to `main`: the next tick imports it once. |
 
 ## 4. Settings worth knowing (`config/defaults.php`)
 
@@ -104,6 +125,11 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 - `licensing.payment_mode`: `invoice` (default: you email payment details) or `links` with
   `licensing.payment_links` such as `'stagewatch.pro' => 'https://…'`.
 - `chat.*`: models, limits, the daily token budget and how long conversations are kept (30 days).
+- `news.*`: the desk's key (`api_key`; empty falls back to `chat.api_key`), how long one model call may take
+  (`timeout_seconds`, 600) and to connect (`connect_timeout_seconds`, 15), the check model (`check_model`), a
+  session's deadline (`session_minutes`, 40) and its spending ceiling (`session_ceiling_usd`, 5 USD, estimated), and
+  whether imported articles without a time go live 10 to 30 minutes apart (`import_stagger`). Everything else about
+  the desk (sessions, models, cap, lists, prompts) is set on its admin pages and kept in the database.
 - `security.turnstile_site_key` / `turnstile_secret`: add Cloudflare Turnstile to the contact form if spam appears.
 - `app.trusted_proxy_header` / `app.trusted_proxies`: how the site learns a visitor's address behind a CDN, which
   every per-address limit (sign-in, contact, register, the assistant) counts by. Leave the header `null` (the
@@ -115,7 +141,24 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
   visitor wrote, and ignores the header on a request that did not come through those ranges. Any other header
   (such as `HTTP_CF_CONNECTING_IP`) is read only from a request whose `REMOTE_ADDR` is in `trusted_proxies`.
 
-## 5. Backups
+## 5. Taking an Industry Updates article down
 
-Hostinger backs up files and databases daily. The data that matters is the MySQL database, `patterns-data/`
-(configuration, uploads, licence files) and `public_html/downloads-vault/`.
+News pages are cached for 2 minutes (`public, max-age=120, stale-while-revalidate=600`) and news images for an hour
+on the CDN (`s-maxage=3600`). Whether Hostinger's CDN honours those times is still to be confirmed on the live site,
+so to remove something at once:
+
+1. **Unpublish it** (Portal → Admin → Industry Updates → the article → *Unpublish*), or delete it, or delete just the
+   image. The site stops serving it straight away; an imported article that is deleted is never imported again.
+2. **Flush the CDN**: GitHub → Actions → *Flush CDN* → *Run workflow* (or hPanel → Performance → CDN → Flush cache).
+   Without the flush a cached copy can stay at the edge for a few minutes, an image for up to an hour.
+3. If the request came from outside (a correction, a complaint), note what was changed and when; the audit log
+   (Portal → Admin → Audit log, `news.`) has the record.
+
+To stop the desk publishing anything new while you look into it, pause it on the desk page, or untick *Publish
+articles automatically* in its settings so every article waits as a draft.
+
+## 6. Backups
+
+Hostinger backs up files and databases daily. The data that matters is the MySQL database (news articles, comments
+and the desk's settings and prompts included), `patterns-data/` (configuration, uploads and news images, licence
+files) and `public_html/downloads-vault/`.
