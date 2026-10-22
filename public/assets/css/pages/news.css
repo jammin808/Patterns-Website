@@ -1,0 +1,116 @@
+/*
+ * Industry Updates (docs/DESIGN.md 8.36): the lists, the category bar, the cards, the artwork and the article page.
+ * Everything sits in the components layer and uses the tokens from site.css; no raw colours. Pushed only by the
+ * news templates.
+ */
+@layer components {
+  /* ===== The lists' hero: title left, lede right from 64rem, as on the workflows hub ===== */
+  @media (width >= 64rem) {
+    .news-hero .c-hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap) clamp(40px, 5vw, 80px); align-items: end; }
+    .news-hero .c-hero-lede { margin-top: 0; }
+  }
+  .news-list { padding-block: clamp(24px, 3vw, 40px) var(--section-y); }
+
+  /* ===== The bar: the categories as a wrapping list of 44px targets (a form with a select below 40rem), then the
+     search. The current category reads as the pager's current page does: filled, with the words kept. ===== */
+  .news-bar { display: grid; gap: var(--sp-4); margin-bottom: var(--sp-6); }
+  .news-cats { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px;
+    & a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px 0 14px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
+      font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; transition: border-color var(--d-1) var(--e-cut); }
+    & a:hover { border-color: var(--text-2); }
+    & a[aria-current] { border-color: var(--text); background: var(--text); color: var(--bg); }
+    & a[aria-current] .news-cats-count { background: var(--bg); color: var(--text); } }
+  .news-cats-count { padding: 3px 7px; border-radius: var(--r-pill); background: var(--s3); font: 600 11px/1 var(--font-mono); color: var(--text-2); }
+  .news-pick, .news-search { margin-bottom: 0; }
+  .news-pick select { flex: 1 1 10rem; min-width: 0; max-width: none; }
+  .news-search .c-search-field input { width: 100%; min-width: 0; }
+  .news-search-help { flex-basis: 100%; }
+  @media (forced-colors: active) { .news-cats a[aria-current] { outline: 2px solid Highlight; outline-offset: -2px; } }
+
+  .news-list-title { font-size: var(--fs-5); }
+  .news-count { margin-top: 6px; font-size: var(--fs-1); color: var(--text-2); }
+  .news-list-title + .news-count, .news-list-title + .news-grid, .news-list-title + .news-empty { margin-top: var(--sp-5); }
+  .news-count + * { margin-top: var(--sp-5); }
+  .news-pager { margin-top: var(--sp-6); }
+
+  /* ===== The grid: one, two, then three columns; the newest article on a first page spans two columns and two
+     rows from 64rem, so the eleven beside and below it fill whole rows ===== */
+  .news-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr); }
+  @media (width >= 40rem) {
+    .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .news-card--lead { grid-column: 1 / -1; }
+  }
+  @media (width >= 64rem) {
+    .news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .news-card--lead { grid-column: span 2; grid-row: span 2; }
+    .news-card--lead .news-card-media { flex: 1 1 auto; aspect-ratio: auto; min-height: 18rem; }
+  }
+
+  /* ===== Cards: the title's link covers the card; the picture and the categories show first, read after ===== */
+  .news-card { position: relative; overflow: hidden; transition: border-color var(--d-1) var(--e-cut);
+    & .c-card-title { font-size: var(--fs-4); line-height: 1.2; }
+    & .c-card-title a { text-decoration: none; }
+    & .c-card-title a::after { content: ""; position: absolute; inset: 0; }
+    & .c-card-title a:focus-visible { outline: none; }
+    &:hover { border-color: var(--text-2); & .c-card-title a { text-decoration: underline; text-underline-offset: 0.2em; } }
+    &:has(.c-card-title a:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; } }
+  .news-card--lead .c-card-title { font-size: var(--fs-5); }
+  .news-card--lead .c-card-body { font-size: var(--fs-2); }
+  .news-card-media { order: -2; margin: -20px -20px 6px; aspect-ratio: 16 / 9; overflow: hidden; border-bottom: 1px solid var(--line); background: var(--s2);
+    & img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    & .news-art { height: 100%; border: 0; border-radius: 0; aspect-ratio: auto; } }
+  .news-card-cats { order: -1; font-size: var(--fs-0); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); }
+  .news-card-meta { gap: 4px 0; font-size: var(--fs-0); color: var(--text-2);
+    & > :not(:last-child)::after { content: "·" / ""; margin-inline: 10px; color: var(--text-3); } }
+
+  /* ===== Artwork: a category's symbol in --text-3 on a hairline grid in --line, where there is no picture ===== */
+  .news-art { display: grid; place-items: center; aspect-ratio: 16 / 9; color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-2);
+    background: linear-gradient(color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 1px) 50% 50% / 24px 24px,
+      linear-gradient(90deg, color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 1px) 50% 50% / 24px 24px, var(--s2); }
+  .news-art--wide { aspect-ratio: 12 / 5; }
+  .news-art-svg { width: 76%; height: 76%; overflow: visible; }
+
+  /* ===== The article: one reading column, the hero's width (the hero stays one column at every width) ===== */
+  .news-story-hero .c-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--sp-4); padding-bottom: clamp(28px, 4vw, 48px); }
+  .news-story-hero .news-story-title { max-width: none; font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem); line-height: 1.05; }
+  .news-story-hero .news-story-dek { margin-top: 0; max-width: none; }
+  .news-tags { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px;
+    & .c-tag { min-height: 28px; border-color: var(--field); color: var(--text); text-decoration: none; }
+    & .c-tag:hover { border-color: var(--text-2); } }
+  .news-meta { display: flex; flex-wrap: wrap; gap: 4px 0; font-size: var(--fs-1); color: var(--text-2);
+    & > :not(:last-child)::after { content: "·" / ""; margin-inline: 10px; color: var(--text-3); } }
+  .news-preview { margin-bottom: var(--sp-2); }
+
+  .news-story { padding-block: clamp(32px, 4vw, 56px) var(--section-y); }
+  /* Long addresses in a source list or a fact break anywhere rather than push the page sideways at 320px. */
+  .news-story-wrap { display: grid; gap: var(--sp-6); overflow-wrap: anywhere;
+    & > * { min-width: 0; } }
+  .news-figure { margin: 0;
+    & img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--s2); } }
+  .news-figure-caption { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: var(--fs-1); color: var(--text-2); }
+  .news-figure-credit { color: var(--text-3); & a { color: var(--text-2); } }
+  .news-gallery { display: grid; gap: var(--sp-6); }
+
+  .news-part { display: grid; gap: var(--sp-4);
+    & > h2 { font-size: var(--fs-5); } }
+  /* Facts: each with its badge (a word and a dot, never colour alone) and its source. */
+  .news-facts { list-style: none; padding: 0; border-top: 1px solid var(--line); }
+  .news-fact { display: grid; gap: 8px; justify-items: start; padding-block: 16px; border-bottom: 1px solid var(--line);
+    & > p { max-width: 70ch; } }
+  @media (width >= 40rem) {
+    .news-fact { grid-template-columns: 8.5rem minmax(0, 1fr); column-gap: 16px;
+      & > .c-badge { grid-row: 1 / span 2; align-self: start; margin-top: 2px; } & > p { grid-column: 2; } }
+  }
+  .news-fact-source { font-size: var(--fs-1); color: var(--text-2);
+    & a { font-weight: 600; color: var(--text); text-decoration-color: var(--line-2); } & a:hover { text-decoration-color: currentColor; } }
+  .news-verdict h2.c-callout-title { font-size: var(--fs-3); line-height: 1.3; }
+
+  .news-sources { display: grid; gap: 14px; padding-left: 1.8em;
+    & li::marker { font: 600 var(--fs-1) var(--font-mono); color: var(--text-3); }
+    & a { font-weight: 600; text-decoration-color: var(--line-2); } & a:hover { text-decoration-color: currentColor; } }
+  .news-source-meta { display: flex; flex-wrap: wrap; gap: 2px 0; margin-top: 4px; font-size: var(--fs-0); color: var(--text-2);
+    & > :not(:last-child)::after { content: "·" / ""; margin-inline: 8px; color: var(--text-3); } }
+  .news-later { list-style: none; padding: 0; display: grid; gap: 10px;
+    & a { font-weight: 600; } & time { margin-left: 8px; font-size: var(--fs-0); color: var(--text-2); } }
+  .news-preview-comments { font-size: var(--fs-1); color: var(--text-2); }
+}

@@ -21,4 +21,6 @@ return [
     'mail' => ['driver' => 'log', 'admin_to' => 'owner@example.test'],
     'chat' => ['api_key' => ''],
     'security' => ['login_max_attempts' => 50],
+    // The launch articles all go live at once when the server starts, so pages.spec checks every one of them.
+    'news' => ['import_stagger' => false],
 ];

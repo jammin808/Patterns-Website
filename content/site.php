@@ -74,6 +74,8 @@ return [
         ],
         ['label' => 'Workflows', 'href' => '/workflows/'],
         ['label' => 'Licensing', 'href' => '/licensing/'],
+        // Industry Updates; the bar has room for a short label only (docs/NEWS.md §2.1).
+        ['label' => 'News', 'href' => '/news/'],
         ['label' => 'Support', 'href' => '/support/'],
     ],
 
@@ -135,6 +137,7 @@ return [
             'links' => [
                 ['label' => 'Home', 'href' => '/'],
                 ['label' => 'About', 'href' => '/about/'],
+                ['label' => 'Industry Updates', 'href' => '/news/'],
                 ['label' => 'Contact', 'href' => '/contact/'],
                 ['label' => 'How licensing works', 'href' => '/licensing/'],
                 ['label' => 'Software licence terms', 'href' => '/legal/licence-terms/'],

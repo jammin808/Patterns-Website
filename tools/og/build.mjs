@@ -43,7 +43,9 @@ foreach ($wf as $path => $p) { if (($p['type'] ?? '') === 'workflow') { $workflo
 $flows = require $root . '/content/workflows.php';
 $wfProducts = [];
 foreach ($flows as $key => $f) { $wfProducts[$f['slug'] ?? $key] = $f['products'] ?? []; }
-echo json_encode(['og' => $og, 'products' => $products, 'lines' => $lines, 'tiers' => $tiers, 'workflows' => $workflows, 'wfProducts' => $wfProducts], JSON_UNESCAPED_UNICODE);
+$newsCopy = require $root . '/content/news.php';
+$news = ['eyebrow' => $newsCopy['index']['eyebrow'], 'title' => $newsCopy['index']['title'], 'confirmed' => $newsCopy['sections']['confirmed'], 'speculation' => $newsCopy['sections']['speculation']];
+echo json_encode(['og' => $og, 'products' => $products, 'lines' => $lines, 'tiers' => $tiers, 'workflows' => $workflows, 'wfProducts' => $wfProducts, 'news' => $news], JSON_UNESCAPED_UNICODE);
 `;
 const data = JSON.parse(execFileSync('php', ['-r', php, root], { encoding: 'utf8' }));
 const P = data.products;
@@ -108,6 +110,10 @@ const V = {
     <div class="og-chat-chips"><span>Which licence do I need?</span><span>Which app is for an AGM?</span><span>How do I report a bug?</span></div></div>`,
   topics: () => `<div class="og-radios">${['Buying a licence or pricing', 'Help with the software', 'A licence I already have', 'Rental, reseller or partnership']
     .map((t, i) => `<div class="og-radio${i === 0 ? ' is-on' : ''}">${t}</div>`).join('')}</div>`,
+  // Industry Updates: what every article carries, in its own section names (content/news.php), not a headline.
+  digest: () => `<div class="og-sheet"><div class="og-sheet-head">${icon('doc')}In every article</div><ul class="og-list">${[
+    ['check', data.news.confirmed], ['eye', data.news.speculation], ['users', 'What it means for your shows'], ['idea', 'Whether it is worth testing'],
+  ].map(([i, t]) => `<li>${icon(i)}${esc(t)}</li>`).join('')}</ul></div>`,
 };
 
 // ---------------------------------------------------------------------------------------------- the cards
@@ -131,6 +137,7 @@ const cards = {
   support: { title: 'Support', sub: 'Getting-started guides, troubleshooting, licence help and the support assistant.', visual: V.assistant(), size: 80 },
   contact: { eyebrow: 'Contact', title: 'Get in touch', sub: 'Licences, an AGM, rental packs or a show next week. Based in the UK.', visual: V.topics(), size: 80 },
   about: { eyebrow: 'About', title: 'Made in the UK by Ben Rohleder', sub: 'Built at real show desks for the crews who run conferences, AGMs and live events.', visual: V.habits() },
+  news: { eyebrow: data.news.eyebrow, title: data.news.title, sub: 'What changed, what it means for freelancers and event teams, and whether to test it.', visual: V.digest(), size: 80 },
 };
 
 const missing = Object.keys(data.og).filter((k) => !cards[k]);

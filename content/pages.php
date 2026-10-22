@@ -398,7 +398,8 @@ return [
         'parent' => '/',
         'section' => 'news',
         'type' => 'hub',
-        'og' => '/assets/img/og/default.png',
+        'og' => '/assets/img/og/news.png',
+        'og_alt' => 'Industry Updates, AV and live event news. In every article: what\'s confirmed, what\'s still speculation, what it means for your shows and whether it is worth testing.',
         'updated' => '2026-10-22',
     ],
     '/contact/' => [
@@ -433,7 +434,7 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
     '/legal/terms/' => [
         'template' => 'pages/legal/terms',
@@ -443,7 +444,7 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
     '/legal/licence-terms/' => [
         'template' => 'pages/legal/licence-terms',
@@ -463,6 +464,6 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => $updated,
+        'updated' => '2026-10-22',
     ],
 ];

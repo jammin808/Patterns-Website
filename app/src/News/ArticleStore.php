@@ -435,6 +435,25 @@ final class ArticleStore
         return $files;
     }
 
+    /** Adds one click to the link's total and to its row for $day (Y-m-d), making that row on the day's first click. */
+    public function countClick(int $linkId, string $day): void
+    {
+        $this->db()->transaction(static function (Database $db) use ($linkId, $day): void {
+            $db->exec('UPDATE news_links SET clicks = clicks + 1 WHERE id = ?', [$linkId]);
+            if ($db->exec('UPDATE news_link_clicks SET clicks = clicks + 1 WHERE link_id = ? AND day = ?', [$linkId, $day]) === 0) {
+                try {
+                    $db->insert('news_link_clicks', ['link_id' => $linkId, 'day' => $day, 'clicks' => 1]);
+                } catch (\PDOException $e) {
+                    // Another click made the day's row first: add to it.
+                    if (!self::isDuplicate($e)) {
+                        throw $e;
+                    }
+                    $db->exec('UPDATE news_link_clicks SET clicks = clicks + 1 WHERE link_id = ? AND day = ?', [$linkId, $day]);
+                }
+            }
+        });
+    }
+
     /** Whether a database error is a unique key refused (a slug, an import key, a slot taken by someone else). */
     public static function isDuplicate(\Throwable $e): bool
     {

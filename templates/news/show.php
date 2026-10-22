@@ -1,0 +1,213 @@
+<?php
+/**
+ * /news/{slug}/: one article, in the order docs/NEWS.md §10 sets. The hero holds the breadcrumbs (put there by the
+ * layout), the category tags, the headline, the standfirst and the meta line; then the follow-up banner, the lead
+ * image or the category's artwork, the body, what is confirmed and what is still speculation (each fact with its
+ * badge and its source), what it means, the verdict, the other images, the numbered sources, the later updates,
+ * the note on AI-written articles and the comments. Every source link is real (rel nofollow, a new tab) and carries
+ * data-news-link, which news.js counts. The page is the same for every visitor; the administrators' preview adds
+ * a banner and leaves out the counting and the comments.
+ *
+ * @var array<string, mixed> $copy  content/news.php
+ * @var array<string, mixed> $article  ArticleStore::findBySlug() or find()
+ * @var bool $preview
+ * @var bool $live
+ * @var array{name: string}|null $primary  the primary category
+ * @var array<string, array{name: string}> $categories
+ * @var string $byline
+ * @var int|null $published
+ * @var int|null $updated  set when the article changed after it went live
+ * @var int $modified  its last change that counts: $updated, else the time it went live
+ * @var int $readMinutes
+ * @var string $body  rendered Markdown
+ * @var string $impact  rendered Markdown, its headings one level down
+ * @var list<array{html: string, url: string, link: int|null, label: string}> $confirmed
+ * @var list<array{html: string, url: string, link: int|null, label: string}> $speculation
+ * @var list<array<string, mixed>> $sources  news_links rows
+ * @var array{earlier: list<array<string, mixed>>, later: list<array<string, mixed>>} $related
+ * @var array<string, mixed>|null $lead  NewsController::picture()
+ * @var list<array<string, mixed>> $images  the other pictures
+ * @var string $aiNote
+ * @var list<array<string, mixed>> $comments
+ * @var \Psc\View\Seo $seo
+ */
+$this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/news.css')) . '">');
+$this->push('head', '<link rel="alternate" type="application/rss+xml" title="' . e($copy['feed']['label'] ?? 'Industry Updates RSS feed') . '" href="/news/feed.xml">');
+if ($published !== null) {
+    $this->push('head', '<meta property="article:published_time" content="' . e(date(DATE_ATOM, $published)) . '">');
+    $this->push('head', '<meta property="article:modified_time" content="' . e(date(DATE_ATOM, $modified)) . '">');
+}
+if ($primary !== null) {
+    $this->push('head', '<meta property="article:section" content="' . e($primary['name']) . '">');
+}
+foreach ($article['tag_list'] as $tag) {
+    $this->push('head', '<meta property="article:tag" content="' . e($tag) . '">');
+}
+if (!$preview) {
+    $this->push('scripts', '<script type="module" src="' . e(asset('/assets/js/news.js')) . '"></script>');
+}
+
+$sections = is_array($copy['sections'] ?? null) ? $copy['sections'] : [];
+$meta = is_array($copy['meta'] ?? null) ? $copy['meta'] : [];
+$badges = is_array($copy['badges'] ?? null) ? $copy['badges'] : [];
+$kinds = is_array($copy['kinds'] ?? null) ? $copy['kinds'] : [];
+$newTab = '<span class="u-visually-hidden"> (' . e($copy['new_tab'] ?? 'opens in a new tab') . ')</span>';
+$when = static fn (int $ts): string => '<time datetime="' . e(date(DATE_ATOM, $ts)) . '">' . e(date('j F Y, H:i', $ts)) . '</time>';
+$verdict = $copy['verdicts'][(string) ($article['verdict'] ?? '')] ?? null;
+$primaryKey = (string) $article['category'];
+// A source link names its source; the source list's links name their pages.
+$out = static fn (string $url, ?int $id, string $label): string => '<a href="' . e($url) . '" rel="nofollow noopener" target="_blank"' . ($id !== null ? ' data-news-link="' . $id . '"' : '') . '>' . e($label) . $newTab . '</a>';
+// Tell us (in the editable note) is the way to the contact page.
+$note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>', e($aiNote), 1);
+?>
+<section class="c-hero c-hero--page news-story-hero" aria-labelledby="story-title">
+    <div class="l-wrap l-wrap--prose">
+        <div class="c-hero-grid">
+            <?php if ($preview): $previewCopy = is_array($copy['preview'] ?? null) ? $copy['preview'] : []; ?>
+                <div class="c-callout c-callout--warning news-preview" role="note">
+                    <?= icon('eye') ?>
+                    <strong class="c-callout-title"><?= e($live ? ($previewCopy['live'] ?? 'Preview: this article is live') : ($previewCopy['title'] ?? 'Preview: not published')) ?></strong>
+                    <?php if (!$live): ?>
+                        <p><?= ($article['status'] ?? '') === 'published' && $published !== null
+                            ? strtr(e($previewCopy['scheduled'] ?? 'Scheduled to go live :time.'), [':time' => $when($published)])
+                            : e($previewCopy['draft'] ?? '') ?></p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($article['categories'] !== []): ?>
+                <ul class="news-tags" role="list" aria-label="<?= e($copy['categories_label'] ?? 'Categories') ?>">
+                    <?php foreach ($article['categories'] as $key): ?>
+                        <li><a class="c-tag" href="/news/category/<?= e($key) ?>/"><?= e($categories[$key]['name'] ?? $key) ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <h1 class="c-hero-title news-story-title" id="story-title"><?= e($article['title']) ?></h1>
+            <p class="c-hero-lede news-story-dek"><?= e($article['dek']) ?></p>
+            <p class="news-meta">
+                <?php if ($published !== null): ?><span><?= $when($published) ?></span><?php else: ?><span><?= e($meta['unpublished'] ?? 'Not published yet') ?></span><?php endif; ?>
+                <span><?= e(strtr((string) ($meta['read'] ?? ':n min read'), [':n' => (string) $readMinutes])) ?></span>
+                <?php if ($updated !== null): ?><span><?= e($meta['updated'] ?? 'Updated') ?> <?= $when($updated) ?></span><?php endif; ?>
+                <span><?= e($meta['by'] ?? 'By') ?> <?= e($byline) ?></span>
+            </p>
+        </div>
+    </div>
+</section>
+
+<div class="l-section l-section--flush news-story">
+    <div class="l-wrap l-wrap--prose news-story-wrap">
+        <?php if ($related['earlier'] !== []): ?>
+            <div class="c-callout c-callout--info news-followup" role="note">
+                <?= icon('link') ?>
+                <strong class="c-callout-title"><?= e($sections['follow_up'] ?? 'Follow-up to') ?>:</strong>
+                <ul>
+                    <?php foreach ($related['earlier'] as $r): ?>
+                        <li><a href="/news/<?= e($r['slug']) ?>/"><?= e($r['title']) ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($lead !== null): ?>
+            <?= $this->partial('news/figure', ['picture' => $lead, 'copy' => $copy, 'eager' => true]) ?>
+        <?php else: ?>
+            <div class="news-lead-art"><?= $this->partial('news/art', ['key' => $primaryKey, 'wide' => true]) ?></div>
+        <?php endif; ?>
+
+        <div class="c-prose news-body"><?= $body ?></div>
+
+        <?php if ($confirmed !== []): ?>
+            <section class="news-part" aria-labelledby="news-confirmed">
+                <h2 id="news-confirmed"><?= e($sections['confirmed'] ?? "What's confirmed") ?></h2>
+                <ul class="news-facts" role="list">
+                    <?php foreach ($confirmed as $f): ?>
+                        <li class="news-fact">
+                            <span class="c-badge c-badge--done"><?= e($badges['confirmed'] ?? 'Confirmed') ?></span>
+                            <p><?= $f['html'] ?></p>
+                            <?php if ($f['url'] !== ''): ?><p class="news-fact-source"><?= e($meta['source'] ?? 'Source') ?>: <?= $out($f['url'], $f['link'], $f['label']) ?></p><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
+        <?php endif; ?>
+
+        <?php if ($speculation !== []): ?>
+            <section class="news-part" aria-labelledby="news-speculation">
+                <h2 id="news-speculation"><?= e($sections['speculation'] ?? 'Still speculation') ?></h2>
+                <ul class="news-facts" role="list">
+                    <?php foreach ($speculation as $f): ?>
+                        <li class="news-fact">
+                            <span class="c-badge c-badge--progress"><?= e($badges['unconfirmed'] ?? 'Unconfirmed') ?></span>
+                            <p><?= $f['html'] ?></p>
+                            <?php if ($f['url'] !== ''): ?><p class="news-fact-source"><?= e($meta['source'] ?? 'Source') ?>: <?= $out($f['url'], $f['link'], $f['label']) ?></p><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
+        <?php endif; ?>
+
+        <?php if (trim(strip_tags($impact)) !== ''): ?>
+            <section class="news-part" aria-labelledby="news-impact">
+                <h2 id="news-impact"><?= e($sections['impact'] ?? 'What it means for freelancers and corporate events') ?></h2>
+                <div class="c-prose"><?= $impact ?></div>
+            </section>
+        <?php endif; ?>
+
+        <?php if (is_array($verdict)): ?>
+            <div class="c-callout<?= $verdict['callout'] !== '' ? ' ' . e($verdict['callout']) : '' ?> news-verdict" role="note">
+                <?= icon((string) $verdict['icon']) ?>
+                <h2 class="c-callout-title"><span class="u-visually-hidden">Our verdict: </span><?= e($verdict['label']) ?></h2>
+                <?php if (trim((string) ($article['verdict_note'] ?? '')) !== ''): ?><p><?= e($article['verdict_note']) ?></p><?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($images !== []): ?>
+            <div class="news-gallery">
+                <?php foreach ($images as $picture): ?>
+                    <?= $this->partial('news/figure', ['picture' => $picture, 'copy' => $copy]) ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($sources !== []): ?>
+            <section class="news-part" aria-labelledby="news-sources">
+                <h2 id="news-sources"><?= e($sections['sources'] ?? 'Sources') ?></h2>
+                <ol class="news-sources">
+                    <?php foreach ($sources as $s): ?>
+                        <li>
+                            <?= $out((string) $s['url'], (int) $s['id'], (string) (($s['title'] ?? '') ?: $s['host'])) ?>
+                            <span class="news-source-meta">
+                                <?php if (($s['publisher'] ?? '') !== '' && $s['publisher'] !== null): ?><span><?= e($s['publisher']) ?></span><?php endif; ?>
+                                <span><?= e($s['host']) ?></span>
+                                <span><?= e($kinds[(string) $s['kind']] ?? $kinds['other'] ?? 'Other') ?></span>
+                            </span>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            </section>
+        <?php endif; ?>
+
+        <?php if ($related['later'] !== []): ?>
+            <section class="news-part" aria-labelledby="news-later">
+                <h2 id="news-later"><?= e($sections['later'] ?? 'Later updates') ?></h2>
+                <ul class="news-later" role="list">
+                    <?php foreach ($related['later'] as $r): ?>
+                        <li><a href="/news/<?= e($r['slug']) ?>/"><?= e($r['title']) ?></a><?php if ($r['published_at'] !== null): ?> <time datetime="<?= e(date(DATE_ATOM, (int) $r['published_at'])) ?>"><?= e(date_short((int) $r['published_at'])) ?></time><?php endif; ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
+        <?php endif; ?>
+
+        <?php if ($aiNote !== ''): ?>
+            <div class="c-callout news-ainote" role="note">
+                <?= icon('sparkles') ?>
+                <p><?= $note ?></p>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($preview): ?>
+            <p class="news-preview-comments"><?= e($copy['preview']['comments'] ?? '') ?></p>
+        <?php else: ?>
+            <?= $this->partial('news/comments', ['article' => $article, 'comments' => $comments]) ?>
+        <?php endif; ?>
+    </div>
+</div>

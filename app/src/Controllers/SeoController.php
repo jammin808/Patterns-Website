@@ -4,14 +4,31 @@ declare(strict_types=1);
 
 namespace Psc\Controllers;
 
+use Psc\App;
 use Psc\Chat\AnthropicGateway;
 use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\ArticleStore;
+use Psc\News\Categories;
+use Psc\News\Images;
+use Psc\News\Settings;
 
-/** sitemap.xml, robots.txt, llms.txt, the web manifest, security.txt and a health check, all built from content/. */
+/**
+ * sitemap.xml, robots.txt, llms.txt, the web manifest, security.txt and a health check, built from content/ and,
+ * for Industry Updates, from the live articles (read in a try, so each file still answers when the database cannot).
+ */
 final class SeoController extends Controller
 {
+    /** The desk's last tick older than this, with the desk on and a key set, means its cron has stopped (docs/NEWS.md §6.1). */
+    public const NEWS_STALE_SECONDS = 35 * 60;
+
+    /** The newest articles llms.txt lists. */
+    public const LLMS_ARTICLES = 10;
+
+    /** Live articles read per query while the sitemap is built. */
+    private const SITEMAP_BATCH = 500;
+
     public function sitemap(Request $request): Response
     {
         $base = $this->app->baseUrl();
@@ -25,6 +42,12 @@ final class SeoController extends Controller
             if (!empty($page['updated'])) {
                 $xml[] = '    <lastmod>' . htmlspecialchars((string) $page['updated'], ENT_XML1) . '</lastmod>';
             }
+            $xml[] = '  </url>';
+        }
+        foreach (self::newsUrls($this->app) as $path => $modified) {
+            $xml[] = '  <url>';
+            $xml[] = '    <loc>' . htmlspecialchars($base . $path, ENT_XML1) . '</loc>';
+            $xml[] = '    <lastmod>' . gmdate('Y-m-d\TH:i:s\Z', $modified) . '</lastmod>';
             $xml[] = '  </url>';
         }
         $xml[] = '</urlset>';
@@ -41,6 +64,8 @@ final class SeoController extends Controller
             'User-agent: *',
             'Allow: /',
             'Disallow: /api/',
+            // The tracked way out to an article's sources; the articles link to the sources themselves.
+            'Disallow: /news/go/',
             '',
         ];
         if (!empty(Content::get('site')['block_training'])) {
@@ -91,6 +116,20 @@ final class SeoController extends Controller
                 array_push($out, ...$lines);
                 $out[] = '';
             }
+        }
+        $news = Content::page('/news/');
+        if ($news !== null) {
+            $out[] = '## ' . (string) (Content::get('news')['name'] ?? 'Industry Updates');
+            $out[] = '';
+            $out[] = '- [' . ($news['crumb'] ?? $news['title']) . '](' . $base . '/news/): ' . $news['description'];
+            try {
+                foreach ((new ArticleStore($this->app))->live(null, null, 1, self::LLMS_ARTICLES)['items'] as $a) {
+                    $out[] = '- [' . self::oneLine((string) $a['title']) . '](' . $base . '/news/' . $a['slug'] . '/): ' . self::oneLine((string) ($a['summary'] ?: $a['dek']));
+                }
+            } catch (\Throwable $e) {
+                $this->app->log->exception($e, 'llms news');
+            }
+            $out[] = '';
         }
         return Response::text(implode("\n", $out))->header('Cache-Control', 'public, max-age=3600');
     }
@@ -177,8 +216,97 @@ final class SeoController extends Controller
         $checks['config_shadowed'] = $cfg->shadowed();
         $checks['schema'] = $checks['database'] && $this->app->migrator()->isCurrent();
         $ok = self::healthy($checks, $cfg->bool('chat.enabled', true) && $cfg->string('chat.api_key') !== '');
-        return Response::json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks, 'build' => self::build()], $ok ? 200 : 503)
-            ->header('X-Robots-Tag', 'noindex');
+        // The AI desk and image support are reported, never failed: the site serves its pages either way.
+        return Response::json([
+            'status' => $ok ? 'ok' : 'degraded',
+            'checks' => $checks,
+            'news' => self::newsState($this->app, $checks['schema']),
+            'images' => self::imagesSupported($this->app),
+            'build' => self::build(),
+        ], $ok ? 200 : 503)->header('X-Robots-Tag', 'noindex');
+    }
+
+    /**
+     * The AI desk as an uptime monitor sees it: off while it has no key or is paused, ok while the cron's last tick
+     * is under NEWS_STALE_SECONDS old, and stale otherwise (the cron line has stopped, or the database cannot say).
+     */
+    public static function newsState(App $app, bool $database): string
+    {
+        if (Settings::apiKey($app) === '') {
+            return 'off';
+        }
+        if (!$database) {
+            return 'stale';
+        }
+        try {
+            $settings = new Settings($app);
+            if ($settings->get('enabled') !== true) {
+                return 'off';
+            }
+            $tick = $settings->lastTick();
+        } catch (\Throwable $e) {
+            $app->log->exception($e, 'health news');
+            return 'stale';
+        }
+        return $tick !== null && (int) ($tick['t'] ?? 0) >= time() - self::NEWS_STALE_SECONDS ? 'ok' : 'stale';
+    }
+
+    /**
+     * Whether article images can be stored: the Images class's own answer once it is installed, otherwise the same
+     * test (GD's WebP and JPEG writers and getimagesize).
+     */
+    public static function imagesSupported(App $app): bool
+    {
+        if (class_exists(Images::class) && method_exists(Images::class, 'supported')) {
+            $method = new \ReflectionMethod(Images::class, 'supported');
+            return (bool) ($method->isStatic() ? $method->invoke(null) : $method->invoke(new Images($app)));
+        }
+        return function_exists('imagewebp') && function_exists('imagejpeg') && function_exists('getimagesize');
+    }
+
+    /**
+     * The news addresses the sitemap adds, each with the time it last changed: every live article (its own last
+     * change, or the time it went live if that is later), then each category that has one (its newest such time).
+     * None when the database cannot be read.
+     *
+     * @return array<string, int> path => Unix time
+     */
+    public static function newsUrls(App $app): array
+    {
+        $articles = [];
+        $categories = [];
+        try {
+            $store = new ArticleStore($app);
+            for ($page = 1; ; $page++) {
+                $batch = $store->live(null, null, $page, self::SITEMAP_BATCH);
+                foreach ($batch['items'] as $a) {
+                    $modified = max((int) $a['published_at'], (int) $a['updated_at']);
+                    $articles['/news/' . $a['slug'] . '/'] = $modified;
+                    foreach ($a['categories'] as $key) {
+                        $categories[(string) $key] = max($categories[(string) $key] ?? 0, $modified);
+                    }
+                }
+                if ($page >= $batch['pages']) {
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            $app->log->exception($e, 'sitemap news');
+            return [];
+        }
+        $out = $articles;
+        foreach (Categories::KEYS as $key) {
+            if (isset($categories[$key])) {
+                $out['/news/category/' . $key . '/'] = $categories[$key];
+            }
+        }
+        return $out;
+    }
+
+    /** Text on one line, for a list item in llms.txt. */
+    private static function oneLine(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
     /**

@@ -12,6 +12,7 @@ the browser blocks the fonts and the module scripts.
 | `public/assets/js/site.js` | On every page: theme, drawer, mega-menu, header shadow, reveal, comparison-table affordance, copy, the account link, dismissibles, the launcher tuck, the cue ladder, tabs, form helpers |
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
+| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `public/assets/img/news-art.svg` | Industry Updates' article pages (counting source clicks), its pages' styles and its category artwork (8.36) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
 | `public/assets/img/icons.svg` | The icon sprite (96 symbols, 8.30) |
 | `public/favicon.svg`, `public/favicon.ico`, `public/assets/img/brand/` | The brand mark as favicons, touch, app and logo icons (8.33) |
@@ -687,7 +688,7 @@ The clock is green, amber ("WRAP UP") from `data-warn` seconds, and red counting
   <figcaption class="c-shot-caption">What the screen shows, in the product's words.</figcaption>
 </figure>
 <!-- until the capture exists -->
-<div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>StageWatch — cue ladder</b>1920 × 1200 · 16:10</span></div></div>
+<div class="c-shot-frame"><div class="c-shot-placeholder"><span class="c-shot-label"><b>StageWatch: cue ladder</b>1920 × 1200 · 16:10</span></div></div>
 <div class="c-shots" data-scroll-region="StageWatch screenshots">…three figures; a swipeable strip below 48rem…</div>   <!-- c-shots--2 for two -->
 ```
 
@@ -891,7 +892,7 @@ hides the strip's copy of it, so the refusal is said once.
   <span class="c-pager-info">7–12 of 38</span><a rel="next" href="…">Next</a></nav>          <!-- portal: pt-pager, pt-pager-info -->
 <div class="c-stats"><div class="c-stat"><span class="c-stat-value">12</span><span class="c-stat-label">Open tickets</span>
   <span class="c-stat-meta"><i class="c-lamp c-lamp--standby"></i>3 waiting on you</span></div>…</div>   <!-- portal: pt-stats -->
-<button type="submit" class="pt-vote" aria-pressed="true"><span class="pt-vote-count">48</span> <span class="pt-small">votes</span><span class="u-visually-hidden"> — vote for “…”</span></button>
+<button type="submit" class="pt-vote" aria-pressed="true"><span class="pt-vote-count">48</span> <span class="pt-small">votes</span><span class="u-visually-hidden">, vote for “…”</span></button>
 ```
 - A vote's triangle is hollow; pressed, it fills, the border doubles and the button turns green, with the
   template's "You voted" line beside it. A `form` that holds a vote is inline, so it sits in a table cell or in
@@ -1088,6 +1089,7 @@ followspot in its colour; PlayMap's card says "Early access".
 | `patterns`, `stagewatch`, `agmessage`, `playmap` | each product's overview, features and licensing | the product's drawn screen on a monitor with its UMD |
 | `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
 | `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
+| `news` | Industry Updates: the index, the category pages, and every article without a picture of its own | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
 
 Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines (four for the home card's
 long headline, so it stays large beside the multiview); hyphenated words never
@@ -1123,6 +1125,56 @@ the banner works as below.
   consent and deletes the `_ga` cookies.
 - **Reopening:** any `[data-consent-open]` reopens the card with focus on the current answer, and Escape closes a
   reopened card. The openers stay hidden without scripting, because the choice needs scripting, and so does the tag.
+
+### 8.36 Industry Updates (`pages/news.css`, `news.js`, `news-art.svg`)
+
+**The name.** "Industry Updates" is a proper name, written in title case wherever it appears: the h1, the page
+titles, the footer link, the admin navigation and the byline ("Industry Updates desk"). The header bar is the one
+exception: there it is **News**, because the longer name does not fit the bar from 1152 to 1440px (8.3).
+
+```html
+<div class="news-bar">                                         <!-- above a list -->
+  <nav class="news-cats-nav u-hide-sm" aria-label="Categories"><ul class="news-cats" role="list">
+    <li><a href="/news/" aria-current="page">All <span class="news-cats-count"><span class="u-visually-hidden">, </span>16<span class="u-visually-hidden"> articles</span></span></a></li>…</ul></nav>
+  <form class="c-search news-pick u-show-sm" method="get" action="/news/">…label, select name="category", Show…</form>
+  <form class="c-search news-search" role="search" method="get" action="/news/">…c-search-field, Search, c-help…</form>
+</div>
+<div class="news-grid">
+  <article class="c-card news-card news-card--lead">            <!-- the newest, on a list's first page -->
+    <h3 class="c-card-title"><a href="/news/{slug}/">…</a></h3>   <!-- the link covers the card -->
+    <p class="news-card-cats">Legal, Freelance</p><p class="c-card-body">…standfirst…</p>
+    <p class="c-card-footer news-card-meta"><time>22 Oct 2026</time><span>4 min read</span></p>
+    <div class="news-card-media">…img alt="" or the artwork…</div>   <!-- shown first, read last -->
+  </article>…
+</div>
+<nav class="c-pager news-pager" aria-label="Pages">…</nav>
+```
+
+- **The category bar.** Links, never script: a wrapping list of 44px targets with their counts (the current one
+  filled, as the pager's current page is, with its words kept); below 40rem the same choice is a GET form with a
+  select and a **Show** button. Only categories with live articles are listed.
+- **Cards** follow the workflow cards (`support-wfcard` in `pages/support.css`): the title's link covers the card, and the picture
+  and the categories are shown above the title but read after it. From 64rem the newest article on a first page
+  spans two columns and two rows. A card's picture has empty alt text: its title says what it is.
+- **The article** is one reading column (`l-wrap--prose`) in the order docs/NEWS.md §10 sets. Its hero holds the
+  category tags (`news-tags`, `c-tag` links), the h1, the standfirst and `news-meta` (the London date and time,
+  the read time, "Updated" when it changed after it went live, the byline). Facts are `news-facts` rows, each with
+  a status badge holding its word: `c-badge--done` "Confirmed", `c-badge--progress` "Unconfirmed" (8.7), and its
+  source. The verdict is a callout in its own variant (`c-callout--success` worth adopting, `--info` worth testing
+  and good to know, `--warning` one to watch, plain safe to skip); the follow-up banner is `c-callout--info`, the
+  AI note a plain `c-callout`. Sources are a numbered `news-sources` list with the publisher, host and kind.
+- **Links out** are real (`rel="nofollow noopener" target="_blank"`, a hidden "opens in a new tab") and carry
+  `data-news-link`, which `news.js` reports with a keepalive fetch; the browser follows the link as it would anyway.
+- **Pictures.** An article's images are uploaded by an administrator with the right to use them, re-encoded and
+  served by the site (`/news/media/`), never hotlinked: `news-figure` with every width in `srcset`, its size, alt
+  text, caption and credit. The AI desk never adds a picture.
+- **The artwork rule.** An article without a picture shows its primary category's artwork: one monochrome
+  `<symbol>` per category in `news-art.svg`, used with `<use>` and `aria-hidden`, drawn in `currentColor` on 1.5px
+  hairlines that keep their weight at any size. The tile (`news-art`) sets the colours through classes, the symbol
+  in `--text-3` on a hairline grid in `--line` over `--s2`, so it follows the theme. No SMPTE bars, no product
+  colours, no inline styles. The motifs: a monitor wall (Video), a waveform (Audio), beams (Lighting), a truss
+  (Staging), a cue stack (Production), a clock (Showcalling), a signal (Streaming), nodes (Automation), a grid
+  (Interactive), a spark (AI), a network (Technology), a person (Freelance), a shield (Legal), a lightbulb (Tips).
 
 ## 9. Imagery: real screenshots
 
@@ -1190,6 +1242,7 @@ the banner works as below.
 | Support hub and four product help pages | `c-hero--page`, inline assistant (`c-chat--inline`), `c-support-links`, `c-faq`, `c-prose` |
 | FAQ | `c-hero--page`, `c-tabs` (groups) or section heads, `c-faq` |
 | Contact | `c-hero--page`, `c-callout--info` (show in 48 hours), `c-form--panel`, `c-kv` |
+| Industry Updates: index, categories, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources` (8.36) |
 | About, legal | `c-hero--page`, `c-prose` |
 | Portal: dashboard, downloads, licences, tickets, ideas board, account | `pt-shell`, `pt-header`, `pt-stats`, `pt-grid` + `pt-card--link`, `pt-table`, `pt-badge`, `pt-vote`, `pt-thread`, `pt-files`, `pt-kv`, `pt-alert`, `pt-empty`, `pt-pager` |
 | Admin tables | `pt-table` (+ `c-table--zebra c-table--compact`, `aria-sort` + `c-sort`), `pt-search`, `pt-tabs`, `pt-badge`, `c-table--stack` with `data-label` for phones |

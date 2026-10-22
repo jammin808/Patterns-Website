@@ -23,13 +23,58 @@ return [
         'label' => 'Search Industry Updates',
         'button' => 'Search',
         'help' => 'Searches the headlines and standfirsts.',
+        'placeholder' => 'Search the articles',
+        // A search's meta description (its page is never indexed, but a shared link still shows it).
+        'description' => 'Industry Updates articles whose headline or standfirst matches your search, the newest first.',
     ],
     'categories_label' => 'Categories',
     'all' => 'All',
+    'all_link' => 'See every article',
+    // The category form that stands in for the list on phones.
+    'pick' => ['label' => 'Category', 'button' => 'Show'],
     'empty' => [
         'index' => 'Nothing published yet. The first articles are on their way, so check back soon.',
         'category' => 'Nothing in this category yet. Try another category, or see every article.',
         'search' => 'No articles match that search. Try fewer or different words, or browse a category.',
+        'unavailable' => 'The articles cannot be shown just now. Please try again in a minute.',
+    ],
+    // A list's heading (:category, :q and :n are filled in) and its count.
+    'list' => [
+        'latest' => 'Latest articles',
+        'category' => 'Latest in :category',
+        'results' => 'Results for “:q”',
+        'count_one' => 'One article, the newest first.',
+        'count_many' => ':n articles, the newest first.',
+    ],
+    // An article's meta line.
+    'meta' => [
+        'read' => ':n min read',
+        'updated' => 'Updated',
+        'by' => 'By',
+        'unpublished' => 'Not published yet',
+        'source' => 'Source',
+        'credit' => 'Image',
+    ],
+    // What each source is, beside its link.
+    'kinds' => [
+        'primary' => 'Primary source',
+        'press' => 'Press',
+        'report' => 'Report',
+        'standard' => 'Standard',
+        'other' => 'Other',
+    ],
+    'new_tab' => 'opens in a new tab',
+    'preview' => [
+        'title' => 'Preview: not published',
+        'live' => 'Preview: this article is live',
+        'scheduled' => 'Scheduled to go live :time.',
+        'draft' => 'A draft: only administrators can see it.',
+        'comments' => 'Comments appear here once the article is live.',
+    ],
+    'feed' => [
+        'title' => 'Industry Updates from Patterns Show Control',
+        'description' => 'AV and live event industry news for freelance crew and corporate event teams, with verified facts kept apart from speculation.',
+        'label' => 'Industry Updates RSS feed',
     ],
 
     // The verdict callout on an article: its label, its callout variant (empty for the plain callout) and its icon.
