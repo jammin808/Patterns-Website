@@ -1,4 +1,4 @@
-This site uses **Google Analytics** to understand how its pages are used, and Google Analytics sets cookies on the pages you read. The contact form, the client portal and the support assistant set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
+This site uses **Google Analytics** to understand how its pages are used, and Google Analytics sets cookies on the pages you read. The contact form, the client portal, the support assistant and commenting on Industry Updates set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
 
 ## Analytics cookies
 
@@ -11,9 +11,9 @@ Google Analytics collects which pages are viewed, how you arrived (the referring
 
 ## Essential cookies
 
-- **Session cookie** (`__Host-psc`): keeps you signed in to the client portal and protects forms against cross-site requests. Set when you open the contact page or a client portal page, or use the support assistant. It is sent only to this site, only over a secure connection, and page scripts cannot read it. It ends when you close your browser, and you are signed out after two hours without activity or 12 hours after you signed in, whichever comes first.
+- **Session cookie** (`__Host-psc`): keeps you signed in to the client portal and protects forms against cross-site requests. Set when you open the contact page or a client portal page, use the support assistant, or comment on an Industry Updates article (an article asks the site who you are only while the signed-in hint below is set, so reading the news sets no cookie). It is sent only to this site, only over a secure connection, and page scripts cannot read it. It ends when you close your browser, and you are signed out after two hours without activity or 12 hours after you signed in, whichever comes first.
 - **Remember-me cookie** (`__Host-psc_rm`): only if you tick "Keep me signed in". It holds a random sign-in token, never your password, and signs you back in on that browser for up to 30 days; each time it does, it is replaced by a new one for another 30 days. Like the session cookie, it is sent only to this site, only over a secure connection, and page scripts cannot read it. Signing out removes it.
-- **Signed-in hint** (`psc_li`): set when you sign in, so the page header can show "My account" instead of "Client login". It holds no personal data and grants no access. Page scripts can read it, which is all it is for, and it is sent only over a secure connection. It ends when you close your browser, or after 30 days if you ticked "Keep me signed in". Signing out removes it.
+- **Signed-in hint** (`psc_li`): set when you sign in, so the page header can show "My account" instead of "Client login" and Industry Updates articles can offer you the comment box. It holds no personal data and grants no access. Page scripts can read it, which is all it is for, and it is sent only over a secure connection. It ends when you close your browser, or after 30 days if you ticked "Keep me signed in". Signing out removes it.
 
 ## Storage in your browser
 
@@ -21,6 +21,7 @@ These are kept in your browser's own storage, not in cookies, and are never sent
 
 - **Theme preference**: if you choose light or dark mode, the choice is kept in your browser's local storage. Choosing "Follow the system" again removes it.
 - **Dismissed notices**: if you close an announcement, it is noted in your browser's local storage so it stays closed.
+- **Unsent comment**: what you type in an Industry Updates comment box is kept in your browser's session storage for that article until you post it or close the tab, so it is still there if you have to sign in again. This copy is never sent; the comment is sent only when you post it.
 - **Assistant conversation**: the messages shown in the assistant panel are kept in your browser's session storage so they stay visible as you move between pages; they are cleared when you close the tab. The questions you ask are sent to answer you, as the [privacy policy](/legal/privacy/) explains, but this copy stays in your browser.
 
 The essential cookies and the browser storage above are strictly necessary for features you ask for. The analytics cookies are not; you can block them as described above. You can delete any of them at any time in your browser settings.

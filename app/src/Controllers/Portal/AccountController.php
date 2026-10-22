@@ -9,19 +9,27 @@ use Psc\Controllers\Controller;
 use Psc\Db\Database;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\Comments;
 use Psc\Support\Audit;
 use Psc\Support\Uploads;
 
 /**
- * The signed-in person's own account: details, password, a copy of their data, and deleting the account. Every
- * handler acts on the session's account only; nothing posted can name another one.
+ * The signed-in person's own account: details, password, their Industry Updates comments (each with the way to its
+ * comment page, where it can be deleted, also on an article that is no longer live), a copy of their data, and
+ * deleting the account. Every handler acts on the session's account only; nothing posted can name another one.
  *
- * Deleting anonymises rather than removes the row: tickets, comments and licences are business records and stay,
- * shown as "Deleted user"; the name, email, company, password and every sign-in token go.
+ * Deleting anonymises rather than removes the row: tickets, ticket comments and licences are business records and
+ * stay, shown as "Deleted user"; the name, email, company, password and every sign-in token go. Comments on Industry
+ * Updates articles are public and no business record, so they go for good, with the reports the person made: the
+ * anonymising UPDATE never fires the foreign keys' CASCADE, so they are deleted here, and the counts they touched
+ * (an article's visible comments, a comment's reports) are counted again.
  */
 final class AccountController extends Controller
 {
     public const DELETE_WORD = 'DELETE';
+
+    /** The newest of the person's Industry Updates comments the account page lists (the data copy has every one). */
+    public const NEWS_COMMENTS_SHOWN = 50;
 
     /** The profile columns a copy of the data carries (never the password hash or the sign-in counters). */
     private const PROFILE_COLUMNS = ['id', 'email', 'name', 'company', 'role', 'status', 'marketing_opt_in', 'email_verified_at', 'last_login_at', 'created_at', 'updated_at'];
@@ -42,6 +50,9 @@ final class AccountController extends Controller
                 'licences' => (int) $db->value('SELECT COUNT(*) FROM licences WHERE user_id = ?', [$id]),
                 'tickets' => (int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$id]),
             ],
+            'newsComments' => (int) $db->value('SELECT COUNT(*) FROM news_comments WHERE user_id = ?', [$id]),
+            // Listed with the way to each comment page, so a comment on an article taken down can still be deleted.
+            'newsList' => (new Comments($this->app))->ofAccount($id, self::NEWS_COMMENTS_SHOWN),
             'deleteWord' => self::DELETE_WORD,
             'soleAdmin' => $this->isSoleAdmin($user),
         ], 'Your account');
@@ -136,7 +147,8 @@ final class AccountController extends Controller
             'tickets' => (int) $db->value('SELECT COUNT(*) FROM tickets WHERE user_id = ?', [$id]),
             'comments' => (int) $db->value('SELECT COUNT(*) FROM ticket_comments WHERE user_id = ?', [$id]),
         ];
-        $db->transaction(static function (Database $db) use ($id): void {
+        $comments = new Comments($this->app);
+        $removed = $db->transaction(static function (Database $db) use ($id, $comments): array {
             $db->update('users', [
                 'status' => 'disabled',
                 'role' => 'client',
@@ -150,14 +162,17 @@ final class AccountController extends Controller
                 'updated_at' => time(),
             ], ['id' => $id]);
             $db->exec('DELETE FROM user_tokens WHERE user_id = ?', [$id]);
+            $news = $comments->deleteForAccount($id);
+            return ['news_comments' => $news['comments'], 'news_reports' => $news['reports']];
         });
-        Audit::log($this->app, $id, 'account.deleted', (string) $id, $kept);
+        Audit::log($this->app, $id, 'account.deleted', (string) $id, $kept + ['removed' => $removed]);
         $this->app->auth()->notifyAdmins('An account was deleted', 'account-deleted-admin', [
             'id' => $id,
             'name' => (string) $user['name'],
             'email' => (string) $user['email'],
             'company' => (string) ($user['company'] ?? ''),
             'kept' => $kept,
+            'removed' => $removed,
         ]);
         $this->app->auth()->logout();
         return $this->redirect('/portal/login/', 'success', 'Your account is deleted and you are signed out. Thank you for using Patterns Show Control.');
@@ -195,6 +210,7 @@ final class AccountController extends Controller
             $conv['messages'] = $db->all('SELECT role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY id', [(string) $conv['id']]);
             $conversations[] = $conv;
         }
+        $news = (new Comments($this->app))->forExport($id);
         $data = [
             'exported_at' => time(),
             'site' => $this->app->baseUrl() . '/',
@@ -206,6 +222,9 @@ final class AccountController extends Controller
             'votes' => $votes,
             'licences' => $licences,
             'assistant_conversations' => $conversations,
+            // Comments on Industry Updates articles in every status (visible, pending, hidden), and the reports made.
+            'news_comments' => $news['news_comments'],
+            'news_comment_reports' => $news['news_comment_reports'],
         ];
         // Bytes that are not UTF-8 (older or imported records) become U+FFFD rather than failing the whole copy.
         $json = json_encode(self::isoDates($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);

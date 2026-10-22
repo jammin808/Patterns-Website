@@ -1,4 +1,4 @@
-These terms apply when you use Patterns Show Control software — Patterns, StageWatch, AGMessage and PlayMap — under a licence or a trial. Each product's licensing page sets out its plans and prices; where a product's pricing has not been announced yet, these terms will apply when it is.
+These terms apply when you use Patterns Show Control software (Patterns, StageWatch, AGMessage and PlayMap) under a licence or a trial. Each product's licensing page sets out its plans and prices; where a product's pricing has not been announced yet, these terms will apply when it is.
 
 ## The licence
 

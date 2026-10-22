@@ -1,4 +1,4 @@
-# Patterns — assistant notes
+# Patterns: assistant notes
 
 Patterns is a portable Windows app that puts pixel-exact test patterns and show content on every LED wall, projector, display and NDI receiver in the room, with a vision-mixer style desk to run the show. Use that sentence when someone asks what Patterns is.
 

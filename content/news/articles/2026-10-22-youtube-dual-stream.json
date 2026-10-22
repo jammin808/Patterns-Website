@@ -1,0 +1,127 @@
+{
+  "key": "2026-10-22-youtube-dual-stream",
+  "title": "YouTube Live Control Room streams now get a cropped vertical copy by default",
+  "seo_title": "YouTube Live now adds a vertical copy by default",
+  "dek": "Streams started from YouTube's Live Control Room now go out in 16:9 and 9:16 at once unless someone switches Dual stream off, and the vertical copy is a centre crop of your programme. Separately, YouTube plans to pilot Live auto dubbing from early 2027.",
+  "summary": "YouTube Live Control Room streams now get a cropped vertical copy by default. Check it on a phone, or switch it off before you go live.",
+  "body": "Streams you start from YouTube's Live Control Room now go out in two shapes at once: the 16:9 programme you built, and a 9:16 vertical copy for phones. [YouTube's help page](https://support.google.com/youtube/answer/2474026) puts it plainly: \"By default, your live streams will go live in both horizontal (16:9 aspect ratio) and vertical (9:16 aspect ratio) formats\". Unless you change it, the vertical version is a centre crop of the horizontal one.\n\nAccording to Upstream, the switch to on-by-default was announced in a YouTube Creators community post in late September. We have not read that post ourselves. [Upstream](https://upstream.so/blog/youtube-dual-stream/), a vendor whose own tool creates YouTube streams, reproduces it as saying \"Dual horizontal & vertical formats will be automatically turned on as your default streaming setting in Studio\". The feature predates the default: [PPC Land](https://ppc.land/encoders-gain-youtube-dual-streaming-as-vertical-feed-lacks-5-of-9-features/) reported that dual-format streaming reached third-party encoders on 20 August.\n\n## What the crop keeps\n\nCropping a 16:9 frame to 9:16 leaves a narrow strip down the middle. Upstream puts it at about 608 px of a 1920x1080 frame. That is Upstream's figure, not YouTube's, though the sums hold (1080 x 9/16 is 607.5). Call it a little under a third of the width.\n\nUpstream's list of what falls off the sides is written for streamers: guest cameras, a corner facecam, a logo, a scoreboard. Read it against a conference stream and our guess is that the lower third goes first, because it usually starts near the left edge. In a presenter-and-slides split, the phone audience gets a fine view of the gap between the CEO and the chart. That is our reading, not YouTube's, but it is not difficult geometry.\n\nYouTube offers two other layouts besides Center crop (YouTube's spelling): Fit to phone width and Stacked. Help says you change the layout from the Manage tab of the Live Control Room, by selecting the scheduled stream and then Edit layout on the vertical preview. We would try both in a private rehearsal stream, on an actual phone, before trusting either with a keynote.\n\n## What the vertical copy cannot do\n\nThe two versions share a stream URL and a live chat, subscribers get a single go-live notification, and viewers in the Shorts feed on mobile see the vertical one. They are not equals, though. YouTube's own feature table marks the vertical feed \"No\" for live ad midrolls and pre-rolls, clickable links, 4K on the YouTube app, Premieres and live redirect. Memberships and gifted memberships work on both.\n\nFor a corporate show, the links row is the one that bites. If the call to action is a registration link in chat, the people watching in the Shorts feed cannot click it. And if the end-of-show plan relies on live redirect, the vertical audience is not coming with you.\n\nNumbers arrive late too. Vertical-only metrics turn up 24 hours after the stream, so the \"how did we do\" email on the night is missing a piece.\n\n## Switching it off, and checking it is on\n\nThe setting is Dual stream, under Stream settings in the Stream tab. Turn it off and, in Help's words, \"A vertical stream will no longer be created from your horizontal live stream.\" Help also says \"You can’t add the vertical format once the stream has started.\" It does not say whether you can take it away mid-stream. Upstream says that in its own test, on one channel on 17 October, the switch could not be changed during the stream. Either way, the decision belongs before the countdown, not halfway through the Q&A.\n\nThe default is not universal, either. In the same test, a stream that Upstream's tool created through YouTube sign-in had Dual stream switched off before it started. Upstream says other sign-in tools \"may behave the same way\", but it tested only its own. So the check runs both ways: if the client wants vertical, make sure it is actually on.\n\n## Doing vertical properly\n\nIf vertical matters to the client, feed it yourself. Help describes third-party dual streaming over RTMP(S), with the vertical preview's Auto dropdown set to Encoder and a second stream key for the vertical stream chosen from the Stream key dropdown. Its own check is short: the vertical and horizontal content must match, and the right format must go to the right key. That costs a second output and someone's attention. In return, the phone audience gets graphics somebody actually built for a phone.\n\n## The dubbing\n\nThe other half of the news is further off. YouTube's [Live tools post](https://blog.youtube/news-and-events/made-on-youtube-live-tools-fan-funding-dubbing/), dated 23 September and bylined by Barbara Macdonald, who leads YouTube Live's product team, says \"we’re piloting Live auto dubbing, starting in early 2027.\" The idea is that it translates the streamer's speech in real time, so viewers can listen in their preferred language. The post names no languages and no creators.\n\nThe post's own numbers show why YouTube cares: more than 40% of live watch time comes from viewers outside a creator's home country, and in August more than 600M logged-in viewers watched live content (archive included) each day on average.\n\nFor a multinational town hall, live dubbing is the item to watch. A pilot with no languages named is not something to write into a proposal, though. Keep the interpreters booked, and their booth on the floor plan.",
+  "confirmed": [
+    {
+      "text": "YouTube Help says that by default, live streams go live in horizontal (16:9) and vertical (9:16) formats at the same time when you stream from the Live Control Room.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says the vertical stream is a centre crop of the horizontal stream, with Fit to phone width and Stacked as the other vertical layout options.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says you can't add the vertical format once the stream has started. The page does not say the vertical format cannot be removed.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says turning off Dual stream, under Stream settings in the Stream tab, means a vertical stream is no longer created from the horizontal stream.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says both versions share one live chat, subscribers receive one go-live notification with a shared stream URL, and viewers in the Shorts feed on mobile see the vertical version.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help's feature table marks the vertical feed No for live ad midrolls and pre-rolls, clickable links, 4K on the YouTube app, Premieres and live redirect. Memberships and gifted memberships work on both.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says metrics for the vertical stream alone become available 24 hours after the stream, with combined metrics shown in the Live Control Room.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "YouTube Help says third-party dual streaming uses RTMP(S) with a second stream key for the vertical stream, and that the vertical and horizontal content must match, with the correct format sent to each key.",
+      "url": "https://support.google.com/youtube/answer/2474026"
+    },
+    {
+      "text": "Upstream (20 October 2026) reproduces a late-September 2026 YouTube Creators community post saying dual horizontal and vertical formats will be turned on by default in Studio. We have not read the post itself.",
+      "url": "https://upstream.so/blog/youtube-dual-stream/"
+    },
+    {
+      "text": "PPC Land (21 August 2026) reports that dual-format live streaming reached third-party encoders on 20 August 2026, and that the vertical half carries no advertising breaks.",
+      "url": "https://ppc.land/encoders-gain-youtube-dual-streaming-as-vertical-feed-lacks-5-of-9-features/"
+    },
+    {
+      "text": "YouTube's blog post of 23 September 2026, bylined Barbara Macdonald, Product Management, YouTube Live, says YouTube is piloting Live auto dubbing starting in early 2027, translating the streamer's speech in real time. It names no languages or creators.",
+      "url": "https://blog.youtube/news-and-events/made-on-youtube-live-tools-fan-funding-dubbing/"
+    },
+    {
+      "text": "YouTube says more than 40% of live watch time comes from viewers outside a creator's home country, and that in August 2026 more than 600M logged-in viewers watched live content (including archive) each day on average.",
+      "url": "https://blog.youtube/news-and-events/made-on-youtube-live-tools-fan-funding-dubbing/"
+    }
+  ],
+  "speculation": [
+    {
+      "text": "Upstream says its own test (one channel, 17 October 2026) found a stream its tool created through YouTube sign-in had Dual stream off before it started, and the switch could not be changed during the stream. It tested only its own tool. This is a vendor test, not a YouTube statement.",
+      "url": "https://upstream.so/blog/youtube-dual-stream/"
+    },
+    {
+      "text": "Upstream says the vertical copy keeps a strip about 608 px wide from a 1920x1080 frame. YouTube Help gives no pixel width, though the arithmetic is consistent (1080 x 9/16 = 607.5).",
+      "url": "https://upstream.so/blog/youtube-dual-stream/"
+    },
+    {
+      "text": "Upstream names guest cameras, a corner facecam, a logo and a scoreboard as things a centre crop can lose. That lower thirds and slides go too on conference layouts is our own inference, not Upstream's or YouTube's.",
+      "url": "https://upstream.so/blog/youtube-dual-stream/"
+    },
+    {
+      "text": "Creators replying under a YouTube announcement, as reported by PPC Land, say the vertical half of a dual stream gets less Shorts push than a standalone vertical stream and that home-page viewers see only horizontal. PPC Land says YouTube did not reply publicly.",
+      "url": "https://ppc.land/encoders-gain-youtube-dual-streaming-as-vertical-feed-lacks-5-of-9-features/"
+    },
+    {
+      "text": "YouTube's roadmap items are announced, not shipped: Live auto dubbing and Go Live Together matchmaking in early 2027, Live showdowns in 2027, and Watch With for long-form videos from later this year.",
+      "url": "https://blog.youtube/news-and-events/made-on-youtube-live-tools-fan-funding-dubbing/"
+    }
+  ],
+  "impact": "**On the pre-show checklist.** Dual stream on or off is now a decision for every stream you set up in the Live Control Room. Agree it with the client and check Stream settings before the countdown: vertical cannot be added once you are live, and on Upstream's single test the switch could not be changed mid-stream either.\n\n**If you stream corporate shows.** The default crop publishes a strip of your programme that nobody designed. In our view that is a brand problem as much as a picture one, because sponsor logos and lower thirds tend to live near the edges. Look at it on a phone in rehearsal, or switch it off.\n\n**If the call to action is a link.** The vertical copy has no clickable links, and mobile viewers in the Shorts feed get the vertical copy. If a URL has to reach everyone, put it on screen as text, and put it in the middle.\n\n**If you write the post-show report.** Vertical-only metrics land 24 hours after the stream. Say so on the night, or send those numbers the next day.\n\n**If the client asks for vertical.** Quote it as a deliverable: a second 9:16 output on its own stream key over RTMP(S), with graphics built for it. The free centre crop is not the same product.\n\n**If a third-party tool creates your streams.** Upstream found Dual stream off on a stream its own tool created through YouTube sign-in. Do not assume either way; look in the Live Control Room before you go live.\n\n**Live auto dubbing.** A pilot from early 2027 with no languages named. Nothing to plan or price around this season.",
+  "verdict": "test",
+  "verdict_note": "Run a private rehearsal stream, look at the vertical copy on a phone, and agree Dual stream on or off with the client before you go live; on most corporate layouts we would switch it off or feed a proper vertical from the encoder. Live auto dubbing is a 2027 pilot, one to watch rather than plan around.",
+  "categories": [
+    "streaming",
+    "video",
+    "tips"
+  ],
+  "tags": [
+    "youtube",
+    "youtube live",
+    "dual stream",
+    "vertical video",
+    "live control room",
+    "auto dubbing",
+    "rtmp",
+    "shorts"
+  ],
+  "sources": [
+    {
+      "url": "https://support.google.com/youtube/answer/2474026",
+      "title": "Get started with live streaming - YouTube Help",
+      "publisher": "YouTube Help",
+      "kind": "primary"
+    },
+    {
+      "url": "https://blog.youtube/news-and-events/made-on-youtube-live-tools-fan-funding-dubbing/",
+      "title": "New YouTube Live tools for fan funding, dubbing and more",
+      "publisher": "YouTube Official Blog",
+      "kind": "primary"
+    },
+    {
+      "url": "https://upstream.so/blog/youtube-dual-stream/",
+      "title": "YouTube Dual Stream: What the Vertical Copy Does and How to Turn It Off",
+      "publisher": "Upstream (vendor blog)",
+      "kind": "other"
+    },
+    {
+      "url": "https://ppc.land/encoders-gain-youtube-dual-streaming-as-vertical-feed-lacks-5-of-9-features/",
+      "title": "Encoders gain YouTube dual streaming as vertical feed lacks 5 of 9 features",
+      "publisher": "PPC Land",
+      "kind": "press"
+    }
+  ],
+  "follow_up_of": [],
+  "story_key": "youtube-live-dual-stream-vertical-default",
+  "ai_written": true
+}

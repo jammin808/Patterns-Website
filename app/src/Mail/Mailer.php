@@ -12,7 +12,7 @@ use Psc\View\View;
 /**
  * Sends the site's emails from templates/emails/<name>.php (HTML; a plain-text part is derived from it).
  * Drivers: smtp (Hostinger mail: implicit TLS on 465 or STARTTLS on 587), mail (PHP mail()), log (writes .eml
- * files to storage/mail — development and tests). A failed send is logged and reported false; it never breaks
+ * files to storage/mail, for development and tests). A failed send is logged and reported false; it never breaks
  * the page that triggered it.
  */
 final class Mailer

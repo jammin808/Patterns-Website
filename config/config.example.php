@@ -3,7 +3,7 @@
 /*
  * The server's configuration. Copy this file to one of these places (first found wins) and fill it in:
  *   1. the path in the PSC_CONFIG environment variable
- *   2. ../patterns-data/config.php   (beside public_html: outside the web root — preferred)
+ *   2. ../patterns-data/config.php   (beside public_html, outside the web root: preferred)
  *   3. config/local.php              (inside the site; denied to the web by .htaccess)
  * A config/local.php found while (2) does not exist is moved to (2) on the first request when that folder can be
  * created, so a file uploaded into the site lands outside the web root and survives redeploys.
@@ -35,5 +35,10 @@ return [
     ],
     'chat' => [
         'api_key' => 'REPLACE_WITH_ANTHROPIC_API_KEY',
+    ],
+    'news' => [
+        // Industry Updates' AI desk: a key in a workspace of its own, so news cannot use up the assistant's limit.
+        // Leave it out to use chat.api_key.
+        // 'api_key' => 'REPLACE_WITH_ANTHROPIC_API_KEY',
     ],
 ];

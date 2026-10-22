@@ -217,7 +217,8 @@ if (!function_exists('e')) {
             if (!preg_match('#^(https?://|/(?![/\\\\]))#', $href) || str_contains($href, '\\')) {
                 return $m[1];
             }
-            $external = str_starts_with($href, 'http') && !str_starts_with($href, App::get()->baseUrl());
+            // External by host, never by prefix: https://patternsshowcontrol.co.uk.evil.example/ is someone else's.
+            $external = str_starts_with($href, 'http') && !\Psc\News\Urls::isOwn($href, App::get()->baseUrl());
             return '<a href="' . e($href) . '"' . ($external ? ' rel="nofollow noopener" target="_blank"' : '') . '>' . $m[1] . '</a>';
         }, $s);
         return $s;

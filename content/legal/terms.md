@@ -1,4 +1,4 @@
-These terms apply to your use of patternsshowcontrol.co.uk, the client portal, downloads from the portal, bug reports and feature requests, and the support assistant. The software itself is covered by its [licence terms](/legal/licence-terms/). By creating an account or using the site you agree to these terms.
+These terms apply to your use of patternsshowcontrol.co.uk, the client portal, downloads from the portal, bug reports and feature requests, comments on Industry Updates articles, and the support assistant. The software itself is covered by its [licence terms](/legal/licence-terms/). By creating an account or using the site you agree to these terms.
 
 ## Your account
 
@@ -12,6 +12,18 @@ These terms apply to your use of patternsshowcontrol.co.uk, the client portal, d
 - Feature requests and their comments are visible to other signed-in clients. Do not post anything confidential in them.
 - You keep the rights in what you post. You give us permission to use it to support and improve the software, including building features you suggest, without any obligation or payment.
 - We may edit or remove posts that break these terms.
+
+## Comments on Industry Updates
+
+Anyone with an account can comment on Industry Updates articles while comments on that article are open.
+
+- Comments are public. Anyone can read them, signed in or not, with your first name, the initial of your last name and the time. Our own team's comments carry a "Patterns team" badge.
+- Keep comments lawful, civil and about the article: no harassment, threats, hate, spam or advertising, nothing that infringes someone else's rights, nothing confidential, and no personal details of other people.
+- Comments are plain text, from 2 to 2,000 characters, with at most 2 links (shown as text, not as links) and no email addresses.
+- A comment may wait for our approval before others can see it: always, while we have approval switched on, and when an account less than a day old includes a link. Until then only you can see it.
+- Any signed-in reader can report a comment. A comment reported by 3 readers is hidden until we look at it. We may approve, hide or delete any comment that breaks these rules, and close comments on an article or on all of them; the comments already there stay unless we remove them.
+- You can delete your own comments at any time. Deleting your account deletes all of them.
+- You keep the rights in your comments and give us permission to show them on the site for as long as they are there.
 
 ## Downloads
 

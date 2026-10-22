@@ -1,13 +1,15 @@
 <?php
 /**
  * The administration overview: what is waiting (accounts, tickets, licence requests, messages), assistant use,
- * and the newest five of each waiting thing.
+ * the newest five of each waiting thing, and Industry Updates (held articles, comments to look at, the AI desk).
  *
  * @var array{total: int, pending: int, approval: int, active: int, disabled: int} $users
  * @var array<string, int> $openByType ticket type => tickets not yet closed
  * @var array{approval: int, tickets: int, licences: int, messages: int} $waiting
  * @var array{requested: int, awaiting_payment: int} $licencesWaiting
  * @var array{today: array<string, int>, week: array<string, int>} $assistant
+ * @var array{held: int, reported: int, pending: int, desk: string, spent: float, budget: int, last: array<string, mixed>|null}|null $news
+ *      Industry Updates (null when its tables cannot be read); desk is the desk's state key (AdminNewsDeskController::state())
  * @var array{approval: list<array<string, mixed>>, tickets: list<array<string, mixed>>, licences: list<array<string, mixed>>, messages: list<array<string, mixed>>} $latest
  * @var array<int, string> $licenceNames
  * @var array<string, string> $ticketTypes
@@ -21,6 +23,8 @@ $time = static fn (mixed $ts): string => (int) $ts > 0
     : '';
 $n = static fn (int $v): string => number_format($v);
 $typeTabs = ['bug' => 'Open bug reports', 'feature' => 'Open feature requests', 'question' => 'Open questions'];
+$count = static fn (int $v, string $one, string $many): string => ($v === 0 ? 'No' : number_format($v)) . ' ' . ($v === 1 ? $one : $many);
+$news ??= null;
 ?>
 <header class="pt-header">
     <p class="pt-eyebrow">Administration</p>
@@ -194,4 +198,44 @@ $typeTabs = ['bug' => 'Open bug reports', 'feature' => 'Open feature requests', 
         </div>
         <div class="pt-card-footer"><a href="/portal/admin/messages/">Open the inbox</a></div>
     </section>
+
+    <?php if ($news !== null):
+        [$deskBadge, $deskWords] = match ($news['desk']) {
+            'on' => ['active', 'Running'],
+            'paused' => ['pending', 'Paused'],
+            'budget' => ['pending', 'Waiting: the monthly cap is near'],
+            'no_key' => ['disabled', 'Stopped: no API key is set'],
+            'sdk_missing' => ['disabled', 'Stopped: the SDK is not installed'],
+            'no_tick' => ['disabled', 'Stopped: the cron job has not ticked yet'],
+            'stopped' => ['disabled', 'Stopped: the cron job is not ticking'],
+            default => ['pending', 'Not running'],
+        };
+        $last = $news['last'];
+        $runWords = ['queued' => 'waiting to start', 'running' => 'running now', 'done' => 'done', 'skipped' => 'skipped', 'failed' => 'failed']; ?>
+        <section class="pt-card" aria-labelledby="ov-news">
+            <h2 class="pt-card-title" id="ov-news">Industry Updates</h2>
+            <div class="pt-card-body">
+                <ul>
+                    <li>
+                        <a href="/portal/admin/news/?tab=held"><?= e($count($news['held'], 'article held for review', 'articles held for review')) ?></a>
+                        <span class="pt-small pt-muted">Drafts the AI desk wrote, waiting for you to publish or delete them</span>
+                    </li>
+                    <li>
+                        <a href="/portal/admin/news/comments/"><?= e($count($news['reported'], 'reported comment', 'reported comments')) ?></a>
+                    </li>
+                    <li>
+                        <a href="/portal/admin/news/comments/?tab=pending"><?= e($count($news['pending'], 'comment waiting for approval', 'comments waiting for approval')) ?></a>
+                    </li>
+                    <li>
+                        <a href="/portal/admin/news/desk/">The AI desk</a>
+                        <span class="pt-badge pt-badge--<?= e($deskBadge) ?>"><?= e($deskWords) ?></span>
+                        <span class="pt-small pt-muted">
+                            <?php if ($last !== null): ?>Last session <?= $time($last['created_at']) ?>: <?= e($runWords[(string) $last['status']] ?? (string) $last['status']) ?>, <?= e($count((int) $last['articles'], 'article', 'articles')) ?> · <?php endif; ?>Spent this month: about <?= e(number_format($news['spent'], 2)) ?> of <?= e(number_format($news['budget'])) ?> USD (estimated)
+                        </span>
+                    </li>
+                </ul>
+            </div>
+            <div class="pt-card-footer"><a href="/portal/admin/news/">See every article</a></div>
+        </section>
+    <?php endif; ?>
 </div>

@@ -1,4 +1,4 @@
-# AGMessage — assistant notes
+# AGMessage: assistant notes
 
 AGMessage is private, live messaging for AGMs and board meetings: the research team in the back-room puts answers, board-pack documents and tap-to-answer questions in front of the directors on stage, from one Windows laptop on the venue network. It is the people app of the Patterns ecosystem, beside Patterns (the picture), StageWatch (the show clock) and PlayMap (playback and mapping), and it also suits corporate conferences. The back-room is usually the company secretary, legal, investor relations, finance and ESG. The current version is 0.4.0. AGMessage has its own product site, agmessage.com, where people book a rehearsal demo and read about the pilot.
 

@@ -109,6 +109,28 @@ final class App
         return $this->db;
     }
 
+    /**
+     * The database, checked with SELECT 1 first: a MySQL connection the server dropped while a long model call ran is
+     * replaced by a new one to the configured database. SQLite is never reconnected (a file needs no reconnecting,
+     * and the tests' in-memory database lives only in its connection), so its failure is thrown as it is.
+     */
+    public function dbAlive(): Database
+    {
+        $db = $this->db();
+        try {
+            $db->value('SELECT 1');
+            return $db;
+        } catch (\PDOException $e) {
+            if ($db->driver() !== 'mysql') {
+                throw $e;
+            }
+            $this->log->warning('database connection lost, reconnecting', ['error' => $e->getMessage()]);
+            $this->db = null;
+            $this->limiter = null;
+            return $this->db();
+        }
+    }
+
     /** The schema migrator for the configured database, its marker keyed to that database's DSN and user. */
     public function migrator(): Migrator
     {
@@ -282,12 +304,15 @@ final class App
         }
         $lower = strtolower($request->path);
         if ($lower !== $request->path && !str_starts_with($request->path, '/portal/') && !str_starts_with($request->path, '/api/')) {
-            // Only a path that exists in lower case is redirected: anything else is a 404, never a permanent hop.
-            $again = $this->router->match('GET', $lower);
-            if ($again === null) {
+            // Only a page that exists in lower case, with nothing in its path a route reads as a value, is redirected:
+            // anything else (an unknown address, an article's slug or a category key typed in capitals) is a 404,
+            // never a permanent hop to a guess. Slugs and keys are only ever written in lower case.
+            $target = self::localTarget($this->router->match('GET', $lower)['redirect'] ?? $lower);
+            $again = $this->router->match('GET', $target);
+            if ($again === null || !isset($again['route']) || $again['params'] !== []) {
                 return $this->errorResponse($request, 404);
             }
-            return Response::redirect(self::localTarget($again['redirect'] ?? $lower) . $this->queryString($request), 301);
+            return Response::redirect($target . $this->queryString($request), 301);
         }
         $match = $this->router->match($request->method, $request->path);
         if ($match === null) {
@@ -335,11 +360,11 @@ final class App
     public function errorResponse(Request $request, int $status, ?\Throwable $e = null): Response
     {
         if ($request->wantsJson() || str_starts_with($request->path, '/api/')) {
-            $messages = [404 => 'not_found', 405 => 'method_not_allowed', 403 => 'forbidden', 429 => 'too_many_requests', 500 => 'server_error'];
+            $messages = [404 => 'not_found', 405 => 'method_not_allowed', 403 => 'forbidden', 410 => 'gone', 429 => 'too_many_requests', 500 => 'server_error'];
             return Response::json(['error' => $messages[$status] ?? 'error'], $status);
         }
         try {
-            $titles = [403 => 'Access denied', 404 => 'Page not found', 405 => 'Method not allowed', 419 => 'Session expired', 429 => 'Too many requests', 500 => 'Something went wrong'];
+            $titles = [403 => 'Access denied', 404 => 'Page not found', 405 => 'Method not allowed', 410 => 'Page removed', 419 => 'Session expired', 429 => 'Too many requests', 500 => 'Something went wrong'];
             $seo = $this->seo(($titles[$status] ?? 'Error') . ' | ' . $this->name(), 'Patterns Show Control', $request->path)->noindex();
             $template = $this->view()->exists('errors/' . $status) ? 'errors/' . $status : 'errors/error';
             $html = $this->view()->page($template, [

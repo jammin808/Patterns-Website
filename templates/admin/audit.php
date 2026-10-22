@@ -82,8 +82,8 @@ $time = static fn (mixed $ts): string => (int) $ts > 0
                             <?php endif; ?>
                         </td>
                         <th scope="row" class="pt-mono"><?= e($action) ?></th>
-                        <td class="pt-mono" data-label="Subject"><?php if ($subject === null): ?><span class="pt-muted">—</span><?php elseif ($subjectUrl !== null): ?><a href="<?= e($subjectUrl) ?>"><?= e($subject) ?></a><?php else: ?><?= e($subject) ?><?php endif; ?></td>
-                        <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">—</span><?php endif; ?></td>
+                        <td class="pt-mono" data-label="Subject"><?php if ($subject === null): ?><span class="pt-muted">None</span><?php elseif ($subjectUrl !== null): ?><a href="<?= e($subjectUrl) ?>"><?= e($subject) ?></a><?php else: ?><?= e($subject) ?><?php endif; ?></td>
+                        <td data-label="Details"><?php if ($meta !== ''): ?><pre class="pt-mono pt-small"><?= e($meta) ?></pre><?php else: ?><span class="pt-muted">None</span><?php endif; ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

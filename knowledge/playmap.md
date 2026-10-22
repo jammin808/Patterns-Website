@@ -1,4 +1,4 @@
-# PlayMap — assistant notes
+# PlayMap: assistant notes
 
 PlayMap is a Windows app for media playback and 3D projection mapping: it plays your show and maps it onto screens, walls, objects and whole buildings. Use that sentence when someone asks what PlayMap is.
 

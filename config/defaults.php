@@ -90,6 +90,18 @@ return [
         'timeout_seconds' => 60,
     ],
 
+    'news' => [
+        // Industry Updates' AI desk (docs/NEWS.md). Its schedule, models, caps and prompts are admin settings held in
+        // the database; these are the deployment's own.
+        'api_key' => '',                  // the desk's Anthropic key; empty: it falls back to chat.api_key
+        'import_stagger' => true,         // imported articles without a published_at go live 10 to 30 minutes apart
+        'timeout_seconds' => 600,         // the longest one model call may take
+        'connect_timeout_seconds' => 15,
+        'check_model' => 'claude-haiku-5-5', // the banned-topic and allegation check
+        'session_minutes' => 40,          // a session's deadline, from its start
+        'session_ceiling_usd' => 5,       // a session stops spending once its estimated cost passes this
+    ],
+
     'licensing' => [
         'payment_mode' => 'invoice',      // invoice | links
         'payment_links' => [],            // e.g. ['stagewatch.pro' => 'https://buy.stripe.com/...']
