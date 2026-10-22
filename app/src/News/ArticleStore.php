@@ -13,10 +13,11 @@ use Psc\Db\Database;
  * fills in the SEO title and meta description when they were left empty, registers each link once by its
  * canonical key (the sources, then every other external address in the body, impact and items) keeping the click
  * counts of links that stay, counts the words and makes the slug unique (-2, -3 ...) and clear of the words the
- * routes use (Paths::isReserved()): a new article's comes from Draft::slugBase(), and a stored one's changes only
- * when a draft names one and never once the article has been live (hasBeenLive()), so an address that has been
- * shared always finds it. Each write is one transaction; a slug taken by a concurrent save is retried with the next
- * number.
+ * routes use (Paths::isReserved()) and of every deleted article's (news_retired_slugs, isRetired()): a new
+ * article's comes from Draft::slugBase(), and a stored one's changes only when a draft names one and never once the
+ * article has been live (hasBeenLive()), so an address that has been shared always finds it, or answers that it is
+ * gone, and never leads to another article. Each write is one transaction; a slug taken by a concurrent save is
+ * retried with the next number.
  *
  * Live means status published and published_at at or before now; a published article with a later time is
  * scheduled. Rows come back with confirmed and speculation decoded to lists of {text, url}, plus categories (the
@@ -224,8 +225,9 @@ final class ArticleStore
 
     /**
      * Deletes an article with its categories, links, clicks, follow-ups, images and comments, then its image
-     * files, and returns the row as it was (for the audit), or null when there was none. An imported article's
-     * news_imports row stays, so the file never brings it back.
+     * files, and returns the row as it was (for the audit), or null when there was none. Its slug is retired with it
+     * (isRetired()), live or not, so no later article is given it. An imported article's news_imports row stays, so
+     * the file never brings it back.
      *
      * @return array<string, mixed>|null
      */
@@ -236,9 +238,13 @@ final class ArticleStore
             return null;
         }
         $images = $this->images($id);
-        $this->db()->transaction(static function (Database $db) use ($id): void {
+        $slug = strtolower((string) $row['slug']);
+        $this->db()->transaction(static function (Database $db) use ($id, $slug): void {
             $db->exec('DELETE FROM news_images WHERE article_id = ?', [$id]);
             $db->exec('DELETE FROM news_articles WHERE id = ?', [$id]);
+            if ($db->value('SELECT 1 FROM news_retired_slugs WHERE slug = ?', [$slug]) === null) {
+                $db->insert('news_retired_slugs', ['slug' => $slug, 'article_id' => $id, 'retired_at' => time()]);
+            }
         });
         foreach ($images as $image) {
             $this->removeImageFiles($image);
@@ -266,6 +272,47 @@ final class ArticleStore
             ? $this->db()->one("SELECT * FROM news_articles WHERE slug = ? AND status = 'published' AND published_at <= ?", [$slug, time()])
             : $this->db()->one('SELECT * FROM news_articles WHERE slug = ?', [$slug]);
         return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    /** Whether $slug was a deleted article's: never given again, and its addresses answer 410. */
+    public function isRetired(string $slug): bool
+    {
+        $slug = strtolower(trim($slug));
+        return $slug !== '' && $this->db()->value('SELECT 1 FROM news_retired_slugs WHERE slug = ?', [$slug]) !== null;
+    }
+
+    /**
+     * The slug the store would give an article with this base now (uniqueSlug(), the article $id itself passed
+     * over): what the editor's empty Address field stands for.
+     */
+    public function slugFor(string $base, ?int $id = null): string
+    {
+        return $this->uniqueSlug($this->db(), $base, $id, 0);
+    }
+
+    /**
+     * The live articles among $slugs, by slug, each with its id, slug and primary category (for Paths::article()):
+     * one query for every link a page draws to another article (Markdown::articleSlugs()).
+     *
+     * @param list<string> $slugs
+     * @return array<string, array{id: int, slug: string, category: string}>
+     */
+    public function liveBySlugs(array $slugs): array
+    {
+        $slugs = array_values(array_unique(array_filter(array_map(static fn (string $s): string => strtolower(trim($s)), $slugs), static fn (string $s): bool => $s !== '' && strlen($s) <= 190)));
+        if ($slugs === []) {
+            return [];
+        }
+        $out = [];
+        $rows = $this->db()->all(
+            'SELECT a.id, a.slug, ' . self::PRIMARY . ' AS category FROM news_articles a'
+            . ' WHERE a.slug IN (' . self::marks($slugs) . ") AND a.status = 'published' AND a.published_at <= ?",
+            [...$slugs, time()]
+        );
+        foreach ($rows as $row) {
+            $out[strtolower((string) $row['slug'])] = ['id' => (int) $row['id'], 'slug' => (string) $row['slug'], 'category' => (string) ($row['category'] ?? '')];
+        }
+        return $out;
     }
 
     /**
@@ -682,15 +729,15 @@ final class ArticleStore
     }
 
     /**
-     * The first free slug among $base, $base-2, $base-3 ... (Paths::numbered()), passing over the words the routes use
-     * and the category keys, and skipping $skip free ones (a retry after a clash).
+     * The first free slug among $base, $base-2, $base-3 ... (Paths::numbered()), passing over the words the routes use,
+     * the category keys and the slugs of deleted articles, and skipping $skip free ones (a retry after a clash).
      */
     private function uniqueSlug(Database $db, string $base, ?int $exceptId, int $skip): string
     {
         $base = $base !== '' ? $base : 'article';
         for ($n = 1; ; $n++) {
             $slug = Paths::numbered($base, $n);
-            if (Paths::isReserved($slug)) {
+            if (Paths::isReserved($slug) || $db->value('SELECT 1 FROM news_retired_slugs WHERE slug = ?', [$slug]) !== null) {
                 continue;
             }
             $id = $db->value('SELECT id FROM news_articles WHERE slug = ?', [$slug]);

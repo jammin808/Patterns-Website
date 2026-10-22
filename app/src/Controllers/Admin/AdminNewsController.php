@@ -188,7 +188,11 @@ final class AdminNewsController extends Controller
         }
         $id = (int) $article['id'];
         $kept = $this->takeKept($id);
-        $values = $kept ?? self::valuesOf($store->draft($id) ?? new Draft());
+        $values = $kept;
+        if ($values === null) {
+            $draft = $store->draft($id) ?? new Draft();
+            $values = self::valuesOf($draft, $store->slugFor($draft->slugBase(), $id));
+        }
         // A kept form keeps the version it was first opened on, so showing it again never makes it current.
         if ($values['loaded_at'] === '') {
             $values['loaded_at'] = (string) (int) $article['updated_at'];
@@ -260,11 +264,11 @@ final class AdminNewsController extends Controller
         }
         $clean = $result->draft;
         // Until it has been live the address is the one typed, or with none the one its words make, as the store
-        // makes it (an address it already has, or the same one numbered to be unique, is kept as it is); after that
-        // it is the address it went live at, whatever was posted.
+        // makes it (an address that is already exactly that one is kept as it is); after that it is the address it
+        // went live at, whatever was posted.
         if (ArticleStore::hasBeenLive($article)) {
             $clean->slug = null;
-        } elseif ($clean->slug === null && !Paths::isNumberedFrom((string) $article['slug'], $clean->slugBase())) {
+        } elseif ($clean->slug === null && $store->slugFor($clean->slugBase(), $id) !== (string) $article['slug']) {
             $clean->slug = $clean->slugBase();
         }
         $changed = $store->update($id, $clean, (int) $admin['id'], $loaded);
@@ -512,12 +516,14 @@ final class AdminNewsController extends Controller
     }
 
     /**
-     * A stored article as the editor's values. An SEO title, meta description or address that is only what an empty
-     * field becomes shows as empty, so it goes on following the headline, the standfirst and the words.
+     * A stored article as the editor's values. An SEO title or meta description that is only what an empty field
+     * becomes shows as empty, so it goes on following the headline or the standfirst; so does an address that is
+     * exactly the one an empty field gives now ($auto, ArticleStore::slugFor()). Any other address was typed, and
+     * shows as typed, even one that ends in a number (a year, a count).
      *
      * @return array<string, mixed>
      */
-    private static function valuesOf(Draft $d): array
+    private static function valuesOf(Draft $d, string $auto): array
     {
         $empty = clone $d;
         $empty->seoTitle = '';
@@ -528,7 +534,7 @@ final class AdminNewsController extends Controller
         return self::withDefaults([
             'title' => $d->title,
             'seo_title' => $d->seoTitle === $empty->seoTitleOrDefault() ? '' : $d->seoTitle,
-            'slug' => $d->slug === null || Paths::isNumberedFrom($d->slug, $d->slugBase()) ? '' : $d->slug,
+            'slug' => $d->slug === null || $d->slug === $auto ? '' : $d->slug,
             'summary' => $d->summary === $empty->summaryOrDefault() ? '' : $d->summary,
             'dek' => $d->dek,
             'body' => $d->body,

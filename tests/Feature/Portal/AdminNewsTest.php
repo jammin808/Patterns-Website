@@ -678,6 +678,76 @@ final class AdminNewsTest extends TestCase
         self::assertSame([], $this->auditRows('news.updated'));
     }
 
+    /**
+     * A typed address stays as typed, even one that ends in a number the way a numbered one does (a year): the
+     * editor shows it, and a new headline leaves it. Only an address that is exactly the one the words make shows
+     * empty and follows them; emptied, the field follows them again.
+     */
+    public function testATypedAddressStaysAsTypedEvenWhenItEndsInANumber(): void
+    {
+        $this->signInAdmin();
+        $this->post('/portal/admin/news/', self::form(['action' => 'save', 'title' => 'Year in review for show control', 'slug' => 'year-in-review-for-show-control-2026']));
+        $id = $this->newest();
+        $path = '/portal/admin/news/' . $id . '/';
+        self::assertSame('year-in-review-for-show-control-2026', $this->article($id)['slug']);
+        $page = $this->request('GET', $path)->body;
+        self::assertMatchesRegularExpression('#id="f-slug" name="slug"[^>]* value="year-in-review-for-show-control-2026">#', $page, 'shown as typed');
+        preg_match('#name="loaded_at" value="(\d+)"#', $page, $loaded);
+
+        $this->post($path, self::form(['action' => 'save', 'title' => 'Year in review for show control teams', 'slug' => 'year-in-review-for-show-control-2026', 'loaded_at' => $loaded[1] ?? '']));
+        self::assertSame('year-in-review-for-show-control-2026', $this->article($id)['slug'], 'a new headline leaves a typed address');
+        self::assertNotContains('slug', json_decode((string) $this->auditRows('news.updated')[0]['meta'], true)['fields']);
+
+        $this->post($path, self::form(['action' => 'save', 'title' => 'Year in review for show control', 'slug' => '']));
+        self::assertSame('year-in-review-for-show-control', $this->article($id)['slug'], 'emptied: the words make it, though the typed one looked numbered from them');
+        self::assertMatchesRegularExpression('#id="f-slug" name="slug"[^>]* value="">#', $this->request('GET', $path)->body, 'and it goes on following them');
+        $this->post($path, self::form(['action' => 'save', 'title' => 'Year in review for show control teams', 'slug' => '']));
+        self::assertSame('year-in-review-for-show-control-teams', $this->article($id)['slug']);
+    }
+
+    /**
+     * Saving a live article with nothing changed changes nothing: its links to other articles stay as written (the
+     * page draws them at their own addresses), so no update is stored, audited or shown as Updated.
+     */
+    public function testSavingAnArticleUnchangedLeavesItsLinksAndItsDateAlone(): void
+    {
+        $this->makeArticle(['slug' => 'target-story', 'categories' => ['audio']]);
+        $id = $this->makeArticle(['slug' => 'linking-story', 'categories' => ['video']]);
+        $body = 'See [the earlier story](/news/target-story/) for more. ' . str_repeat('Words that make the body long enough to publish under the rules. ', 4);
+        $this->db->exec('UPDATE news_articles SET body = ?, published_at = ?, created_at = ?, updated_at = ? WHERE id = ?', [trim($body), time() - 86400, time() - 86400, time() - 86400, $id]);
+        $before = $this->article($id);
+        $this->signInAdmin();
+        $path = '/portal/admin/news/' . $id . '/';
+        $page = $this->request('GET', $path)->body;
+        preg_match('#name="loaded_at" value="(\d+)"#', $page, $loaded);
+        $d = (new ArticleStore($this->app))->draft($id);
+        self::assertNotNull($d);
+        $r = $this->post($path, self::form([
+            'action' => 'save',
+            'title' => $d->title,
+            'dek' => $d->dek,
+            'body' => $d->body,
+            'impact' => $d->impact,
+            'verdict' => $d->verdict,
+            'verdict_note' => $d->verdictNote,
+            'tags' => implode(', ', $d->tags),
+            'byline' => $d->byline,
+            'categories' => $d->categories,
+            'sources' => $d->sources,
+            'confirmed' => $d->confirmed,
+            'speculation' => [],
+            'loaded_at' => $loaded[1] ?? '',
+        ]));
+        self::assertRedirect($r, $path);
+        self::assertSame(['type' => 'info', 'message' => 'Nothing changed, so nothing was saved.'], self::lastFlash());
+        $after = $this->article($id);
+        self::assertSame([$before['body'], (int) $before['updated_at']], [$after['body'], (int) $after['updated_at']]);
+        self::assertSame([], $this->auditRows('news.updated'));
+        $public = $this->request('GET', '/news/video/linking-story/')->body;
+        self::assertStringContainsString('<a href="/news/audio/target-story/">the earlier story</a>', $public, 'drawn at its own address');
+        self::assertStringNotContainsString('Updated', $public);
+    }
+
     public function testEveryRowUpToTheLimitIsKeptAndOneMoreIsRefused(): void
     {
         $this->signInAdmin();
@@ -763,7 +833,8 @@ final class AdminNewsTest extends TestCase
         $meta = json_decode((string) $this->auditRows('news.deleted')[0]['meta'], true);
         self::assertSame(['going-for-good', 'live', 'manual', 1], [$meta['slug'], $meta['state'], $meta['origin'], $meta['images']]);
         self::assertSame(404, $this->request('GET', $path)->status);
-        self::assertSame(404, $this->request('GET', '/news/going-for-good/')->status);
+        self::assertSame(410, $this->request('GET', '/news/going-for-good/')->status, 'its address says it is gone for good');
+        self::assertTrue((new ArticleStore($this->app))->isRetired('going-for-good'), 'and no other article is given it');
     }
 
     public function testRefusedActionsAndUnknownArticles(): void

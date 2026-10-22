@@ -145,14 +145,15 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 
 ## 5. Taking an Industry Updates article down
 
-News pages are cached for 2 minutes (`public, max-age=120, stale-while-revalidate=60`) and news images for an hour
-on the CDN (`s-maxage=3600`). Whether Hostinger's CDN honours those times is still to be confirmed on the live site,
+News pages are cached for 2 minutes, and may be served stale for 1 more while the CDN fetches a new copy (`public,
+max-age=120, stale-while-revalidate=60`: up to about 3 minutes), and news images for an hour on the CDN
+(`s-maxage=3600`). Whether Hostinger's CDN honours those times is still to be confirmed on the live site,
 so to remove something at once:
 
 1. **Unpublish it** (Portal → Admin → Industry Updates → the article → *Unpublish*), or delete it, or delete just the
    image. The site stops serving it straight away; an imported article that is deleted is never imported again.
 2. **Flush the CDN**: GitHub → Actions → *Flush CDN* → *Run workflow* (or hPanel → Performance → CDN → Flush cache).
-   Without the flush a cached copy can stay at the edge for about 2 minutes, an image for up to an hour.
+   Without the flush a cached copy can stay at the edge for up to about 3 minutes, an image for up to an hour.
 3. If the request came from outside (a correction, a complaint), note what was changed and when; the audit log
    (Portal → Admin → Audit log, `news.`) has the record.
 

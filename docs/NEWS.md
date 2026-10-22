@@ -86,7 +86,7 @@ These are the owner's words, kept because the defaults and fences come from them
    - News responses never start a session and never set a cookie. This is a fence: every `/news/*` GET, made with a signed-in admin's cookie jar, sets no cookies.
    - Comments are rendered into the page. `news-comments.js` asks `/api/news/{id}/state` what the person may do only while the portal's `psc_li` hint is set (so a reader who never signs in starts no session), then adds the comment box and the person's own recent, pending and hidden comments.
    - Without scripting, the box links to the comment page `/news/{category}/{slug}/comment/` (`news-address`, `session`, `auth`, `nostore`).
-   - News HTML sends `public, max-age=120, stale-while-revalidate=60` (`NewsController::CACHE`), so even a copy served stale is about two minutes old at most. Whether Hostinger's CDN honours `max-age` must be checked on the live site; until then, takedown actions in the admin say "Run Flush CDN to remove both at once".
+   - News HTML sends `public, max-age=120, stale-while-revalidate=60` (`NewsController::CACHE`), so a CDN that serves a stale copy while it fetches a new one can show a page for up to about 3 minutes (120 + 60 seconds) after a change. Whether Hostinger's CDN honours `max-age` must be checked on the live site; until then, takedown actions in the admin say "Run Flush CDN to remove both at once".
 5. **A session is three kinds of model call.** Structured output cannot be combined with web-search citations, and forcing a tool call is refused on these models, so the steps are kept apart:
    1. **Research.** Web tools on, free text. The model writes a brief between marker lines. The server builds numbered references from every search result, fetched page and citation.
    2. **Select.** No tools, JSON schema. The model returns every candidate it considered, each with a decision. The server enforces the count, the importance threshold, the window and dedup itself.
@@ -151,7 +151,7 @@ These are the owner's words, kept because the defaults and fences come from them
 **Publishing**
 - `status VARCHAR(16) NOT NULL DEFAULT 'draft'`: `draft|published`
 - `published_at INT NULL`: a future time means scheduled
-- `first_live_at INT NULL` (migration `0005_news_first_live`): the time the article first went live, kept when a publish or an unpublish would lose it (a reschedule moves `published_at` on; a takedown of a scheduled time clears it). An article has been live when this is set or `published_at` has passed, and from then on its slug never changes
+- `first_live_at INT NULL` (migration `0005_news_first_live`): the time the article first went live, kept when a publish or an unpublish would lose it (a reschedule moves `published_at` on; a takedown of a scheduled time clears it). An article has been live when this is set or `published_at` has passed, and from then on its slug never changes. The migration fills it from `published_at` for every article that is published and already past its time
 - `origin VARCHAR(16) NOT NULL DEFAULT 'manual'`: `manual|ai|import`
 - `ai_written TINYINT(1) NOT NULL DEFAULT 0`: 1 for `ai`; for `import`, the file's `ai_written` (default true); for `manual`, the editor's "Written with AI help" tick. It decides the AI note and the desk byline
 - `review_reason VARCHAR(300) NULL`: why an AI article was held as a draft (the desk's reasons, or "Held when the desk was paused")
@@ -184,6 +184,7 @@ These are the owner's words, kept because the defaults and fences come from them
 | `news_settings` | `name VARCHAR(64)` PK, `value TEXT NULL` (JSON), `updated_by INT UNSIGNED NULL`, `updated_at INT NOT NULL DEFAULT 0` | |
 | `news_prompt_versions` | `id`, `field VARCHAR(16)` (`brief\|voice`), `body TEXT`, `created_by INT UNSIGNED NULL`, `created_at` | `news_prompt_versions_field (field, created_at)` |
 | `news_imports` | `import_key VARCHAR(190)` PK, `article_id INT UNSIGNED NULL`, `imported_at INT` | |
+| `news_retired_slugs` (migration `0005_news_first_live`) | `slug VARCHAR(190)` PK, `article_id INT UNSIGNED` (no FK: the article is gone), `retired_at INT`. Written by `ArticleStore::delete()` for every article deleted, live or not | |
 
 In `news_links`:
 - `url_key` is the sha256 of `Urls::canonical`.
@@ -238,7 +239,8 @@ In `news_links`:
 - `feed(?string $key)`: `/news/feed.xml` or `/news/{key}/feed.xml`.
 - `go()`, `media($file, $admin)`, `sitemap()`, `sitemapMonth('YYYY-MM')`, `sitemapNews()`.
 - `categoryPattern()`: the fourteen keys as the routes' `{category}` alternation.
-- `parse(string $path)`: the `{category, slug, comment}` an address on this site names, or null for a hub, a list page or a reserved word (the validator and the sign-in return path use it).
+- `parse(string $path)`: the `{category, slug, comment}` an address on this site names, or null for a hub, a list page or a reserved word (the sign-in return path uses it).
+- `named(string $href, string $baseUrl)`: the same for a link as a person types it: relative or on this site's host, the path in any case, with or without its last slash (`/news/Some-Story` names `some-story`). The validator and `Markdown` use it.
 - `slug(string $text)`: the slug rules. Lower case ASCII words joined by hyphens (through `Prose::slug()`), with no stop word at either end (`a an the and or of to in on for with at by is are from`), at most `SLUG_MAX` (60) characters cut at a word.
 - `numbered($base, $n)`: `base`, `base-2`, `base-3` ..., the base cut at a word (and its end's stop words trimmed again) so the number still fits within 60.
 - `RESERVED`: `page comment category go media feed sitemap`. No slug is one of these or a category key (`isReserved()`), and no category key is one of these.
@@ -258,13 +260,15 @@ In `news_links`:
 - `normaliseDomain(string): ?string`.
 
 **`Markdown`**
-- `render(string $md, array $linkIds, string $baseUrl): string`:
+- `render(string $md, array $linkIds, string $baseUrl, ?array $articles = null): string`:
   1. Normalises blank lines around heading and list lines so that `md()` recognises them.
   2. Refuses fenced code: the fence lines go and their lines stay as plain paragraphs.
   3. Runs `md()`.
   4. Shifts headings so a body starts at h2, never skips a level and goes no deeper than h4. The impact section is shifted one level further, under its own h2.
   5. For each external link whose canonical key is in `$linkIds`, keeps the real `href` and adds `data-news-link="{id}"`.
+  6. With `$articles` (slug ⇒ live article, from `ArticleStore::liveBySlugs()`), each link to an article on this site (`Paths::named()`) goes to that article's address as it is now (`Paths::article()`, or its comment page, the fragment kept), and a link to an article that is not live keeps only its words. Links between articles are resolved here, when the page is drawn, never written into the stored text, so a change of primary category moves every link to the article at once.
 - `inline()`: the same, for one line: a list item, a confirmed or speculation item.
+- `articleSlugs(string $md, string $baseUrl)`: the slugs those links name, so `renderArticle()` reads every linked article in one query.
 - `helpers.php` `md()` and `md_inline()` decide "external" by comparing parsed hosts (`Urls::isOwn`), not by a string prefix. This fixes `https://patternsshowcontrol.co.uk.evil.example/` counting as internal.
 
 ### Articles
@@ -295,7 +299,7 @@ In `news_links`:
 - **Writing:**
   - `create(Draft, ?int $userId, ?int $runId): int` and `update(int $id, Draft, ?int $userId, ?int $expectedUpdatedAt = null): ?array $changed`. Both run in one transaction and retry a unique-slug clash. `update()` never changes the status, the time or the origin, keeps an AI article `ai_written`, and returns the names of the fields that changed (`[]` writes nothing). With `$expectedUpdatedAt`, an article changed since answers null and nothing is written: the check is in the UPDATE's own WHERE, and a save it allows moves `updated_at` past the expected one.
   - `publish(int $id, ?int $at)`: at `$at` (a later time schedules it), else at the time it first went live, else now. `unpublish(int $id)`: back to a draft, keeping a time it went live at and dropping a scheduled time it never reached. Both move `updated_at` on like a save (`max(now, updated_at + 1)`), so a form opened before either is stale, and keep `first_live_at` before they replace or clear a time the article was live at.
-  - `delete(int $id): ?array`. It deletes the image rows and the article (the rest goes by CASCADE), then the image files, and returns the row for the audit.
+  - `delete(int $id): ?array`. It deletes the image rows and the article (the rest goes by CASCADE) and retires its slug (`news_retired_slugs`), then the image files, and returns the row for the audit.
   - `countClick(int $linkId, string $day)`: one click on the link's total and on its row for the day.
 - **Reading:**
   - `find(int)`, `findBySlug(string, bool $liveOnly = true)`: an article is found by its slug alone, whatever category its address names. Hydrated rows carry `confirmed` and `speculation` as lists, `categories`, `category` (the primary) and `tag_list`.
@@ -307,12 +311,14 @@ In `news_links`:
   - `categoryCounts(): array`, `categories(int)`.
   - `links(int)` (the sources first), `linkIds(int)`, `sourceKeys(array $ids)`, `related(int, bool $liveOnly = true): {earlier, later}`, `images(int)`.
   - `isLive(array $row)`, `draft(int $id): ?Draft`, and `imageFiles(array $image)` (static): the four file names of an image.
+  - `isRetired(string $slug)`: whether it was a deleted article's. `slugFor(string $base, ?int $id)`: the slug the store would give that base now (what the editor's empty Address field stands for). `liveBySlugs(array $slugs)`: the live articles among them, by slug, in one query.
 - **On every save:**
   - applies `Prose::undash` to every text field;
   - lower-cases the tags;
   - registers the links (the sources, plus every external link in the body, the impact and the confirmed and speculation items);
   - computes `word_count`;
-  - makes the slug unique (`-2`, `-3` and so on) and clear of the reserved words (`Paths::numbered()`, `Paths::isReserved()`). A new article's comes from `Draft::slugBase()` (its own SEO title, else its headline, by `Paths::slug()`), or a slug the draft names by the same rules; a stored one's changes only when a draft names one and never once the article has been live.
+  - makes the slug unique (`-2`, `-3` and so on) and clear of the reserved words and of every deleted article's slug (`Paths::numbered()`, `Paths::isReserved()`, `news_retired_slugs`), so an old link, a search result or a feed's guid never leads to another article. A new article's comes from `Draft::slugBase()` (its own SEO title, else its headline, by `Paths::slug()`), or a slug the draft names by the same rules; a stored one's changes only when a draft names one and never once the article has been live.
+  - stores the links as written: a link to another article is drawn at that article's address when the page is drawn (`Markdown`), so saving an article unchanged changes nothing.
 - **"Live"** means `status = 'published' AND published_at <= now`.
 
 **`Images`**
@@ -415,7 +421,7 @@ In `news_links`:
 ### Elsewhere
 
 **Controllers**
-- `Psc\Controllers\NewsController`: index, category, oldCategory, show, feed, go and click; `elsewhere()` is the 301 (308 for a POST) to an article's own address; `renderArticle(array $article, bool $preview = false)` draws an article, for the public page and the admin preview; `picture(array $image, bool $admin = false)` is an image row as the templates draw it.
+- `Psc\Controllers\NewsController`: index, category, oldCategory, show, feed, go and click; `elsewhere()` is the 301 (308 for a POST) to an article's own address, or the 410 of a deleted article's slug; `renderArticle(array $article, bool $preview = false)` draws an article, for the public page and the admin preview, with its links to other articles at their addresses of the day (one `liveBySlugs()` query); `picture(array $image, bool $admin = false)` is an image row as the templates draw it.
 - `SeoController`: the site's sitemap, robots and llms, the section's sitemaps (`newsSitemap`, `newsSitemapMonth`, `newsSitemapRecent`), and `/health`'s `news` and `images` (`newsState()`, `imagesSupported()`).
 - `NewsMediaController`: public media and admin media.
 - `NewsCommentController`: the API (`state`, `create`, `delete`, `report`), the comment page (`show`; not `page`, which `Controller` already has) and its forms (`submit`).
@@ -442,7 +448,8 @@ The section is one silo. The router takes the first route that matches, so the s
 they use (`page`, `go`, `media`, `category`, `feed`, `sitemap`) is a reserved slug, `{category}` is only ever one of the
 fourteen keys (`Paths::categoryPattern()`), and `{page}` is 2 or more (`[1-9][0-9]{0,5}`). The comment pages carry
 `news-address` first: a live article's comment page asked for at another of its addresses answers 301 (308 for a POST,
-so a form drawn before a category change is sent again, not lost) before any session starts.
+so a form drawn before a category change is sent again, not lost) before any session starts, and a deleted article's
+answers 410.
 
 ```
 GET  /news/                                   NewsController::index           ?q= ?page= (moved) ?category= (302)
@@ -451,7 +458,7 @@ GET  /news/feed.xml                           NewsController::feed
 GET  /news/sitemap.xml                        SeoController::newsSitemap      (a sitemap index)
 GET  /news/sitemap-news.xml                   SeoController::newsSitemapRecent
 GET  /news/sitemap-{month:yyyy-mm}.xml        SeoController::newsSitemapMonth
-GET  /news/category/{key:[a-z]+}/             NewsController::oldCategory     301 to /news/{key}/ (?page=N to its page)
+GET  /news/category/{key:[a-z]+}/             NewsController::oldCategory     301 to /news/{key}/ (?page=N to its page; past the end, 404)
 GET  /news/go/{id:\d+}/                       NewsController::go              ['nostore']
 GET  /news/media/{file:[a-f0-9]{32}-[a-z0-9]+\.(?:webp|jpg)}   NewsMediaController::public
 GET  /news/{category}/                        NewsController::category        ?page= (moved)
@@ -462,7 +469,7 @@ POST /news/{category}/{slug}/comment/         NewsCommentController::submit   ['
 GET  /news/{category}/{slug}/                 NewsController::show
 GET  /news/{slug}/comment/                    NewsCommentController::show     (the same, at the lasting address)
 POST /news/{slug}/comment/                    NewsCommentController::submit
-GET  /news/{slug}/                            NewsController::show            301 to the article's own address
+GET  /news/{slug}/                            NewsController::show            301 to the article's own address (a deleted one's, 410)
 GET  /api/news/{id:\d+}/state                 NewsCommentController::state    ['api','session','nostore']
 POST /api/news/{id:\d+}/comments              NewsCommentController::create   ['api','session','auth','nostore']
 POST /api/news/comments/{id:\d+}/delete       NewsCommentController::delete   ['api','session','auth','nostore']
@@ -492,8 +499,10 @@ GET  /portal/admin/news/desk/runs/{id:\d+}/   AdminNewsDeskController::run      
 
 **The addresses' rules**
 - `/news/{category}/{slug}/` is an article's canonical address, the category its primary one. The slug is unique across the site and never changes once the article has been live (`first_live_at`, §3).
-- Any other category in the path, or the bare `/news/{slug}/`, answers 301 to the canonical address, keeping the query string; so does the comment page. An unknown slug, or one whose article is not live, is a 404 at every address, with no redirect.
-- `?page=N` on a list answers 301 to its path form (`/news/page/N/`, `/news/{key}/page/N/`), and `/news/page/1/` (or `/news/{key}/page/1/`) to the list itself; `?page=0`, `?page=02` and the like are 404s. A search pages by its query (`/news/?q=...&page=N`); `/news/page/N/?q=...` answers 301 there.
+- Any other category in the path, or the bare `/news/{slug}/`, answers 301 to the canonical address, keeping the query string; so does the comment page. A deleted article's slug answers 410 (noindex) at every address, the comment page too, and is never given to another article (`news_retired_slugs`). Any other unknown slug, or one whose article is not live, is a 404 at every address, with no redirect.
+- `?page=N` on a list answers 301 to its path form (`/news/page/N/`, `/news/{key}/page/N/`), and `/news/page/1/` (or `/news/{key}/page/1/`) to the list itself; `?page=0`, `?page=02` and the like are 404s. A search pages by its query (`/news/?q=...&page=N`); `/news/page/N/?q=...` answers 301 there. A move to a page past the end of its list (here or from `/news/category/{key}/?page=N`) is never made: the address answers 404 itself.
+- Every list move keeps the rest of the query string (`utm_*` and the like), as the article moves do; only `page` moves into the path (or into the search's own query), and an empty `q` is dropped.
+- An address without its trailing slash takes the router's 301 to the slashed form first, then the article's own 301 when it has moved: two hops. That is accepted, not a fault.
 - A path in capitals answers 301 to its lower-case form only when that form is a page with no route parameters (`/News/` goes to `/news/`); `/news/NOPE/` or `/news/Video/` is a 404 with no redirect (`App::dispatch`).
 - **Slugs**: from the SEO title when the article has its own, else the headline (`Draft::slugBase()`); lower case ASCII words joined by hyphens; at most 60 characters cut at a word; no stop word at either end; unique (`-2`, `-3` ...); never a reserved word or a category key (those get a number). An admin may type one, by the same rules, until the article has been live.
 
@@ -591,7 +600,7 @@ The run is started from `queued` (one conditional UPDATE), then takes the lease 
    - **Rejected,** or refused for anything a rewrite cannot fix: logged with its rules and dropped.
    - **Phrases to avoid, or lengths only a rewrite can fix** (`Result::repairable()`): one repair call (`compose_model`, effort medium, `repairRules`; the phrases it uses, "What it must fix:" with each problem in plain words, and the article JSON; it returns the same schema), then validate again. An article the repair leaves refused is dropped; one that still uses a phrase is held as a draft.
 6. **Check** (`news.check_model`, Haiku 5.5, effort low, `max_tokens` 4000, schema `check`).
-   - **Input:** the banned topics, then every part of the article a reader sees between `<article>` and `</article>` (any such marker inside the text is removed): the title, SEO title, standfirst, summary, body, impact, the confirmed and speculation items, the verdict and its note, and the sources' titles and publishers. Every prompt tells the model that this text, like every page and search result, is untrusted data whose instructions are never followed.
+   - **Input:** the banned topics, then every part of the article a reader sees between `<article>` and `</article>`: the title, SEO title, standfirst, summary, tags, body, impact, the confirmed and speculation items, the verdict and its note, and the sources' titles and publishers. Every marker inside the text (`<article>`, `</ article >` and the like, in any case) is removed, again until none is left, so a marker pieced together by a removal (`</art</article>icle>`) cannot close the article early either. Every prompt tells the model that this text, like every page and search result, is untrusted data whose instructions are never followed.
    - **Output:** `{banned_topics: [string], names_private_individual: bool, alleges_wrongdoing: bool, reason: string}`.
    - A banned topic it names that matches one of the settings' rejects the article.
    - Either flag holds it as a draft, with `review_reason`.
@@ -721,13 +730,13 @@ Lengths are checked on the text as it will be stored (after `Prose::undash`). Th
 | `verdict_note` | all | Up to 320 characters. AI: repairable | Keep the verdict note to 320 characters. |
 | `byline` | all | Up to 120 characters | Keep the byline to 120 characters. |
 | `key` | import | Required, up to 190 characters | Give the file a key of up to 190 characters. |
-| `refs` | ai | Every `ref` exists. Unknown refs are dropped from sources and items, and unknown inline links (in the body, the impact and the items) are unlinked, keeping the text. An item's valid ref that is not among the sources is added to them. Each confirmed ref must be `via=fetch` or `cited`, otherwise the item moves to speculation. Rejected if no valid source remains. | |
-| `links` | all | Every link in the body, the impact and the items is an http or https address on a named site, never on a banned one. AI: it must also be on this site, one of the research's addresses, or a stored source of a `follow_up_of` article; any other is unlinked, keeping its text, with a warning. Manual and import: an error on the field | Each link needs a web address on a named site, starting https:// or http://. |
+| `refs` | ai | Every `ref` exists. Unknown refs are dropped from sources and items, and unknown inline links (in the body, the impact and the items) are unlinked, keeping the text without its brackets, read again until nothing changes. An item's valid ref that is not among the sources is added to them. Each confirmed ref must be `via=fetch` or `cited`, otherwise the item moves to speculation. Rejected if no valid source remains. | |
+| `links` | all | Every link in the body, the impact and the items is an http or https address on a named site, never on a banned one. AI: it must also be on this site, one of the research's addresses, or a stored source of a `follow_up_of` article; any other is unlinked, keeping its text without its brackets, with a warning. A field is judged again after a pass that unlinked anything, until it settles (at most 10 passes; one that never settles keeps no link), so no kept text joins what follows it into a link that was never judged, however deep the nesting. Manual and import: an error on the field | Each link needs a web address on a named site, starting https:// or http://. |
 | `banned_domain` | all | No source, item, link or `credit_url` on a banned domain (subdomains included). AI: dropped like an unknown ref | That site is on the banned list. |
 | `banned_topic` | ai, import | No banned topic as a whole-word, case-insensitive match in the title, SEO title, dek, summary, body, impact, items, verdict note or tags (not the byline, nor the sources' own page titles). Manual: a warning flash only | |
 | `duplicate` | ai, import | Duplicate when either: the `story_key` equals one from the last 365 days; or any source URL key matches a source of an article from the last 120 days; or the Jaccard overlap of lower-case words across title + dek + tags is 0.5 or more against an article from the last 60 days. A match against an article in `follow_up_of` is allowed only if the new article brings at least one source URL none of them used. A match against an article that was not in the context (`seen`; an import file was shown none), with new sources, becomes an automatic follow-up (a warning). Otherwise rejected | |
 | `follow_up` | all | Every id or slug exists and is not the article itself; for AI, every one the desk declared is live, or the article is rejected (an automatic follow-up of an article not live holds the article instead, §6.2 step 7). Manual: an error on the list | Choose the earlier articles from the list. |
-| `own_links` | all | A link on this site to an article (`Paths::parse()`) is rewritten to that article's own address (or its comment page) while it is live. AI: a link to one that is not live, or not there, is unlinked, keeping its text, with a warning | |
+| `own_links` | all | A link on this site to an article (`Paths::named()`: relative or on this host, in any case, with or without its slash) is stored as written; the page draws it at that article's own address (or its comment page) while it is live, and as its words alone when it is not (`Markdown`). AI: a link to one that is not live, or not there, is unlinked, keeping its text, with a warning | |
 | `contact` | all | No email address and no `mailto:` in any text field | Remove the email address; link to a page instead. |
 | `dashes` | all | Not a rejection: `undash` runs on save. A manual save that replaced any shows a flash | Em dashes were replaced with commas. |
 | `tells` | ai | Phrases to avoid in the dek, body, impact and verdict note: repair, then hold (§6.2 step 5) | |
@@ -817,7 +826,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - **Indexing:**
   - every page names itself as canonical (path-based) and is `index, follow`; page 2 and on say their number in the title ("..., page 2"), the description ("Page 2: ...") and the breadcrumbs ("Page 2");
   - `?q=` pages are `noindex, follow` and `private, no-store`;
-  - a page number past the end is a 404, and `?page=N` and `/news/page/1/` answer 301 to the clean address (§5).
+  - a page number past the end is a 404, and `?page=N` and `/news/page/1/` answer 301 to the clean address with the rest of the query, never to a page past the end (§5).
 - **When the articles cannot be read** (the database is down), every list still renders and says so, as a 503 with `Retry-After: 120`, `private, no-store` and `noindex, follow` (so no canonical and no JSON-LD); its page number is not checked against the end then.
 - **Head:** `CollectionPage` with `mainEntity` its `ItemList` of the page's articles at their own addresses, the BreadcrumbList, the news share card, and the RSS alternate for `/news/feed.xml`.
 
@@ -884,7 +893,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
   - the user agent is empty or looks like a bot (`bot|crawl|spider|slurp|preview|fetch|monitor|curl|wget|python|httpclient|headless`);
   - it is past the limit of one per link per IP per 10 minutes (the RateLimiter hashes it).
 - A counted click adds to the link's total and to its row for the day (UTC), through `ArticleStore::countClick()`. A failure is logged, never shown.
-- `/news/go/{id}/` answers 302 to the stored URL only, never to a URL from the request, and counts by the same rules. A link whose article is not live gives 404.
+- `/news/go/{id}/` answers 302 to the stored URL only, never to a URL from the request, and counts by the same rules, and only a visit: `Sec-Fetch-Dest` absent or `document` and `Sec-Fetch-Mode` absent or `navigate`. An image, a script, a frame or a fetch that names the address on another page is sent on but never counted, so a hidden `<img>` elsewhere cannot inflate the counts; a click from another site (a feed reader's) still counts. A link whose article is not live gives 404.
 - The admin calls the counts "approximate".
 
 **Images**
@@ -892,7 +901,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - The admin route serves any image with `private, no-store`.
 
 **Cache and layout**
-- News HTML and the feeds are `public, max-age=120, stale-while-revalidate=60` (`NewsController::CACHE`); a search and a list that cannot be read are `private, no-store`.
+- News HTML and the feeds are `public, max-age=120, stale-while-revalidate=60` (`NewsController::CACHE`), so a page can be served for up to about 3 minutes after a change; a search and a list that cannot be read are `private, no-store`. A deleted article's 410 is `private, no-store`, like every error page.
 - The article's column (`news-story-wrap`) and each comment's body hold `overflow-wrap: anywhere` for long URLs.
 - Code blocks are never rendered.
 
@@ -916,7 +925,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 **Order of the page**
 1. The error summary.
 2. The headline, then the SEO title, the address and the meta description (optional, with live counters).
-   - **The address** is the slug after `/news/{category}/`. Until the article has been live it is a field: empty, it is made from the SEO title or the headline as the store makes it (`Draft::slugBase()`) and goes on following them; typed, it takes the same rules (`Paths::slug()`, numbered clear of other articles and the reserved words). Once the article has been live (`ArticleStore::hasBeenLive()`) it is shown, never offered, and a posted slug is ignored; a new primary category moves the article, and its old address answers 301 there.
+   - **The address** is the slug after `/news/{category}/`. Until the article has been live it is a field: empty, it is made from the SEO title or the headline as the store makes it (`Draft::slugBase()`) and goes on following them; typed, it takes the same rules (`Paths::slug()`, numbered clear of other articles, deleted articles' slugs and the reserved words) and stays as typed. The field shows empty only when the stored slug is exactly the one an empty field gives now (`ArticleStore::slugFor()`), so a typed address that ends in a number (`year-in-review-2026`) is shown, and kept through a new headline. Once the article has been live (`ArticleStore::hasBeenLive()`) it is shown, never offered, and a posted slug is ignored; a new primary category moves the article, and its old address answers 301 there.
    - **The SEO title and the meta description** are stored filled in (§3). When the stored value is just what an empty field would make, the editor shows the field empty, so it goes on following the headline or the standfirst.
 3. The standfirst, the body, and "What's confirmed" and "Still speculation" as rows of text and URL. Each row has an id (`confirmed-3-url`) so the error summary can link to it. The form renders the existing rows plus 6 spare ones (up to the list's 12); `admin-news.js` shows the spare rows one at a time and adds more up to 12.
 4. Impact, the verdict (radio buttons) and the verdict note.
@@ -947,7 +956,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - Link clicks, approximate: per link, in total and for the last 30 days, with a note on what is and is not counted.
 - Delete, behind a confirm tick ("Yes, delete this article, its images and its comments"). An imported article's file never brings it back.
 
-**Takedown actions** (unpublishing or deleting a live article, deleting an image of one, hiding or deleting a visible comment) flash: "Pages can take up to about 2 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once." (`AdminNewsCommentController::TAKEDOWN`; a page's `max-age` 120 and an image's `s-maxage` 3600 keep it true, and a test holds the words to them.) The editor of a live article says it too.
+**Takedown actions** (unpublishing or deleting a live article, deleting an image of one, hiding or deleting a visible comment) flash: "Pages can take up to about 3 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once." (`AdminNewsCommentController::TAKEDOWN`; a page's `max-age` 120 plus its `stale-while-revalidate` 60, and an image's `s-maxage` 3600, keep it true, and a test holds the words to their sum.) The editor of a live article says it too.
 
 ### Preview
 - Renders the article through `NewsController::renderArticle($article, true)` with a banner reading "Preview: not published" (a scheduled article also gets its go-live time), or "Preview: this article is live".
@@ -992,7 +1001,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql.php` against the MySQL migrations.
 
 **Unit** (`tests/Unit/News/`)
-- `ProseTest`, `UrlsTest` (userinfo, IDN, trailing dot, sorting, the longest host), `MarkdownTest` (normalisation, headings, `data-news-link`, no code blocks), `CategoriesTest`, `PathsTest` (the addresses, `parse()`, the slug rules, numbered and reserved slugs), `ValidatorTest` (every rule of §7, the AI fixes and the repairable errors, links inside items), `ScheduleTest` (BST and GMT dates, the two-hour window, a late slot after midnight, overrides, the 60-minute gap, a paused desk, several due, the spring and autumn clock changes), `PricingTest`, `NewsAssetsTest` (the artwork, the stylesheets' tokens and prefix, the click script, the share cards, no inline style, script or dash).
+- `ProseTest`, `UrlsTest` (userinfo, IDN, trailing dot, sorting, the longest host), `MarkdownTest` (normalisation, headings, `data-news-link`, no code blocks), `CategoriesTest`, `PathsTest` (the addresses, `parse()`, `named()`, the slug rules, numbered and reserved slugs), `ValidatorTest` (every rule of §7, the AI fixes and the repairable errors, links inside items, nested links that never leave one unjudged), `ScheduleTest` (BST and GMT dates, the two-hour window, a late slot after midnight, overrides, the 60-minute gap, a paused desk, several due, the spring and autumn clock changes), `PricingTest`, `NewsAssetsTest` (the artwork, the stylesheets' tokens and prefix, the click script, the share cards, no inline style, script or dash).
 - `AnthropicNewsModelTest`, against a Guzzle `MockHandler`, checking:
   - the request JSON (tools, `blocked_domains`, `max_uses`, `user_location`, `output_config.format`, `fallbacks` and the beta header, the cache markers) and the stream client's timeouts;
   - a `pause_turn` resumed as it is, with the container id, and a spent allowance or the fourth continuation writing the brief in a fresh call;
@@ -1002,19 +1011,19 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
   - a fallback's share priced by the model that served it, a `before` hook that throws, and the brief as the finished text between the markers.
 
 **Feature: public** (`tests/Feature/News/`)
-- `NewsPagesTest`: the hub, the category pages and the phone's category form, search, a list that cannot be read (503, no-store, noindex), the article's order, author and "Updated", live articles only, images, the preview, the feed, `go` and `click`, no cookies on any `/news/*` GET even with an admin's cookie jar, the sitemap, `robots`, `llms`, `/health`, one heading tree and whole titles, the lead card, the header and footer links.
-- `NewsSiloTest`: the canonical address and every 301 to it (another category, the lasting address, the comment page before any session starts, the old category address, `?page=N`), no redirect for an unknown slug, one not live or one in capitals, reserved slugs, slugs from the SEO title, the hubs' heads and pages, "More in", the category feeds and share cards, the month and news sitemaps, every page of the silo at one address.
+- `NewsPagesTest`: the hub, the category pages and the phone's category form, search, a list that cannot be read (503, no-store, noindex), the article's order, author and "Updated", live articles only, images, the preview, the feed, `go` and `click` (only a visit counts), no cookies on any `/news/*` GET even with an admin's cookie jar, the sitemap, `robots`, `llms`, `/health`, one heading tree and whole titles, the lead card, the header and footer links.
+- `NewsSiloTest`: the canonical address and every 301 to it (another category, the lasting address, the comment page before any session starts, the old category address, `?page=N`, each with the rest of its query, and never to a page past the end), no redirect for an unknown slug, one not live or one in capitals, a deleted article's slug never given again and answering 410, links to other articles drawn at their addresses of the day, reserved slugs, slugs from the SEO title, the hubs' heads and pages, "More in", the category feeds and share cards, the month and news sitemaps, every page of the silo at one address.
 - `NewsMediaTest`: the copies at every width and the share card, the picture redrawn, EXIF orientation, transparency, the 25-megapixel, memory and size limits, files that are not images, the words, live, draft and admin media, `srcset`, `file()`, deleting and the lead.
 - `FoundationTest`: the route table and its middleware, the index the same for every visitor, the share title, the link host column, `dbAlive` (with a real reconnect on the MariaDB leg).
 - The SiteTest fences still pass.
 
 **Feature: comments**
 - `NewsCommentsTest`: posting, the API's same-origin rule, the limits, the same words twice, the rate limits, the pending rules and their email, `state`, reports with auto-hide, staff and their daily limit, deleting one's own comment (hidden, and on an article no longer live), the article row taken first, a delete racing an approval, closed comments, 404 on articles that are not live, the cached section (no session, no cookie), the no-JS page and its forms, the emails.
-- `AdminNewsCommentsTest`: access, the tabs and the article filter, each action with its audit row and recount, a state another administrator changed, the takedown words held to the CDN lifetimes.
+- `AdminNewsCommentsTest`: access, the tabs and the article filter, each action with its audit row and recount, a state another administrator changed, the takedown words held to the CDN lifetimes (max-age plus stale-while-revalidate).
 - `AccountsTest` (the account page's comments with the way to each, the data copy, deletion and the recounts, `next` kept through registration and only a safe article path offered as the way back), `HousekeepingTest` (clicks and runs at their promised age, orphaned images with their files, and no file deleted when the database names none).
 
 **Feature: admin**
-- `AdminNewsTest`: access and CSRF, the list's tabs and filters, a draft with a headline only, a refused save kept with every field named, validate on publish, publish, schedule, saving a live article, unpublish (never refused, and from a current form saving its changes), a stale form refused and kept, the address rules, every row up to the limit, a banned topic as a warning, delete behind its confirm tick, images (add, describe, lead, delete, unusable uploads refused), the preview without analytics, link clicks, an AI article's origin, the overview card, the audit links.
+- `AdminNewsTest`: access and CSRF, the list's tabs and filters, a draft with a headline only, a refused save kept with every field named, validate on publish, publish, schedule, saving a live article (unchanged, nothing changes), unpublish (never refused, and from a current form saving its changes), a stale form refused and kept, the address rules (a typed address kept as typed), every row up to the limit, a banned topic as a warning, delete behind its confirm tick, images (add, describe, lead, delete, unusable uploads refused), the preview without analytics, link clicks, an AI article's origin, the overview card, the audit links.
 
 **Feature: desk**
 - `AdminNewsDeskTest`: access, every desk page within the admin fences, the main page's state, tick, sessions and spend, a session in its time keeping the cron healthy, the overview card when the cron is not ticking, pause and continue, the pause hold, run now (refused while one is queued, while paused or without a key), settings saved all at once, a refused save kept, a stale settings form refused, the cost of each model, the calendar (days on and off, a month reset, a form drawn before the month turned, one without its months, three months from this one), the prompt versions, a prompt too long, a run's page and a refused article's rules on it.
@@ -1022,7 +1031,7 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 
 **Feature: pipeline**, with a fake `NewsModel` (`PipelineTest`, `TickTest`)
 - The happy path, with staggered times, and each call sent what this design says (models, effort, tools, cache markers, the untrusted-data rules).
-- The check reads every part of the article; references told apart by their addresses.
+- The check reads every part of the article, its tags too, and no marker inside it survives; a nested link never reaches the page; references told apart by their addresses.
 - Slow news skipped; the 7 and 14-day windows.
 - Refs: an unknown ref dropped, no valid source rejected, an unfetched confirmed item moved to speculation.
 - A banned domain and a banned topic.

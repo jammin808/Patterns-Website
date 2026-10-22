@@ -33,10 +33,11 @@ final class AdminNewsCommentController extends Controller
 
     /**
      * Said after a change that takes a comment, an article or an image off the site (docs/NEWS.md §11, takedown
-     * actions; the article editor says it too). Each figure is the CDN lifetime its responses were sent with: a page's
-     * max-age (NewsController::CACHE) and an image's s-maxage (NewsMediaController::PUBLIC_CACHE).
+     * actions; the article editor says it too). Each figure is the longest a CDN may serve what its responses were
+     * sent with: a page's max-age and then its stale-while-revalidate (NewsController::CACHE, 120 + 60 seconds) and an
+     * image's s-maxage (NewsMediaController::PUBLIC_CACHE).
      */
-    public const TAKEDOWN = 'Pages can take up to about 2 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once.';
+    public const TAKEDOWN = 'Pages can take up to about 3 minutes to leave the CDN, and images up to an hour. Run Flush CDN to remove both at once.';
 
     private const PER_PAGE = 25;
 

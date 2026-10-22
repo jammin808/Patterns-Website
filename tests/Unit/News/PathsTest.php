@@ -57,6 +57,21 @@ final class PathsTest extends TestCase
         }
     }
 
+    /** A link names an article as a person types it: any case, with or without the slash, relative or on this host. */
+    public function testALinkNamesItsArticleHoweverItIsTyped(): void
+    {
+        $base = 'https://patternsshowcontrol.test';
+        $story = ['category' => null, 'slug' => 'my-story', 'comment' => false];
+        foreach (['/news/my-story', '/news/My-Story/', '/NEWS/MY-STORY', '/news/my-story/?utm_source=x#top', $base . '/news/my-story', 'HTTPS://PatternsShowControl.test/news/My-Story/'] as $href) {
+            self::assertSame($story, Paths::named($href, $base), $href);
+        }
+        self::assertSame(['category' => 'video', 'slug' => 'my-story', 'comment' => true], Paths::named('/news/Video/My-Story/Comment', $base));
+        foreach (['https://elsewhere.example/news/my-story/', 'https://patternsshowcontrol.test.evil.example/news/my-story/', '//elsewhere.example/news/my-story/', '/news/', '/news/video', '/news/feed.xml', '/news/page/2', '/workflows/', 'S3'] as $href) {
+            self::assertNull(Paths::named($href, $base), $href);
+        }
+        self::assertNull(Paths::named($base . '/news/my-story/'), 'without the site\'s address only a relative one is ours');
+    }
+
     public function testASlugIsShortReadableAsciiWithoutStopWordsAtItsEnds(): void
     {
         self::assertSame('right-to-work-checks-now-cover-freelancers', Paths::slug('The right to work checks now cover freelancers'));

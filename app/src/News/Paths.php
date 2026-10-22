@@ -142,6 +142,25 @@ final class Paths
     }
 
     /**
+     * The article a link on this site names (parse()), read as a person types it: the path in any case and with or
+     * without its last slash (/news/Some-Story is /news/some-story/), from a site-relative address or one on
+     * $baseUrl's host, its query and fragment aside. Null for an address elsewhere or one that names no article.
+     *
+     * @return array{category: string|null, slug: string, comment: bool}|null
+     */
+    public static function named(string $href, string $baseUrl = ''): ?array
+    {
+        if (!Urls::isOwn($href, $baseUrl)) {
+            return null;
+        }
+        $path = strtolower((string) parse_url(trim($href), PHP_URL_PATH));
+        if ($path !== '' && !str_ends_with($path, '/') && !str_contains((string) strrchr($path, '/'), '.')) {
+            $path .= '/';
+        }
+        return self::parse($path);
+    }
+
+    /**
      * A slug from a title: ASCII words in lower case joined by hyphens (Prose::slug()), without the stop words at
      * either end, at most SLUG_MAX characters cut at a word. Empty when nothing is left.
      */

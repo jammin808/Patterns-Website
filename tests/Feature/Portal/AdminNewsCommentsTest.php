@@ -222,16 +222,16 @@ final class AdminNewsCommentsTest extends TestCase
 
     public function testTheTakedownWordsAreTheCdnLifetimesTheResponsesWereSentWith(): void
     {
-        // A page leaves the CDN with its max-age, an image with its s-maxage; the flash names each, and Flush CDN.
+        // A page leaves the CDN after its max-age and, served stale, its stale-while-revalidate after that; an image
+        // after its s-maxage. The flash names the longest each may take, and Flush CDN.
         self::assertSame(1, preg_match('/(?:^|[ ,])max-age=(\d+)/', NewsController::CACHE, $page));
-        self::assertSame(1, preg_match('/s-maxage=(\d+)/', NewsMediaController::PUBLIC_CACHE, $image));
-        self::assertLessThanOrEqual(120, (int) $page[1], 'pages: "up to about 2 minutes"');
-        // A CDN that honours stale-while-revalidate may serve a page that long past its max-age, so it stays short.
         self::assertSame(1, preg_match('/stale-while-revalidate=(\d+)/', NewsController::CACHE, $stale));
-        self::assertLessThanOrEqual(60, (int) $stale[1], 'pages, even served stale: still about 2 minutes, not 12');
+        self::assertSame(1, preg_match('/s-maxage=(\d+)/', NewsMediaController::PUBLIC_CACHE, $image));
+        $pages = (int) $page[1] + (int) $stale[1];
+        self::assertLessThanOrEqual(180, $pages, 'pages, even served stale: "up to about 3 minutes"');
         self::assertSame(NewsController::CACHE, \Psc\Controllers\SeoController::NEWS_SITEMAP_CACHE, 'the news sitemap goes as quickly');
         self::assertLessThanOrEqual(3600, (int) $image[1], 'images: "up to an hour"');
-        self::assertStringContainsString('Pages can take up to about 2 minutes to leave the CDN', AdminNewsCommentController::TAKEDOWN);
+        self::assertStringContainsString('Pages can take up to about ' . (int) ceil($pages / 60) . ' minutes to leave the CDN', AdminNewsCommentController::TAKEDOWN);
         self::assertStringContainsString('images up to an hour', AdminNewsCommentController::TAKEDOWN);
         self::assertStringEndsWith('Run Flush CDN to remove both at once.', AdminNewsCommentController::TAKEDOWN);
 

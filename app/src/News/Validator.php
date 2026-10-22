@@ -12,12 +12,12 @@ namespace Psc\News;
  *
  * Rules by origin: an AI draft's sources and links must come from the research (refs), and an address the desk
  * may not use is dropped or unlinked rather than refused; it may follow up and link to live articles only (a link to
- * one that is not live keeps its text, a follow-up of one is refused), and every link to a live article is written
- * as that article's own address (Paths::article()) whoever wrote it; an AI draft's overshoots that lose nothing are fixed
- * with a warning (fit()), and its lengths only a rewrite can fix are repairable (Result::repairable()); banned
- * topics and duplicates refuse AI and import drafts and only warn on manual ones; the phrases to avoid hold an AI
- * draft for repair or review. Errors are in an administrator's words, keyed by field (sources.2.url for a field in
- * a list).
+ * one that is not live keeps its text, a follow-up of one is refused). A link to an article is stored as written,
+ * whoever wrote it: the page draws it at that article's address of the day (Markdown::render()). An AI draft's
+ * overshoots that lose nothing are fixed with a warning (fit()), and its lengths only a rewrite can fix are
+ * repairable (Result::repairable()); banned topics and duplicates refuse AI and import drafts and only warn on
+ * manual ones; the phrases to avoid hold an AI draft for repair or review. Errors are in an administrator's words,
+ * keyed by field (sources.2.url for a field in a list).
  */
 final class Validator
 {
@@ -50,6 +50,8 @@ final class Validator
     public const VERDICT_NOTE_MAX = 320;
     public const BYLINE_MAX = 120;
     public const KEY_MAX = 190;
+    /** The most times a field's links are judged; a pass that unlinks one judges the text again, until it settles. */
+    public const LINK_PASSES = 10;
 
     /** Duplicate windows, in days: the same story key, a shared source, similar wording (docs/NEWS.md §7). */
     public const STORY_DAYS = 365;
@@ -415,9 +417,12 @@ final class Validator
      * Links in the body, the impact and the confirmed and speculation items (all Markdown, all printed as links).
      * Every writer's must be http(s) addresses on named sites, never on a banned site; an AI draft's must also be on
      * this site, one of the research's addresses, or a source of an article it follows up, and any other keeps only
-     * its text. A link on this site to an article (Paths::parse()) is written as that article's own address while it
-     * is live; an AI draft's link to one that is not live, or not there, keeps only its text. Runs after
-     * checkItems(), so an item's field names the item as it is kept.
+     * its text. A link on this site to an article (Paths::named(): in any case, with or without its slash) stays as
+     * written, for the page to draw at that article's address; an AI draft's link to one that is not live, or not
+     * there, keeps only its text. Text kept from a link loses its brackets, and a field is judged again after a pass
+     * that unlinked anything, until it settles (at most LINK_PASSES; one that never does keeps no link at all), so no
+     * kept text joins what follows it into a link that was never judged. Runs after checkItems(), so an item's field
+     * names the item as it is kept.
      *
      * @param list<string> $followSources
      */
@@ -425,6 +430,7 @@ final class Validator
     {
         $ai = $ctx->origin === 'ai';
         $store = $this->store;
+        $base = $ctx->baseUrl !== '' ? $ctx->baseUrl : 'https://invalid.invalid';
         $allowed = array_merge($d->sourceKeys(), $followSources);
         foreach ($ctx->refs as $ref) {
             $key = is_array($ref) && is_string($ref['url'] ?? null) ? Urls::key($ref['url']) : null;
@@ -432,23 +438,16 @@ final class Validator
                 $allowed[] = $key;
             }
         }
-        // One link's address, judged: the link as written, its text alone (AI), or an error on the field.
-        $check = static fn (string $md, string $field): string => (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', static function (array $m) use ($ctx, $r, $ai, $allowed, $field, $store): string {
+        $unlink = static fn (string $text): string => str_replace(['[', ']'], '', $text);
+        // One pass over a field: each link as written, its text alone (AI), or an error on the field.
+        $pass = static fn (string $md, string $field): string => (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/u', static function (array $m) use ($ctx, $r, $ai, $allowed, $field, $store, $base, $unlink): string {
             $href = $m[2];
-            if (Urls::isOwn($href, $ctx->baseUrl !== '' ? $ctx->baseUrl : 'https://invalid.invalid') || !preg_match('#^https?://#i', $href)) {
-                // On this site: an article's link goes to its own address, and the desk links only to live ones.
-                $named = Paths::parse((string) parse_url($href, PHP_URL_PATH));
-                if ($named === null) {
-                    return $m[0];
-                }
-                $article = $store->findBySlug($named['slug'], false);
-                if ($article !== null && $store->isLive($article)) {
-                    $fragment = (string) parse_url($href, PHP_URL_FRAGMENT);
-                    return '[' . $m[1] . '](' . ($named['comment'] ? Paths::comment($article) : Paths::article($article)) . ($fragment !== '' ? '#' . $fragment : '') . ')';
-                }
-                if ($ai) {
+            if (Urls::isOwn($href, $base) || !preg_match('#^https?://#i', $href)) {
+                // On this site: the desk links only to live articles.
+                $named = Paths::named($href, $base);
+                if ($ai && $named !== null && $store->findBySlug($named['slug']) === null) {
                     $r->warnings[] = 'Unlinked "' . $m[1] . '": the article it links to is not published.';
-                    return $m[1];
+                    return $unlink($m[1]);
                 }
                 return $m[0];
             }
@@ -464,11 +463,22 @@ final class Validator
             }
             if ($ai) {
                 $r->warnings[] = 'Unlinked "' . $m[1] . '": its address could not be used.';
-                return $m[1];
+                return $unlink($m[1]);
             }
             $r->error($field, $problem);
             return $m[0];
         }, $md);
+        $check = static function (string $md, string $field) use ($pass, $unlink, $r): string {
+            for ($n = 0; $n < self::LINK_PASSES; $n++) {
+                $next = $pass($md, $field);
+                if ($next === $md) {
+                    return $md;
+                }
+                $md = $next;
+            }
+            $r->warnings[] = 'Unlinked every link in ' . $field . ', whose links kept making new ones.';
+            return $unlink($md);
+        };
         foreach (['body', 'impact'] as $field) {
             $d->{$field} = $check($d->{$field}, $field);
         }

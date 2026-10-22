@@ -923,20 +923,27 @@ final class Pipeline
     }
 
     /**
-     * The check's message: the banned topics, then every part of the article a reader sees, between the article
-     * markers (a marker inside the text is removed, so nothing in it can close them).
+     * The check's message: the banned topics, then every part of the article a reader sees, its tags too, between the
+     * article markers. Every marker inside the text is removed, again until none is left, so no text that removing one
+     * pieces together (</art</article>icle>) can close them either.
      */
     private function checkTurn(Draft $d): string
     {
         $topics = (array) $this->settings->get('banned_topics');
-        $clean = static fn (string $text): string => trim(str_ireplace(['<article>', '</article>'], '', $text));
+        $clean = static function (string $text): string {
+            do {
+                $text = (string) preg_replace('#<\s*/?\s*article\b[^>]*>#i', '', $text, -1, $removed);
+            } while ($removed > 0);
+            return trim($text);
+        };
         $items = static fn (array $list): string => $list !== [] ? '- ' . implode("\n- ", array_map(static fn (array $i): string => $clean((string) $i['text']), $list)) : '(none)';
         $sources = array_map(static fn (array $s): string => $clean(trim($s['title'] . ' (' . $s['publisher'] . ')')), $d->sources);
         return "Banned topics:\n" . ($topics !== [] ? '- ' . implode("\n- ", $topics) : '(none)')
             . "\n\n<article>\nTitle: " . $clean($d->title) . "\n\nSEO title: " . $clean($d->seoTitle) . "\n\nStandfirst: " . $clean($d->dek)
-            . "\n\nSummary: " . $clean($d->summary) . "\n\nBody:\n" . $clean($d->body) . "\n\nWhat it means:\n" . $clean($d->impact)
+            . "\n\nSummary: " . $clean($d->summary) . "\n\nTags: " . ($d->tags !== [] ? $clean(implode(', ', $d->tags)) : '(none)')
+            . "\n\nBody:\n" . $clean($d->body) . "\n\nWhat it means:\n" . $clean($d->impact)
             . "\n\nWhat's confirmed:\n" . $items($d->confirmed) . "\n\nStill speculation:\n" . $items($d->speculation)
-            . "\n\nVerdict: " . $d->verdict . '. ' . $clean($d->verdictNote)
+            . "\n\nVerdict: " . $clean($d->verdict) . '. ' . $clean($d->verdictNote)
             . "\n\nSources:\n" . ($sources !== [] ? '- ' . implode("\n- ", $sources) : '(none)') . "\n</article>";
     }
 

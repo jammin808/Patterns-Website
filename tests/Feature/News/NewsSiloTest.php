@@ -148,11 +148,25 @@ final class NewsSiloTest extends TestCase
         self::assertGone($this->request('GET', $page), 'to anyone else');
     }
 
+    /**
+     * The old category addresses move to their hubs, a page that exists to its page, with the rest of the query; a
+     * page past the end is a 404 there, never a move to one.
+     */
     public function testTheOldCategoryAddressesMoveToTheirHubs(): void
     {
+        for ($i = 1; $i <= 13; $i++) {
+            $this->makeArticle(['slug' => 'audio-story-' . $i, 'categories' => ['audio'], 'published_at' => time() - 60 * $i]);
+        }
         self::assertMoved('/news/audio/', $this->request('GET', '/news/category/audio/'), 'a hub');
         self::assertMoved('/news/audio/page/2/', $this->request('GET', '/news/category/audio/?page=2'), 'a page of it');
         self::assertMoved('/news/audio/', $this->request('GET', '/news/category/audio/?page=x'), 'a page that is not one');
+        self::assertMoved('/news/audio/?utm_source=newsletter', $this->request('GET', '/news/category/audio/?utm_source=newsletter'), 'its campaign tags kept');
+        self::assertMoved('/news/audio/page/2/?utm_source=newsletter&utm_medium=email', $this->request('GET', '/news/category/audio/?utm_source=newsletter&page=2&utm_medium=email'), 'all but the page');
+        self::assertSame(200, $this->request('GET', '/news/audio/page/2/?utm_source=newsletter&utm_medium=email')->status);
+        foreach (['/news/category/audio/?page=3', '/news/category/audio/?page=5&utm_source=newsletter', '/news/category/video/?page=2'] as $uri) {
+            $past = $this->request('GET', $uri);
+            self::assertSame([404, null], [$past->status, $past->getHeader('Location')], $uri . ': past the end');
+        }
         self::assertGone($this->request('GET', '/news/category/rumours/'), 'an unknown key');
     }
 
@@ -167,6 +181,92 @@ final class NewsSiloTest extends TestCase
         foreach (['/news/NOPE/', '/news/Video/', '/news/video/Genlock-Firmware/', '/News/video/genlock-firmware/', '/news/Some-Typo/comment/'] as $uri) {
             self::assertGone($this->request('GET', $uri), $uri);
         }
+    }
+
+    /**
+     * A link to another article is drawn at the address that article has when the page is drawn, however it was
+     * written (the old flat form, another category, no slash, capitals, this site's host, its comment page); one to an
+     * article that is not live keeps only its words. Nothing is rewritten in the stored body.
+     */
+    public function testLinksToOtherArticlesAreDrawnAtTheirAddressOfTheDay(): void
+    {
+        $target = $this->makeArticle(['slug' => 'target-story', 'categories' => ['video']]);
+        $this->makeArticle(['slug' => 'draft-story', 'status' => 'draft']);
+        $body = 'See [flat](/news/target-story/), [old category](/news/legal/target-story/), [no slash](/news/target-story), [capitals](/news/Target-Story/),'
+            . ' [our host](' . self::BASE . '/news/video/target-story/comment/#comments), [a draft](/news/draft-story/), [nobody](/news/no-such-story),'
+            . ' [a hub](/news/audio/) and [a guide](/workflows/).' . str_repeat(' Words that make the body long enough to publish under the rules.', 4);
+        $this->makeArticle([
+            'slug' => 'linking-story',
+            'categories' => ['audio'],
+            'body' => $body,
+            'impact' => 'Read [the earlier one](/news/target-story/) first.',
+            'confirmed' => [['text' => 'It was [reported](/news/Target-Story) here.', 'url' => 'https://example.com/news/story-3']],
+            'sources' => [['url' => 'https://example.com/news/story-3', 'title' => 'Sample source', 'publisher' => 'Example News', 'kind' => 'press']],
+        ]);
+        $stored = (string) $this->db->value("SELECT body FROM news_articles WHERE slug = 'linking-story'");
+        self::assertSame($body, $stored, 'stored as written');
+
+        $expect = static function (string $at, string $page): void {
+            foreach (['flat', 'old category', 'no slash', 'capitals'] as $words) {
+                self::assertStringContainsString('<a href="' . $at . '">' . $words . '</a>', $page, $words);
+            }
+            self::assertStringContainsString('<a href="' . $at . 'comment/#comments">our host</a>', $page);
+            self::assertStringContainsString('<a href="' . $at . '">the earlier one</a>', $page, 'in the impact');
+            self::assertStringContainsString('<a href="' . $at . '">reported</a>', $page, 'in an item');
+            self::assertStringContainsString(' a draft, nobody, ', $page, 'not live: its words alone');
+            self::assertStringContainsString('<a href="/news/audio/">a hub</a>', $page);
+            self::assertStringContainsString('<a href="/workflows/">a guide</a>', $page);
+            self::assertStringNotContainsString('draft-story', $page);
+        };
+        $expect('/news/video/target-story/', $this->body('/news/audio/linking-story/'));
+
+        // A new main category moves the article, and every link to it moves with it on the next drawing.
+        $store = new ArticleStore($this->app);
+        $draft = $store->draft($target);
+        self::assertInstanceOf(Draft::class, $draft);
+        $draft->categories = ['technology', 'video'];
+        self::assertSame(['categories'], $store->update($target, $draft, null));
+        $expect('/news/technology/target-story/', $this->body('/news/audio/linking-story/'));
+        self::assertSame($body, (string) $this->db->value("SELECT body FROM news_articles WHERE slug = 'linking-story'"));
+
+        // Taken down, it is linked no more.
+        $store->unpublish($target);
+        $page = $this->body('/news/audio/linking-story/');
+        self::assertStringNotContainsString('target-story', $page);
+        self::assertStringContainsString('See flat, old category, no slash, capitals, our host, a draft, nobody,', $page);
+    }
+
+    /**
+     * A deleted article's slug, live or not, is never given to another article, and its addresses (any category, the
+     * lasting one, the comment page) answer 410 and are not indexed, before any session starts.
+     */
+    public function testADeletedArticlesSlugIsNeverGivenAgainAndItsAddressesAreGone(): void
+    {
+        $store = new ArticleStore($this->app);
+        $live = $this->makeArticle(['slug' => 'genlock-firmware', 'categories' => ['video']]);
+        $draft = $this->makeArticle(['slug' => 'console-rumour', 'status' => 'draft']);
+        self::assertNotNull($store->delete($live));
+        self::assertNotNull($store->delete($draft));
+        self::assertTrue($store->isRetired('genlock-firmware'));
+        self::assertTrue($store->isRetired('Console-Rumour'));
+        self::assertFalse($store->isRetired('genlock'));
+
+        $next = $this->makeArticle(['slug' => 'genlock-firmware', 'categories' => ['legal']]);
+        self::assertSame('genlock-firmware-2', $store->find($next)['slug'], 'never the deleted one\'s');
+        self::assertSame('console-rumour-2', $store->find($this->makeArticle(['slug' => 'console-rumour', 'status' => 'draft']))['slug'], 'a draft\'s too');
+        self::assertSame('genlock-firmware-3', $store->slugFor('genlock-firmware'));
+
+        foreach (['/news/video/genlock-firmware/', '/news/legal/genlock-firmware/', '/news/genlock-firmware/', '/news/genlock-firmware/comment/', '/news/video/genlock-firmware/comment/', '/news/console-rumour/'] as $uri) {
+            $r = $this->request('GET', $uri);
+            self::assertSame(410, $r->status, $uri);
+            self::assertNull($r->getHeader('Location'), $uri . ': it leads nowhere else');
+            self::assertSame('noindex', $r->getHeader('X-Robots-Tag'), $uri);
+            self::assertStringContainsString('<meta name="robots" content="noindex', $r->body, $uri);
+            self::assertSame([], $r->cookies(), $uri . ': no session');
+        }
+        self::assertSame(410, $this->post('/news/genlock-firmware/comment/', ['action' => 'post', 'body' => 'Late'])->status);
+        self::assertSame(404, $this->request('GET', '/news/never-was-a-story/')->status, 'a slug nobody had is a plain 404');
+        self::assertSame(200, $this->request('GET', '/news/legal/genlock-firmware-2/')->status);
     }
 
     // ---------------------------------------------------------------------------------------------------- slugs
@@ -262,7 +362,10 @@ final class NewsSiloTest extends TestCase
 
         self::assertMoved('/news/audio/', $this->request('GET', '/news/audio/page/1/'), 'page 1 is the hub');
         self::assertMoved('/news/audio/page/2/', $this->request('GET', '/news/audio/?page=2'), 'a page number in the query');
+        self::assertMoved('/news/audio/page/2/?utm_campaign=x', $this->request('GET', '/news/audio/?page=2&utm_campaign=x'), 'with the rest of its query');
+        self::assertMoved('/news/audio/?utm_campaign=x', $this->request('GET', '/news/audio/page/1/?utm_campaign=x'), 'page 1 too');
         self::assertGone($this->request('GET', '/news/audio/page/3/'), 'past the end');
+        self::assertGone($this->request('GET', '/news/audio/?page=3'), 'past the end, asked by the query: no move to a 404');
         self::assertGone($this->request('GET', '/news/audio/?page=0'), 'not a page');
     }
 

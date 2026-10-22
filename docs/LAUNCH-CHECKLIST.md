@@ -29,7 +29,7 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       articles automatically* in the desk's settings.
 - [ ] Read the research brief and the voice on the desk's prompt page, and add any banned websites and topics.
 - [ ] Read the eight launch articles: the first tick imports them and they go live 10 to 30 minutes apart.
-- [ ] Check on the live site whether Hostinger's CDN keeps news pages for only the 2 minutes they ask for
+- [ ] Check on the live site whether Hostinger's CDN keeps news pages for only the 2 minutes they ask for (about 3 served stale)
       (`curl -I` an article twice and compare the `age` header). Until that is known, a takedown needs the Flush CDN
       workflow (docs/DEPLOY.md §5).
 

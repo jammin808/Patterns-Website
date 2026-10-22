@@ -26,20 +26,26 @@ use Psc\View\Schema;
  * links out to sources. They read the same for every visitor, never start a session and never set a cookie, and are
  * cached briefly (CACHE) so a correction or a takedown leaves the CDN within minutes. Every page of a list has an
  * address of its own and names itself as canonical, so each is indexed; ?page=N and page 1's own path answer 301
- * to the clean address, and a page number past the end is a 404. A search is the one list paged by its query, private,
- * never stored and never indexed, as is an empty category (docs/NEWS.md §10). A list whose articles cannot be read is
- * a 503 with Retry-After, never stored and never indexed.
+ * to the clean address, and a page number past the end is a 404 wherever it is asked for, never a move to one. A
+ * search is the one list paged by its query, private, never stored and never indexed, as is an empty category
+ * (docs/NEWS.md §10). A list whose articles cannot be read is a 503 with Retry-After, never stored and never indexed.
+ * Every move keeps the rest of the query (utm_ tags survive the hop); only a page number moves into the path.
  *
  * An article is found by its slug alone, so asked for under another category, or as /news/{slug}/, it answers 301
- * to its own address (elsewhere()), and an unknown slug is a plain 404. The old category address
- * (/news/category/{key}/) answers 301 to the category's hub.
+ * to its own address (elsewhere()); a deleted article's slug answers 410, noindex (ArticleStore::isRetired()), and
+ * any other unknown slug a plain 404. The old category address (/news/category/{key}/) answers 301 to the
+ * category's hub. Its links to other articles are drawn at their addresses of the day (Markdown::render()).
  *
  * A click on a source counts once per link per address in CLICK_WINDOW, never from a HEAD request or a user agent
- * that names itself a robot, and only while the article is live. /news/go/{id}/ goes to the stored address only.
+ * that names itself a robot, and only while the article is live. /news/go/{id}/ goes to the stored address only, and
+ * always goes there, but counts only a visit (isVisit()): never an image or a script that names it on another page.
  */
 final class NewsController extends Controller
 {
-    /** Every news page's Cache-Control: what a CDN serves, even stale, is at most about two minutes old (TAKEDOWN). */
+    /**
+     * Every news page's Cache-Control: a CDN may serve a page for up to about 3 minutes after a change, its max-age
+     * and then, served stale, its stale-while-revalidate (TAKEDOWN).
+     */
     public const CACHE = 'public, max-age=120, stale-while-revalidate=60';
 
     /** Articles on one page of a list. */
@@ -99,14 +105,16 @@ final class NewsController extends Controller
             return $this->notFound();
         }
         $raw = $request->queryString('page');
-        return Response::redirect(Paths::category($key, preg_match('/^[1-9]\d{0,5}$/', $raw) === 1 ? (int) $raw : 1), 301);
+        $page = preg_match('/^[1-9]\d{0,5}$/', $raw) === 1 ? (int) $raw : 1;
+        return $this->hasPage($key, '', $page) ? self::moved(Paths::category($key, $page), $request, ['page']) : $this->notFound();
     }
 
     public function show(Request $request): Response
     {
-        $article = (new ArticleStore($this->app))->findBySlug($request->attr('slug'));
+        $store = new ArticleStore($this->app);
+        $article = $store->findBySlug($request->attr('slug'));
         if ($article === null) {
-            return $this->notFound();
+            return $store->isRetired($request->attr('slug')) ? $this->app->errorResponse($request, 410) : $this->notFound();
         }
         $at = Paths::article($article);
         return $request->path === $at ? $this->renderArticle($article) : Response::redirect($at . self::query($request), 301);
@@ -115,14 +123,16 @@ final class NewsController extends Controller
     /**
      * A live article's page asked for at an address it does not have (another category, or the lasting /news/{slug}/):
      * the answer that moves the visitor to its own, 301 (308 for a POST, so a form posted from a page drawn before
-     * its category changed is sent again, not lost). Null when the address is its own or names no live article; the
-     * route answers then. The news-address middleware asks it for the comment pages, before any session starts.
+     * its category changed is sent again, not lost). A deleted article's slug answers 410. Null when the address is its
+     * own or names no live article; the route answers then. The news-address middleware asks it for the comment pages,
+     * before any session starts.
      */
     public static function elsewhere(App $app, Request $request): ?Response
     {
-        $article = (new ArticleStore($app))->findBySlug($request->attr('slug'));
+        $store = new ArticleStore($app);
+        $article = $store->findBySlug($request->attr('slug'));
         if ($article === null) {
-            return null;
+            return $store->isRetired($request->attr('slug')) ? $app->errorResponse($request, 410) : null;
         }
         $at = str_ends_with($request->path, '/comment/') ? Paths::comment($article) : Paths::article($article);
         return $request->path === $at ? null : Response::redirect($at . self::query($request), $request->method === 'POST' ? 308 : 301);
@@ -163,6 +173,10 @@ final class NewsController extends Controller
             $byKey[(string) $l['url_key']] ??= $l;
         }
         $sources = array_values(array_filter($links, static fn (array $l): bool => (int) $l['is_source'] === 1));
+        // Its links to other articles go where each lives now, or keep only their words once it is not live: one
+        // query for every such link on the page.
+        $texts = [(string) $article['body'], (string) ($article['impact'] ?? ''), ...array_column($article['confirmed'], 'text'), ...array_column($article['speculation'], 'text')];
+        $articles = $store->liveBySlugs(Markdown::articleSlugs(implode("\n", $texts), $base));
         $images = array_values(array_filter(array_map(fn (array $i): ?array => $this->picture($i, $preview), $store->images($id))));
         $lead = $images[0] ?? null;
 
@@ -229,11 +243,11 @@ final class NewsController extends Controller
         ];
         $seo->add(array_filter($node, static fn (mixed $v): bool => $v !== '' && $v !== []));
 
-        $item = function (array $i) use ($linkIds, $base, $byKey): array {
+        $item = function (array $i) use ($linkIds, $base, $byKey, $articles): array {
             $url = (string) $i['url'];
             $link = $byKey[(string) Urls::key($url)] ?? null;
             return [
-                'html' => Markdown::inline((string) $i['text'], $linkIds, $base),
+                'html' => Markdown::inline((string) $i['text'], $linkIds, $base, $articles),
                 'url' => preg_match('#^https?://#i', $url) === 1 ? $url : '',
                 'link' => $link !== null ? (int) $link['id'] : null,
                 'label' => $link !== null ? (string) (($link['publisher'] ?? '') ?: $link['host']) : (string) Urls::host($url),
@@ -257,8 +271,8 @@ final class NewsController extends Controller
             'updated' => $updated,
             'modified' => $modified,
             'readMinutes' => Prose::readMinutes((int) $article['word_count']),
-            'body' => Markdown::render((string) $article['body'], $linkIds, $base),
-            'impact' => self::demote(Markdown::render((string) ($article['impact'] ?? ''), $linkIds, $base)),
+            'body' => Markdown::render((string) $article['body'], $linkIds, $base, $articles),
+            'impact' => self::demote(Markdown::render((string) ($article['impact'] ?? ''), $linkIds, $base, $articles)),
             'confirmed' => array_map($item, $article['confirmed']),
             'speculation' => array_map($item, $article['speculation']),
             'sources' => $sources,
@@ -339,14 +353,18 @@ final class NewsController extends Controller
         return Response::text(implode("\n", $xml) . "\n", 200, 'application/rss+xml')->header('Cache-Control', self::CACHE);
     }
 
-    /** A tracked link out: to the address stored for it, never one from the request; 404 once its article is not live. */
+    /**
+     * A tracked link out: to the address stored for it, never one from the request; 404 once its article is not live.
+     * Counted only for a visit (isVisit()), and sent on whatever it is: a reader's click from another site (a feed
+     * reader's) counts like one from the page.
+     */
     public function go(Request $request): Response
     {
         $link = $this->liveLink($request->attrInt('id'));
         if ($link === null) {
             return $this->notFound();
         }
-        if ($request->method === 'GET') {
+        if ($request->method === 'GET' && self::isVisit($request)) {
             $this->countClick($link, $request);
         }
         return Response::redirect((string) $link['url'], 302);
@@ -420,16 +438,19 @@ final class NewsController extends Controller
         if ($asked === 0) {
             return $this->notFound();
         }
+        // A move goes only to a page there is, with the rest of the query.
         if ($q !== '') {
             // A search pages by its query, its page 1 without a number.
             if ($atPage !== null || $asked === 1) {
-                return Response::redirect($searchPath($asked ?? $atPage ?? 1), 301);
+                $to = $asked ?? $atPage ?? 1;
+                return $this->hasPage($key, $q, $to) ? self::moved($searchPath($to), $request, ['q', 'page']) : $this->notFound();
             }
             $page = $asked ?? 1;
         } else {
             // Every other page of a list has a path of its own, page 1 the list's own; an empty search is no search.
             if ($asked !== null || $atPage === 1 || ($key === null && array_key_exists('q', $request->query))) {
-                return Response::redirect($listPath($asked ?? $atPage ?? 1), 301);
+                $to = $asked ?? $atPage ?? 1;
+                return $this->hasPage($key, '', $to) ? self::moved($listPath($to), $request, ['q', 'page']) : $this->notFound();
             }
             $page = $atPage ?? 1;
         }
@@ -539,6 +560,36 @@ final class NewsController extends Controller
         return $response->header('Cache-Control', $q !== '' || $unavailable ? 'private, no-store' : self::CACHE);
     }
 
+    /**
+     * Whether page $n of a list (a category's or the hub's, or a search's) exists: what a move to it asks first, so a
+     * move never leads to a 404. A list that cannot be read is let through, for its own page to say so (503).
+     */
+    private function hasPage(?string $key, string $q, int $n): bool
+    {
+        if ($n <= 1) {
+            return true;
+        }
+        try {
+            $total = (new ArticleStore($this->app))->live($key, $q !== '' ? $q : null, 1, 1)['total'];
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'news list');
+            return true;
+        }
+        return $n <= max(1, (int) ceil($total / self::PER_PAGE));
+    }
+
+    /**
+     * Whether the browser says a request is a person following a link: Sec-Fetch-Dest document and Sec-Fetch-Mode
+     * navigate, or neither sent (an older browser, a feed reader). An image, a script, a frame or a fetch that names
+     * the address on another page says otherwise.
+     */
+    private static function isVisit(Request $request): bool
+    {
+        $dest = strtolower($request->header('sec-fetch-dest'));
+        $mode = strtolower($request->header('sec-fetch-mode'));
+        return ($dest === '' || $dest === 'document') && ($mode === '' || $mode === 'navigate');
+    }
+
     /** @return array<string, mixed>|null the link with its address, while its article is live */
     private function liveLink(int $id): ?array
     {
@@ -597,11 +648,32 @@ final class NewsController extends Controller
         }
     }
 
-    /** The request's query string, with its question mark, for an address that moves (utm_ tags survive the hop). */
-    private static function query(Request $request): string
+    /**
+     * The request's query string, with its question mark, for an address that moves (utm_ tags survive the hop),
+     * without the parameters $without names; each pair kept is as it was sent.
+     *
+     * @param list<string> $without
+     */
+    private static function query(Request $request, array $without = []): string
     {
         $qs = (string) ($request->server['QUERY_STRING'] ?? '');
+        if ($without !== []) {
+            $qs = implode('&', array_filter(explode('&', $qs), static fn (string $pair): bool => $pair !== ''
+                && !in_array((string) preg_replace('/\[.*$/s', '', urldecode(explode('=', $pair, 2)[0])), $without, true)));
+        }
         return $qs !== '' ? '?' . $qs : '';
+    }
+
+    /**
+     * A list's move for good: to $to (which may hold a query of its own), with the request's query but for $without
+     * (a page number the path now holds, a search the address now holds, or one that was empty).
+     *
+     * @param list<string> $without
+     */
+    private static function moved(string $to, Request $request, array $without): Response
+    {
+        $rest = self::query($request, $without);
+        return Response::redirect($to . ($rest !== '' && str_contains($to, '?') ? '&' . substr($rest, 1) : $rest), 301);
     }
 
     /** Headings one level down (h2 becomes h3, to h5 at most), for Markdown shown under a heading of its own. */

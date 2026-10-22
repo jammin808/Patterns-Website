@@ -158,28 +158,36 @@ final class ValidatorTest extends TestCase
      * live (or not there) keeps only its text, a declared follow-up of one is refused; and every writer's link to a
      * live article is written as that article's own address (Paths::article()).
      */
-    public function testTheDeskLinksToAndFollowsUpLiveArticlesOnlyAtTheirOwnAddresses(): void
+    /**
+     * The desk links only to live articles, however it typed the address (no slash, capitals); a link to an article
+     * is stored as written, by every writer, for the page to draw at the address the article has then.
+     */
+    public function testTheDeskLinksToAndFollowsUpLiveArticlesOnly(): void
     {
         $live = $this->makeArticle(['slug' => 'live-console-story', 'categories' => ['audio', 'video']]);
         $draft = $this->makeArticle(['slug' => 'unpublished-console-story', 'status' => 'draft']);
         $scheduled = $this->makeArticle(['slug' => 'scheduled-console-story', 'published_at' => time() + 3600]);
         $body = self::article()['body'] . ' Read [the earlier story](/news/live-console-story/), [its comments](' . self::BASE . '/news/video/live-console-story/comment/#comments),'
-            . ' [a draft](/news/video/unpublished-console-story/), [a scheduled one](/news/scheduled-console-story/), [a slug no one has](/news/video/no-such-story/),'
-            . ' [a hub](/news/audio/) and [our guide](/workflows/).';
+            . ' [in capitals](/news/Live-Console-Story), [a draft](/news/video/unpublished-console-story/), [a scheduled one](/news/scheduled-console-story/),'
+            . ' [a slug no one has](/news/video/no-such-story/), [without its slash](/news/unpublished-console-story), [typed in capitals](/news/Unpublished-Console-Story/),'
+            . ' [on our host](' . self::BASE . '/news/Video/Unpublished-Console-Story), [a hub](/news/audio/), [a feed](/news/feed.xml) and [our guide](/workflows/).';
 
         $ai = $this->check(Draft::fromArray(self::aiArticle(['body' => $body]), 'ai', self::refs()), 'ai', 'publish', ['refs' => self::refs()]);
         self::assertTrue($ai->ok(), implode('; ', $ai->reasons()));
         $text = $ai->draft->body;
-        self::assertStringContainsString('[the earlier story](/news/audio/live-console-story/)', $text, 'at its own address');
-        self::assertStringContainsString('[its comments](/news/audio/live-console-story/comment/#comments)', $text);
-        self::assertStringContainsString(' a draft, a scheduled one, a slug no one has,', $text, 'unlinked, keeping their words');
+        self::assertStringContainsString('[the earlier story](/news/live-console-story/)', $text, 'a live one is kept as written');
+        self::assertStringContainsString('[its comments](' . self::BASE . '/news/video/live-console-story/comment/#comments)', $text);
+        self::assertStringContainsString('[in capitals](/news/Live-Console-Story)', $text);
+        self::assertStringContainsString(' a draft, a scheduled one, a slug no one has, without its slash, typed in capitals, on our host,', $text, 'unlinked, keeping their words');
         self::assertStringContainsString('[a hub](/news/audio/)', $text, 'a hub is no article');
+        self::assertStringContainsString('[a feed](/news/feed.xml)', $text);
         self::assertStringContainsString('[our guide](/workflows/)', $text);
         self::assertContains('Unlinked "a draft": the article it links to is not published.', $ai->warnings);
+        self::assertContains('Unlinked "without its slash": the article it links to is not published.', $ai->warnings);
+        self::assertStringNotContainsString('unpublished-console-story', Markdown::render($text, [], self::BASE), 'its address is never printed');
 
         $manual = $this->check(Draft::fromArray(self::article(['body' => $body]), 'manual'), 'manual');
-        self::assertStringContainsString('[the earlier story](/news/audio/live-console-story/)', $manual->draft->body, 'every writer\'s link goes to the address');
-        self::assertStringContainsString('[a draft](/news/video/unpublished-console-story/)', $manual->draft->body, 'an administrator may link to a draft to publish later');
+        self::assertSame(Draft::fromArray(self::article(['body' => $body]), 'manual')->normalised()->body, $manual->draft->body, 'an administrator\'s links are kept as written');
 
         foreach ([$draft, $scheduled] as $id) {
             $refused = $this->check(Draft::fromArray(self::aiArticle(['follow_up_of' => [$id]]), 'ai', self::refs()), 'ai', 'publish', ['refs' => self::refs()]);
@@ -342,6 +350,38 @@ final class ValidatorTest extends TestCase
         }
         $outside = self::article(['confirmed' => [['text' => 'Shown at [a trade show](https://show.example/day-1).', 'url' => 'https://vendor.example/releases/7-2']]]);
         self::assertTrue($this->check(Draft::fromArray($outside, 'manual'), 'manual')->ok(), 'an administrator may link anywhere not banned');
+    }
+
+    /**
+     * Unlinking keeps a link's words but never its brackets, and a field is judged again until it settles: no kept
+     * text joins what follows it into a link nobody judged, however deep the nesting (three levels got through two
+     * passes before), nor by leaving a "(" after a "]".
+     */
+    public function testNestedLinksNeverLeaveALinkUnjudged(): void
+    {
+        $refs = self::refs();
+        $nested = 'Grab the patch from [[[the vendor](https://x1.example/a)](https://x2.example/b)](https://evil.example/download.exe).';
+        $joined = 'See [the notes][(https://evil.example/c)](https://x3.example/d) today.';
+        $mapped = 'Read [[[it](S8)](S9)](S1) and [[[that](S7)](S8)](https://evil.example/e) now.';
+        $ai = Draft::fromArray(self::aiArticle([
+            'body' => self::article()['body'] . ' ' . $nested . ' ' . $joined,
+            'impact' => $mapped,
+            'confirmed' => [['text' => $nested, 'ref' => 'S1'], ['text' => $joined, 'ref' => 'S1']],
+            'speculation' => [['text' => $mapped, 'ref' => 'S3']],
+        ]), 'ai', $refs);
+        self::assertSame(0, preg_match('/\[[^\]]+\]\(\s*[Ss]\d+\s*\)/', $ai->impact), 'no link to a reference is left unmapped: ' . $ai->impact);
+
+        $r = $this->check($ai, 'ai', 'publish', ['refs' => $refs, 'bannedDomains' => ['evil.example']]);
+        self::assertTrue($r->ok(), implode('; ', $r->reasons()));
+        $d = $r->draft;
+        foreach (['body' => $d->body, 'impact' => $d->impact, 'confirmed 0' => $d->confirmed[0]['text'], 'confirmed 1' => $d->confirmed[1]['text'], 'speculation 0' => $d->speculation[0]['text']] as $field => $text) {
+            $html = Markdown::render($text, [], self::BASE);
+            preg_match_all('#<a href="([^"]*)"#', $html, $m);
+            self::assertSame([], array_values(array_filter($m[1], static fn (string $href): bool => !str_starts_with($href, 'https://vendor.example/'))), $field . ' links only to the research: ' . $html);
+        }
+        self::assertSame([], array_values(array_filter($d->inlineLinks(), static fn (string $u): bool => str_starts_with($u, 'http') && !str_starts_with($u, 'https://vendor.example/'))), 'nothing else is registered');
+        self::assertStringContainsString('See the notes today.', $d->body, 'the "(" left by one pass was judged by the next');
+        self::assertContains('Unlinked "the notes": its address could not be used.', $r->warnings);
     }
 
     /** The banned topics are looked for in every word the article prints as its own. */

@@ -386,20 +386,29 @@ final class Draft
 
     /**
      * [text](S3) becomes [text](the address of S3); a link to a reference the research did not return keeps only
-     * its text.
+     * its text, without its brackets, and the text is read again until nothing changes (at most
+     * Validator::LINK_PASSES), so what is kept never joins what follows it into a link of its own. Every link left is
+     * judged by the Validator.
      *
      * @param array<string, array{url: string, title: string, via: string, cited: bool}> $refs
      */
     private function mapLinks(string $md, array $refs): string
     {
-        return (string) preg_replace_callback('/\[([^\]]+)\]\(\s*([Ss]\d+)\s*\)/u', function (array $m) use ($refs): string {
-            $ref = strtoupper($m[2]);
-            if (!isset($refs[$ref])) {
-                $this->notes[] = ['rule' => 'refs', 'detail' => 'Unlinked "' . $m[1] . '": ' . $ref . ' is not a reference.'];
-                return $m[1];
+        for ($pass = 0; $pass < Validator::LINK_PASSES; $pass++) {
+            $next = (string) preg_replace_callback('/\[([^\]]+)\]\(\s*([Ss]\d+)\s*\)/u', function (array $m) use ($refs): string {
+                $ref = strtoupper($m[2]);
+                if (!isset($refs[$ref])) {
+                    $this->notes[] = ['rule' => 'refs', 'detail' => 'Unlinked "' . $m[1] . '": ' . $ref . ' is not a reference.'];
+                    return str_replace(['[', ']'], '', $m[1]);
+                }
+                return '[' . $m[1] . '](' . str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $refs[$ref]['url']) . ')';
+            }, $md);
+            if ($next === $md) {
+                break;
             }
-            return '[' . $m[1] . '](' . str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $refs[$ref]['url']) . ')';
-        }, $md);
+            $md = $next;
+        }
+        return $md;
     }
 
     /**

@@ -360,11 +360,11 @@ final class App
     public function errorResponse(Request $request, int $status, ?\Throwable $e = null): Response
     {
         if ($request->wantsJson() || str_starts_with($request->path, '/api/')) {
-            $messages = [404 => 'not_found', 405 => 'method_not_allowed', 403 => 'forbidden', 429 => 'too_many_requests', 500 => 'server_error'];
+            $messages = [404 => 'not_found', 405 => 'method_not_allowed', 403 => 'forbidden', 410 => 'gone', 429 => 'too_many_requests', 500 => 'server_error'];
             return Response::json(['error' => $messages[$status] ?? 'error'], $status);
         }
         try {
-            $titles = [403 => 'Access denied', 404 => 'Page not found', 405 => 'Method not allowed', 419 => 'Session expired', 429 => 'Too many requests', 500 => 'Something went wrong'];
+            $titles = [403 => 'Access denied', 404 => 'Page not found', 405 => 'Method not allowed', 410 => 'Page removed', 419 => 'Session expired', 429 => 'Too many requests', 500 => 'Something went wrong'];
             $seo = $this->seo(($titles[$status] ?? 'Error') . ' | ' . $this->name(), 'Patterns Show Control', $request->path)->noindex();
             $template = $this->view()->exists('errors/' . $status) ? 'errors/' . $status : 'errors/error';
             $html = $this->view()->page($template, [

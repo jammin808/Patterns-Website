@@ -150,9 +150,16 @@ final class NewsPagesTest extends TestCase
             self::assertSame(404, $bad->status, $uri);
             self::assertNull($bad->getHeader('Location'), $uri);
         }
-        foreach (['/news/?page=1' => '/news/', '/news/page/1/' => '/news/', '/news/?page=2' => '/news/page/2/', '/news/?page=3' => '/news/page/3/'] as $uri => $to) {
+        foreach (['/news/?page=1' => '/news/', '/news/page/1/' => '/news/', '/news/?page=2' => '/news/page/2/',
+            '/news/?page=2&utm_campaign=x' => '/news/page/2/?utm_campaign=x', '/news/?utm_source=a&page=1&utm_medium=b' => '/news/?utm_source=a&utm_medium=b',
+            '/news/page/2/?q=&utm_source=a' => '/news/page/2/?utm_source=a', '/news/?q=+&ref=feed' => '/news/?ref=feed'] as $uri => $to) {
             $moved = $this->request('GET', $uri);
-            self::assertSame([301, $to], [$moved->status, $moved->getHeader('Location')], $uri);
+            self::assertSame([301, $to], [$moved->status, $moved->getHeader('Location')], $uri . ': with the rest of its query');
+        }
+        // A page past the end is a 404 wherever it is asked for, never a move to one.
+        foreach (['/news/?page=3', '/news/?page=3&utm_source=a', '/news/page/3/?q=', '/news/page/9/'] as $uri) {
+            $gone = $this->request('GET', $uri);
+            self::assertSame([404, null], [$gone->status, $gone->getHeader('Location')], $uri);
         }
     }
 
@@ -258,6 +265,12 @@ final class NewsPagesTest extends TestCase
         self::assertSame([301, '/news/?q=wireless'], [$redirect->status, $redirect->getHeader('Location')]);
         $byPath = $this->request('GET', '/news/page/2/?q=wireless');
         self::assertSame([301, '/news/?q=wireless&page=2'], [$byPath->status, $byPath->getHeader('Location')], 'a search pages by its query');
+        foreach (['/news/page/2/?utm_source=a&q=wireless' => '/news/?q=wireless&page=2&utm_source=a', '/news/?q=wireless&page=1&utm_source=a' => '/news/?q=wireless&utm_source=a'] as $uri => $to) {
+            $moved = $this->request('GET', $uri);
+            self::assertSame([301, $to], [$moved->status, $moved->getHeader('Location')], $uri . ': the rest of its query kept');
+        }
+        $past = $this->request('GET', '/news/page/3/?q=wireless');
+        self::assertSame([404, null], [$past->status, $past->getHeader('Location')], 'a search page past its end is a 404, never a move to one');
     }
 
     /**
@@ -635,6 +648,39 @@ final class NewsPagesTest extends TestCase
         $gone = $from('198.51.100.40');
         self::assertSame(404, $gone->status, 'taken down');
         self::assertSame(2, $this->clicks((int) $link['id']));
+    }
+
+    /**
+     * Only a visit counts: a browser's document navigation, from any site (a feed reader's click comes from
+     * another), or a request without the fetch headers. An image, a script, a frame or a fetch naming the address on
+     * some other page is sent on and never counted.
+     */
+    public function testGoCountsOnlyAVisitAndAlwaysSendsOn(): void
+    {
+        $this->bootApp(['app' => ['trusted_proxy_header' => 'HTTP_X_TEST_CLIENT', 'trusted_proxies' => ['203.0.113.7']]]);
+        $link = $this->sourceLink($this->makeArticle(['slug' => 'with-a-source']));
+        $go = '/news/go/' . $link['id'] . '/';
+        $n = 0;
+        $from = function (array $headers) use ($go, &$n): Response {
+            return $this->request('GET', $go, [], $headers + ['user-agent' => 'Mozilla/5.0 (Windows NT 10.0) Chrome/130', 'referer' => 'https://elsewhere.example/page'], null, true, [], ['HTTP_X_TEST_CLIENT' => '198.51.100.' . (++$n)]);
+        };
+        foreach ([
+            'an image' => ['sec-fetch-dest' => 'image', 'sec-fetch-mode' => 'no-cors', 'sec-fetch-site' => 'cross-site'],
+            'a script' => ['sec-fetch-dest' => 'script', 'sec-fetch-mode' => 'no-cors', 'sec-fetch-site' => 'cross-site'],
+            'a frame' => ['sec-fetch-dest' => 'iframe', 'sec-fetch-mode' => 'navigate', 'sec-fetch-site' => 'cross-site'],
+            'a fetch' => ['sec-fetch-dest' => 'empty', 'sec-fetch-mode' => 'cors', 'sec-fetch-site' => 'cross-site'],
+            'a document fetched, not visited' => ['sec-fetch-dest' => 'document', 'sec-fetch-mode' => 'no-cors'],
+        ] as $what => $headers) {
+            $r = $from($headers);
+            self::assertSame([302, (string) $link['url']], [$r->status, $r->getHeader('Location')], $what . ' is still sent on');
+            self::assertSame(0, $this->clicks((int) $link['id']), $what . ' is not counted');
+        }
+        self::assertSame(302, $from(['sec-fetch-dest' => 'document', 'sec-fetch-mode' => 'navigate', 'sec-fetch-site' => 'cross-site', 'sec-fetch-user' => '?1'])->status);
+        self::assertSame(1, $this->clicks((int) $link['id']), 'a click from another site (a feed reader) counts');
+        self::assertSame(302, $from(['Sec-Fetch-Dest' => 'Document', 'Sec-Fetch-Mode' => 'Navigate'])->status);
+        self::assertSame(2, $this->clicks((int) $link['id']), 'the headers in any case');
+        self::assertSame(302, $from([])->status);
+        self::assertSame(3, $this->clicks((int) $link['id']), 'a browser without the fetch headers counts');
     }
 
     public function testTheClickEndpointCountsSameOriginFetchesOnly(): void

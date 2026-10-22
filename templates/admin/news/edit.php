@@ -160,7 +160,7 @@ $sourceNo = 0;
 
 <section class="pt-section" id="delete" aria-labelledby="delete-title">
     <h2 class="pt-h2" id="delete-title">Delete this article</h2>
-    <p>Deleting removes the article, its images, its link counts and its comments for good<?= $origin === 'import' ? ', and its import file will not bring it back' : '' ?>. To take it off the site for now, unpublish it instead.</p>
+    <p>Deleting removes the article, its images, its link counts and its comments for good<?= $origin === 'import' ? ', and its import file will not bring it back' : '' ?>. Its address then says it is gone, and no other article is ever given it. To take it off the site for now, unpublish it instead.</p>
     <form class="pt-form" method="post" action="/portal/admin/news/<?= $id ?>/" novalidate>
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="delete">
