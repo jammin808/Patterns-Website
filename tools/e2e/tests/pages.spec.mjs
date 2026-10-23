@@ -78,9 +78,23 @@ test('the dark/light toggle and the mobile menu work without errors', async ({ p
   if (await toggle.count()) {
     const before = await page.evaluate(() => document.documentElement.dataset.theme ?? '');
     await toggle.click();
-    // The theme lands inside a view transition (a frame after the click) when motion is allowed.
+    // The theme is set at once, never inside a view transition; the poll only waits for the click.
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme ?? '')).not.toBe(before);
   }
+});
+
+// site.js's copy hook, on the share row: however quickly it is pressed again, the button says what happened for two
+// seconds and then its own words again.
+test('Copy link goes back to its own words after a double press', async ({ page }) => {
+  await page.goto('/news/');
+  await page.locator('article.news-card h3 a').first().click();
+  const label = page.locator('.news-share [data-copy] [data-copy-label]');
+  await expect(label).toHaveText('Copy link');
+  await page.locator('.news-share [data-copy]').dblclick();
+  await expect(label).not.toHaveText('Copy link');
+  await expect(label).toHaveText('Copy link', { timeout: 4000 });
+  await page.waitForTimeout(500);
+  await expect(label, 'no stale timer puts the other words back').toHaveText('Copy link');
 });
 
 test('404 pages are noindex and helpful', async ({ page }) => {

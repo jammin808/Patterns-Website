@@ -79,7 +79,7 @@ These are the owner's words, kept because the defaults and fences come from them
 3. **The database, not the content registry.**
    - Articles, comments, settings and runs live in the database (migrations `0004_news` and `0005_news_first_live`).
    - They are not in `content/*.php`, which `ContentRulesTest` fences, because news legitimately names other companies and products and says "open-source". The launch files in `content/news/articles/` are JSON, outside that fence, and are only read by the importer; the dash fence still reads them.
-   - They are not in the assistant's knowledge, which would re-bill its cache on every article. `knowledge/website.md` names the section and tells the assistant to point people to `/news/` rather than summarise the news.
+   - They are not in the assistant's knowledge, which would re-bill its cache on every article. `knowledge/website.md` names the section and tells the assistant to point people to `/news/` rather than summarise the news; it also says what the section's pages offer (the feeds and the follow row, the share row, the newest articles on the home and product pages, the editorial standards page, dated corrections and reporting a mistake through the contact form), which are fixed facts, not article text.
    - `/news/` itself is a registry page (`content/pages.php`) with its own controller, like `/contact/`.
 4. **Public pages stay cacheable and session-free.**
    - The HTML of an article is the same for every visitor.
@@ -97,7 +97,7 @@ These are the owner's words, kept because the defaults and fences come from them
    - a **repair** call, at most once per article, for the phrases to avoid and for the lengths only a rewrite can fix;
    - a **check** call on Claude Haiku 5.5 for every article, for banned topics and for allegation risk.
 6. **Fences, not hopes.** Each of these is code with a test.
-   - An AI article can cite only a numbered reference (`S1`, `S2` …) that the research actually returned, in its sources, its items and its links alike. The server writes the URL, so a URL can never be mistyped or invented. A confirmed item that cites neither a page the desk fetched nor a search citation moves to speculation.
+   - An AI article can cite only a numbered reference (`S1`, `S2` …) that the research actually returned, in its sources, its items and its links alike. The server writes the URL, so a URL can never be mistyped or invented. A confirmed item that cites neither a page the desk fetched nor a search citation moves to speculation. So does one that cites coverage (anything but a `primary` or `standard` source; a page on gov.uk, parliament.uk, gov.scot, gov.wales or europa.eu is `primary` whatever the draft called it) without naming that source's publisher in its text ("as reported by TPi"): the research reads each candidate's primary source first and lists it (`Primary:` in the brief), compose cites it where it states the fact, and a story told only by the trade press still publishes, its facts attributed. What the rule moved in a published article is kept on the run (its outcome's `rules`), so the desk's run page shows it.
    - Banned domains are blocked in the tools, and dropped from (AI) or refused in (manual and import) sources, items, links and image credit links.
    - Banned topics are refused in AI and import articles; a manual article that mentions one gets a warning.
    - Duplicates are refused unless they are declared follow-ups, and a follow-up must bring at least one new source. The desk follows up only live articles.
@@ -114,15 +114,24 @@ These are the owner's words, kept because the defaults and fences come from them
    - The image is then redrawn from its pixels (which leaves its metadata and anything hiding in the file behind; a JPEG is first turned the way its EXIF orientation says) to WebP at 480, 960 and 1600 wide (never upscaled: a narrower original gets one copy at its own width), plus a 1200×630 JPEG share card cropped from the centre, its transparency filled. The result is stored under `storage/uploads/news/`.
    - Public images go out with `public, max-age=86400, s-maxage=3600`, never `immutable`, so a takedown leaves the CDN within the hour.
    - Alt text is required. A caption, credit and credit link are optional; the credit link may not be on a banned site.
-   - The AI desk never copies images. An article without an image shows its category's monochrome artwork, and shares its category's card.
+   - The AI desk never copies images. An article without an image shows its category's artwork, a test card drawn
+     for the category in the seven bars on a dark screen and picked by the article's id, so a list never shows
+     copies (DESIGN.md 8.36); it shares its category's card.
 9. **Models and money.**
    - **Models.** Research defaults to `claude-sonnet-5-5`, because it is search-heavy and reads a lot of input. Select, compose and repair use the writing model, `claude-opus-5-5` by default, because the writing is the point. The admin can switch either between Opus 5.5 and Sonnet 5.5. The check uses `news.check_model`, `claude-haiku-5-5`.
    - **Call settings.** Thinking is adaptive. The effort is high for research and compose, medium for select and repair, and low for the check. The top-level `cacheControl` marker (ephemeral) goes only on research and its continuations, which read the history before them back from the cache; each compose call marks the block that every compose call of the session shares (the brief, the references and the context); select, repair, check and the write-up call cache nothing.
    - **Estimate per session.** Research is roughly 0.4 to 1M input tokens, mostly cached, plus search fees. Select and compose add 30 to 60k input, 10 to 20k more read from the cache, and 20 to 40k output. `Pricing::session()` puts that at about 1 to 2 USD a session with the default models and 12 searches, or about 60 to 120 USD a month for 61 sessions; the settings page shows the range for the models chosen.
    - **Cap.** The default monthly cap is 100 USD, estimated from the reported usage at `Psc\News\Pricing` rates for the model that actually served each call (a model it does not know is priced at its dearest rates). A session starts only if this London month's spend plus the 90th-percentile cost of the last 30 sessions that ran (2.50 USD until there are 10 of them) fits under the cap. Before every model call, a session also checks its own ceiling (`news.session_ceiling_usd`, 5 USD) and stops once it has passed it.
    - **Search and fetch limits.** Default 12 searches and 6 fetches per session, counted across continuations. Fetched pages are capped at 8000 tokens.
+10. **Reaching readers beyond the site** (the owner: "Are RSS feeds being used? Any extra feature to increase exposure and SEO rankings should be explored"). Researched on 23 October 2026; where a source was unconfirmed, the safe option was taken.
+    - **Feeds** stay summary feeds, now with each article's picture (an `enclosure` and Media RSS), the channel's picture, a `ttl`, the categories as one taxonomy, conditional GET (`ETag`, 304), and the WebSub hub (§10, Feeds). Google News no longer reads feeds or anything set in Publisher Center (since March 2025), so the feeds are for readers; Google reads the sitemaps.
+    - **The tick tells** IndexNow (Bing, Yandex, Seznam, Naver, Yep and the others that share it; Google does not take part) and the WebSub hub what went live, changed or went, each address once (`Announcer`, §6.1). Google's sitemap ping is retired (it answers 404), so nothing pings Google: it reads `robots.txt`'s `Sitemap:` lines and Search Console.
+    - **The other pages** carry the newest articles (the home page and each product page, from a file the tick writes, never the database), and the hubs and articles carry follow and share links: plain links only, no third-party script.
+    - **Trust.** An editorial standards page (`/news/standards/`) says how the section is made, who answers for it and how it is corrected; a correction is a dated note on the article, and its `dateModified` follows it. schema.org's `publishingPrinciples` and `correctionsPolicy` are not added: nothing found shows Google reads them.
+    - **Ownership and identity.** Search Console's and Bing's meta tags (`seo.*`) on the home page, and the organisation's own profiles as `sameAs` (`content/site.php` 'same_as').
+    - **Crawlers.** The owner's choice (23 October 2026): allow AI search, block training. The model-training crawlers are asked to stay away and the AI search and answer engines are welcome, each on its own switch (§5). Search engines are never asked, so Google Search, its AI Overviews and AI Mode are unaffected.
 
-## 3. Data (migrations `0004_news` and `0005_news_first_live`, MySQL and SQLite)
+## 3. Data (migrations `0004_news`, `0005_news_first_live` and `0006_news_exposure`, MySQL and SQLite)
 
 - All times are Unix seconds (INT).
 - MySQL follows the 0001 conventions: InnoDB, utf8mb4_unicode_ci, `INT UNSIGNED` ids, `KEY t_x` and `CONSTRAINT fk_t_ref`.
@@ -156,6 +165,8 @@ These are the owner's words, kept because the defaults and fences come from them
 - `ai_written TINYINT(1) NOT NULL DEFAULT 0`: 1 for `ai`; for `import`, the file's `ai_written` (default true); for `manual`, the editor's "Written with AI help" tick. It decides the AI note and the desk byline
 - `review_reason VARCHAR(300) NULL`: why an AI article was held as a draft (the desk's reasons, or "Held when the desk was paused")
 - `story_key VARCHAR(190) NULL`
+- `corrections TEXT NULL` (migration `0006_news_exposure`): a JSON list of `{at, text}`, the dated corrections the article shows under its headline, the oldest first (`Draft::corrections()`); written only through the editor, never by the desk
+- `corrected_at INT NULL` (`0006`): the newest correction's time, which `ArticleStore::lastChange()` counts, so `dateModified`, the feeds' and sitemaps' times and the announcer's versions follow a correction however soon after going live it came
 
 **Counters**
 - `comments_open TINYINT(1) NOT NULL DEFAULT 1`
@@ -185,11 +196,14 @@ These are the owner's words, kept because the defaults and fences come from them
 | `news_prompt_versions` | `id`, `field VARCHAR(16)` (`brief\|voice`), `body TEXT`, `created_by INT UNSIGNED NULL`, `created_at` | `news_prompt_versions_field (field, created_at)` |
 | `news_imports` | `import_key VARCHAR(190)` PK, `article_id INT UNSIGNED NULL`, `imported_at INT` | |
 | `news_retired_slugs` (migration `0005_news_first_live`) | `slug VARCHAR(190)` PK, `article_id INT UNSIGNED` (no FK: the article is gone), `retired_at INT`. Written by `ArticleStore::delete()` for every article deleted, live or not | |
+| `news_pings` (migration `0006_news_exposure`) | `channel VARCHAR(16)` (`indexnow\|websub`), `path VARCHAR(190)` (site-relative), `article_id INT UNSIGNED NULL` (no FK; null for a hub or a feed), `state VARCHAR(8) NOT NULL DEFAULT 'live'` (`live\|gone`), `version INT NOT NULL DEFAULT 0` (the article's `lastChange()` when it was announced), `pinged_at INT NOT NULL`. What the announcer last told each channel about each address, written only after the channel answered 2xx (§6.1) | PK `(channel, path)`; `news_pings_article (article_id)` |
 
 In `news_links`:
 - `url_key` is the sha256 of `Urls::canonical`.
 - `host` is the canonical host, shown beside the link.
 - `kind` is one of `primary|press|report|standard|other`.
+
+`news_settings` also holds internal rows no admin page edits (`Settings::internal()`): the lease, the heartbeat, the `email_*` stamps, the IndexNow key (`indexnow_key`) and each channel's state (`announce_indexnow`, `announce_websub`: failures in a row, when it may try again, and what it last did).
 
 `news_runs` columns:
 - **Identity:** `id`; `slot VARCHAR(40)`, which is `Y-m-d HH:MM` in London time or `manual-<unix>-<6 hex>`; `kind VARCHAR(16)`, `scheduled|manual`.
@@ -243,7 +257,8 @@ In `news_links`:
 - `named(string $href, string $baseUrl)`: the same for a link as a person types it: relative or on this site's host, the path in any case, with or without its last slash (`/news/Some-Story` names `some-story`). The validator and `Markdown` use it.
 - `slug(string $text)`: the slug rules. Lower case ASCII words joined by hyphens (through `Prose::slug()`), with no stop word at either end (`a an the and or of to in on for with at by is are from`), at most `SLUG_MAX` (60) characters cut at a word.
 - `numbered($base, $n)`: `base`, `base-2`, `base-3` ..., the base cut at a word (and its end's stop words trimmed again) so the number still fits within 60.
-- `RESERVED`: `page comment category go media feed sitemap`. No slug is one of these or a category key (`isReserved()`), and no category key is one of these.
+- `standards()`: `/news/standards/`, the editorial standards page.
+- `RESERVED`: `page comment category go media feed sitemap standards`. No slug is one of these or a category key (`isReserved()`), and no category key is one of these.
 
 **`Urls`**
 - `canonical(string): ?string`:
@@ -280,6 +295,7 @@ In `news_links`:
 - `seoTitleOrDefault()`, `summaryOrDefault()`, `slugBase()` (§5, the slugs).
 - `texts()`: every text field by the name its error is reported under; `dashCount()`, `sourceKeys()`, `inlineLinks()` (the links in the body, the impact and the items).
 - `deskByline()`: "Industry Updates desk".
+- `corrections`: the dated corrections (`{at, text}`, the oldest first), read by `fromArray()` for manual and import drafts (never the desk's) and stored by `ArticleStore`; `Draft::corrections()` reads the stored JSON. `texts()` names each `corrections.N`, so the email rule and the dash count cover them.
 
 **`Validator`**
 - `check(Draft, Context): Result`. The `Result` has:
@@ -311,6 +327,7 @@ In `news_links`:
   - `categoryCounts(): array`, `categories(int)`.
   - `links(int)` (the sources first), `linkIds(int)`, `sourceKeys(array $ids)`, `related(int, bool $liveOnly = true): {earlier, later}`, `images(int)`.
   - `isLive(array $row)`, `draft(int $id): ?Draft`, and `imageFiles(array $image)` (static): the four file names of an image.
+  - `liveAddresses()`: every live article's id, own address, version (`lastChange()`) and categories, for the announcer. `newest(?string $category, int $limit)`: the newest live articles in a category or in all (id, slug, title, time, primary category), for the latest-articles file.
   - `isRetired(string $slug)`: whether it was a deleted article's. `slugFor(string $base, ?int $id)`: the slug the store would give that base now (what the editor's empty Address field stands for). `liveBySlugs(array $slugs)`: the live articles among them, by slug, in one query.
 - **On every save:**
   - applies `Prose::undash` to every text field;
@@ -320,6 +337,7 @@ In `news_links`:
   - makes the slug unique (`-2`, `-3` and so on) and clear of the reserved words and of every deleted article's slug (`Paths::numbered()`, `Paths::isReserved()`, `news_retired_slugs`), so an old link, a search result or a feed's guid never leads to another article. A new article's comes from `Draft::slugBase()` (its own SEO title, else its headline, by `Paths::slug()`), or a slug the draft names by the same rules; a stored one's changes only when a draft names one and never once the article has been live.
   - stores the links as written: a link to another article is drawn at that article's address when the page is drawn (`Markdown`), so saving an article unchanged changes nothing.
 - **"Live"** means `status = 'published' AND published_at <= now`.
+- `lastChange()` is the later of the "Updated" time (else the time it went live) and the newest correction (`corrected_at`).
 
 **`Images`**
 - `store(array $upload, ?int $articleId, array $meta, ?int $userId, array $bannedDomains = []): array{ok, image?, error?, errors?}`: the checks and copies of §2.8; `errors` names each field.
@@ -342,7 +360,7 @@ In `news_links`:
 - DB-held settings with defaults (§8): `get(string)` (throws for a name that is not a setting), `all()`, `save(array $values, ?int $userId): array{changed, errors}` (typed values or a form's strings; all or nothing), and `fingerprints(list $names)`, a short hash of each setting's value, which the settings form posts back (§11).
 - `apiKey(App)` (static): `news.api_key`, else `chat.api_key`. `context(string $origin, string $mode, ?int $editingId)`: the Validator's context with the banned lists, the phrases to avoid and the site's address.
 - The prompts: `brief()`, `voice()`, `defaultPrompt(string $field)`, `savePrompt(string $field, string $text, ?int $userId)`, `resetPrompt()`, `restorePrompt(int $versionId, ?int $userId)` (as a new version, so the history keeps what it replaced) and `versions(string $field)`, the newest first.
-- The internal rows: `heartbeat(array $tick)` and `lastTick(): ?array`; `cronState(?array $running): never|ok|stopped` (ok while the last tick is under `TICK_STALE`, 35 minutes, old, or while a session is running and not past its deadline plus 15 minutes); `lease(int $runId, int $until): bool`, `releaseLease(int $runId)` and `leaseHolder()`, one conditional UPDATE on the `lease` row, which keeps its holder in `updated_by` and its expiry in `updated_at`; `claimEmail(string $kind, int $every = 86400)`, at most one admin email of a kind a day.
+- The internal rows: `internal(string $name)` and `putInternal()` for any of them; `indexNowKey(bool $create = true)`, 32 lower-case hex characters made once and kept (never made by the key file's route); `heartbeat(array $tick)` and `lastTick(): ?array`; `cronState(?array $running): never|ok|stopped` (ok while the last tick is under `TICK_STALE`, 35 minutes, old, or while a session is running and not past its deadline plus 15 minutes); `lease(int $runId, int $until): bool`, `releaseLease(int $runId)` and `leaseHolder()`, one conditional UPDATE on the `lease` row, which keeps its holder in `updated_by` and its expiry in `updated_at`; `claimEmail(string $kind, int $every = 86400)`, at most one admin email of a kind a day.
 
 **`Schedule`** (all static; every time is London time)
 - `due(\DateTimeImmutable $now, Settings, ?array $lastRun, array $taken = []): ?string`. It returns the slot due now, or null. A slot is due when all of these hold:
@@ -418,11 +436,27 @@ In `news_links`:
   4. Inserts the `news_imports` row and then the article in one transaction. A primary-key conflict means another run imported it first, so it is skipped.
 - A failing file is logged and skipped; the others go on.
 
+**`Announcer`** (§6.1)
+- `run(?int $now)`: one tick's announcements, each channel's status (`off`, `idle`, `waiting`, `sent` or `failed`), the addresses it named and the HTTP status. `state(string $channel)`: failures, `retry_at`, `sent_at` and the last outcome, which the desk page shows.
+- `indexNowOn()`, `endpoint()`, `hub()` (static): the settings `news.indexnow`, `news.indexnow_endpoint` and `news.websub_hub` (https only, else off).
+- `useTransport(?PingTransport)` (static): the seam tests set (`tests/Fakes/FakePingTransport.php`); `TestCase::tearDown()` resets it. Without one, the real transport (`HttpPingTransport`: curl, else PHP's stream; POST only, https only, no redirect followed, 5 seconds to connect and 15 in all) is built **in production only**, so a test, the browser suite and a development server never reach the network.
+- `MAX_ARTICLES` (500) articles an announcement at most, the rest at the next tick; `RETRY_FIRST` (600 seconds, so the next tick) doubled for each failure in a row, up to `RETRY_MAX` (a day).
+
+**`Latest`** (the newest articles for the other pages)
+- `refresh(App)`: writes `storage/cache/news-latest.json` (the `PER`, 3, newest live articles overall and in each category with any: headline, address, time, primary category) when what it would hold differs, through a temporary file renamed over the old one; true when it wrote. The tick calls it, and so does every article action in the admin, so a takedown leaves the strips with the page.
+- `read(App)`: the lists, or null with no file or an unreadable one; an item that is not whole, or whose address is not in the section, is left out. `forCategories(App, list $keys, int $n = 3)`: the newest in any of the keys, each once (empty keys: overall). `productCategories(string $product)`: `content/news.php` 'products'.
+
+**`Art`** (the category artwork, DESIGN.md 8.36)
+- `tile(string $key, int $id, bool $wide = false, bool $lead = false): string`: the span and its svg, or `''` for an unknown key. `$wide` is the article page's band (its 576 x 180 picture and the card's for narrow screens), `$lead` the lead card's picture shown whole.
+- `pick(int $id): array{v, k, p, f}`: the composition, the take, the bar that leads and the edge asked for, from the id alone (`max(0, $id) % 336`).
+- `SHARE`: each category's share card id. `$file`: the table, `art-data.php` beside the class, generated by `tools/news-art/build.mjs` with each take's edge map from `tools/news-art/edges.json`.
+
 ### Elsewhere
 
 **Controllers**
 - `Psc\Controllers\NewsController`: index, category, oldCategory, show, feed, go and click; `elsewhere()` is the 301 (308 for a POST) to an article's own address, or the 410 of a deleted article's slug; `renderArticle(array $article, bool $preview = false)` draws an article, for the public page and the admin preview, with its links to other articles at their addresses of the day (one `liveBySlugs()` query); `picture(array $image, bool $admin = false)` is an image row as the templates draw it.
-- `SeoController`: the site's sitemap, robots and llms, the section's sitemaps (`newsSitemap`, `newsSitemapMonth`, `newsSitemapRecent`), and `/health`'s `news` and `images` (`newsState()`, `imagesSupported()`).
+- `SeoController`: the site's sitemap, robots (`TRAINING_AGENTS`, `AI_SEARCH_AGENTS`) and llms, the section's sitemaps (`newsSitemap`, `newsSitemapMonth`, `newsSitemapRecent`), the IndexNow key file (`indexNowKey`), and `/health`'s `news` and `images` (`newsState()`, `imagesSupported()`).
+- `PageController` draws `/news/standards/` from the registry, at its route among the section's.
 - `NewsMediaController`: public media and admin media.
 - `NewsCommentController`: the API (`state`, `create`, `delete`, `report`), the comment page (`show`; not `page`, which `Controller` already has) and its forms (`submit`).
 - `Admin\AdminNewsController`: the articles, images and preview.
@@ -436,13 +470,15 @@ In `news_links`:
   2. Reap stale runs, emailing the admins about them.
   3. Import.
   4. Run the queued run (a scheduled one whose 2-hour window has passed is skipped instead), or else claim the due slot and run it; every older slot still due beside it is claimed and skipped as lapsed.
-  5. Write the heartbeat again, with the run and its status.
-  6. Log and print one JSON line, with keys named `usage_in` and `usage_out` and never `tokens`, so the Logger does not mask them.
-- `run` runs a session now. `import` only imports. The exit code is 1 when the session failed.
+  5. Refresh the latest-articles file (`Latest::refresh()`, the report's `latest`).
+  6. Tell IndexNow and the WebSub hub what changed (`Announcer::run()`, the report's `announced`).
+  7. Write the heartbeat again, with the run and its status.
+  8. Log and print one JSON line, with keys named `usage_in` and `usage_out` and never `tokens`, so the Logger does not mask them.
+- `run` runs a session now. `import` only imports, then refreshes the latest-articles file (so the browser suite, which imports before it starts, sees the strips). The exit code is 1 when the session failed.
 
 **App.** `App::dbAlive(): Database` checks the connection with `SELECT 1` and reconnects on MySQL. SQLite is never reconnected, which keeps the tests' in-memory database. The pipeline calls it before every database step that follows a model call.
 
-## 5. Routes (declared before the registry loop, which skips `/news/`)
+## 5. Routes (declared before the registry loop, which skips `/news/` and `/news/standards/`)
 
 The section is one silo. The router takes the first route that matches, so the specific ones come first: every word
 they use (`page`, `go`, `media`, `category`, `feed`, `sitemap`) is a reserved slug, `{category}` is only ever one of the
@@ -461,6 +497,7 @@ GET  /news/sitemap-{month:yyyy-mm}.xml        SeoController::newsSitemapMonth
 GET  /news/category/{key:[a-z]+}/             NewsController::oldCategory     301 to /news/{key}/ (?page=N to its page; past the end, 404)
 GET  /news/go/{id:\d+}/                       NewsController::go              ['nostore']
 GET  /news/media/{file:[a-f0-9]{32}-[a-z0-9]+\.(?:webp|jpg)}   NewsMediaController::public
+GET  /news/standards/                         PageController::show            (a registry page, before the slugs could take it)
 GET  /news/{category}/                        NewsController::category        ?page= (moved)
 GET  /news/{category}/page/{page}/            NewsController::category
 GET  /news/{category}/feed.xml                NewsController::feed
@@ -497,6 +534,8 @@ POST /portal/admin/news/desk/prompt/          AdminNewsDeskController::savePromp
 GET  /portal/admin/news/desk/runs/{id:\d+}/   AdminNewsDeskController::run        $ad
 ```
 
+The IndexNow key file is at the site's root, beside the machine-readable files: `GET /{key:[a-f0-9]{32}}.txt` (`SeoController::indexNowKey`, no middleware). It answers the key alone, `text/plain; charset=utf-8`, `public, max-age=3600`, for the key the pings carry, and 404 for any other name, before a key is made, or with `news.indexnow` off; the route never makes a key. The key is public by design: it proves only that a ping came from whoever controls the site.
+
 **The addresses' rules**
 - `/news/{category}/{slug}/` is an article's canonical address, the category its primary one. The slug is unique across the site and never changes once the article has been live (`first_live_at`, §3).
 - Any other category in the path, or the bare `/news/{slug}/`, answers 301 to the canonical address, keeping the query string; so does the comment page. A deleted article's slug answers 410 (noindex) at every address, the comment page too, and is never given to another article (`news_retired_slugs`). Any other unknown slug, or one whose article is not live, is a 404 at every address, with no redirect.
@@ -508,12 +547,16 @@ GET  /portal/admin/news/desk/runs/{id:\d+}/   AdminNewsDeskController::run      
 
 **Indexing and discovery**
 - `robots.txt` adds `Disallow: /news/go/`, and lists `Sitemap:` lines for `/sitemap.xml` and `/news/sitemap.xml`. Articles use the real links; the go route serves the feeds and no-JS readers.
+- **Crawlers** (`content/site.php`): one group for everyone, then, when a switch asks for it, one more group that asks its crawlers to stay off the whole site. Two separate switches: `block_training` for the model-training crawlers (`SeoController::TRAINING_AGENTS`: GPTBot, ClaudeBot, Google-Extended, Applebot-Extended, CCBot, meta-externalagent, Bytespider), and `ai_search` for the AI search and answer engines (`AI_SEARCH_AGENTS`: OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User, meta-webindexer, meta-externalfetcher). The site ships the owner's choice, allow AI search and block training: `block_training` true and `ai_search` true, so `robots.txt` carries the training group. A missing key blocks nothing (`block_training` absent is off, `ai_search` absent is welcome). No search engine is ever in either; a crawler that matches a group of its own reads only that group, so no group is written for crawlers that should read the same rules as everyone. Google-Extended covers Gemini's training and its grounding in Gemini Apps and Vertex AI: blocking it takes the site out of Gemini's answers as well, but not out of Google Search, AI Overviews or AI Mode, which come from Googlebot (those follow `nosnippet` and Search Console's own control).
+- **IndexNow and WebSub** (§6.1): the tick tells both what changed. Google takes part in neither as a search engine and its sitemap ping is retired, so Google learns from the sitemaps, `robots.txt` and Search Console.
+- **Ownership tokens**: `seo.google_site_verification` and `seo.bing_site_verification` put `google-site-verification` and `msvalidate.01` meta tags in the home page's `<head>` (`Seo::toHead()`, the home page only; a value pasted as the whole tag gives its content; anything but a token is left out).
+- **The organisation's profiles**: `content/site.php` 'same_as' (https addresses) is the Organization's `sameAs` on every page.
 - The site's `/sitemap.xml` lists `/news/` (its `lastmod` the newest live article's last change, never earlier than its registry date) and each category hub with at least one live article (its newest live article's). It never lists an article.
 - `/news/sitemap.xml` is a sitemap index of `/news/sitemap-{yyyy}-{mm}.xml`, one per London month with live articles, the newest first (`lastmod` = the month's newest change), plus `/news/sitemap-news.xml`.
 - Each month's sitemap is a `urlset` of the live articles that went live that London month (`xmlns:image`), each with its `lastmod` (`ArticleStore::lastChange()`) and an `image:image` for a lead image (its widest copy). A month without any is a 404.
 - `/news/sitemap-news.xml` is a Google News sitemap (`xmlns:news`) of the live articles that went live in the last 48 hours: `news:publication` (name "Patterns Show Control", the site's name; language `en`), `news:publication_date` and `news:title`.
 - Every sitemap answers `private, no-store` when the articles cannot be read: the site's still lists its pages, with a 200; the section's answer 503 with `Retry-After`. Otherwise they are `public, max-age=3600`, the news sitemap as briefly as a news page.
-- `llms.txt` adds an "Industry Updates" section: the hub, then the 10 newest articles at their own addresses, each with its summary. When the articles cannot be read it is sent `private, no-store`, so the copy without them never outlives the outage.
+- `llms.txt` adds an "Industry Updates" section: the hub, the editorial standards page, then the 10 newest articles at their own addresses, each with its summary. When the articles cannot be read it is sent `private, no-store`, so the copy without them never outlives the outage.
 
 **Admin**
 - The admin nav adds `['/portal/admin/news/', 'Industry Updates']`.
@@ -533,7 +576,14 @@ GET  /portal/admin/news/desk/runs/{id:\d+}/   AdminNewsDeskController::run      
 
 ### 6.1 A tick (cron, every 15 minutes; times in Europe/London)
 
-- **The steps** are those of `tools/news.php tick` (§4, CLI): heartbeat, reap, import, the queued or due session, heartbeat again. Each runs on its own, so one failing never stops the others.
+- **The steps** are those of `tools/news.php tick` (§4, CLI): heartbeat, reap, import, the queued or due session, the latest-articles file, the announcements, heartbeat again. Each runs on its own, so one failing never stops the others.
+- **Announcements** (`Announcer`), after the session, so an article it published goes out in the same tick:
+  - Each channel compares every live article's own address and version (`ArticleStore::lastChange()`) with what it last told about it (`news_pings`). It names each address it has no record of, has recorded as gone, or recorded at an older version (a scheduled article once its time has passed, a change that counts, a correction), and each address it told was live that no live article has now (taken down: a 404; deleted: a 410; moved by a new primary category: a 301), which IndexNow asks to be told of too. Then the hubs and feeds they touched: `/news/`, each named article's category hubs, `/news/feed.xml` and those categories' feeds (for an address that went, its category comes from the address itself).
+  - **IndexNow**: one POST of JSON to `news.indexnow_endpoint` (`https://api.indexnow.org/indexnow`, which shares it with every engine that takes part): `host`, `key`, `keyLocation` (`/{key}.txt`) and `urlList` (absolute addresses). 200 and 202 count as received.
+  - **WebSub**: one POST to `news.websub_hub` (`https://pubsubhubbub.appspot.com/`, Google's hub, which Blogger's own feeds still declare), `hub.mode=publish` and a `hub.url` for each feed touched. A 2xx counts as received (204 means the hub took the ping, not that anyone was told).
+  - Only a 2xx marks what was sent, so nothing is told twice. A failure (any other status, or no answer) is logged (`news announce failed`) and marks nothing; the channel waits until the next tick, then twice as long after each failure in a row, a day at most (`Announcer::RETRY_FIRST`, `RETRY_MAX`). The channels are separate, so one failing never makes the other repeat itself.
+  - At most 500 articles an announcement; the rest go at the next tick. A channel is off with its setting (`news.indexnow` false, `news.websub_hub` empty), and both are off on any server that is not production, unless a test has set a transport: no test, browser run or development server reaches the network.
+- **The latest-articles file** (`Latest::refresh()`): written when the live set has changed (§10, Latest on other pages).
 - **Which session.** A queued run goes first: a manual one from "Run a session now", or a scheduled one a tick claimed. A scheduled run left queued past its 2-hour window (its tick died before starting it) is skipped, never run late. Otherwise the tick claims the latest due slot (`Schedule::slotDue()`), and every older slot still due beside it is claimed and skipped as `lapsed`, so a missed slot never runs late beside the next one.
 - **Pre-checks.** Nothing runs, and the claimed run is recorded as `skipped` with a reason, when:
   - the desk is paused (`paused`), so the run list shows the sessions a pause cost;
@@ -740,6 +790,7 @@ Lengths are checked on the text as it will be stored (after `Prose::undash`). Th
 | `contact` | all | No email address and no `mailto:` in any text field | Remove the email address; link to a page instead. |
 | `dashes` | all | Not a rejection: `undash` runs on save. A manual save that replaced any shows a flash | Em dashes were replaced with commas. |
 | `tells` | ai | Phrases to avoid in the dek, body, impact and verdict note: repair, then hold (§6.2 step 5) | |
+| `corrections` | manual, import | Each correction one line of up to 300 characters, at most 20 (`Validator::CORRECTION_MAX`, `CORRECTIONS_MAX`); the `contact` rule covers them. The editor names the field it was typed in (`correction_new`, or an earlier line's) | Keep each correction to one line of up to 300 characters. |
 | Drafts | manual | A draft saved by an admin needs only a headline. The full rules apply on publish and schedule, and to every save of an article that is published or scheduled | |
 
 ## 8. Settings (`news_settings`, edited on the desk pages)
@@ -816,7 +867,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 ## 10. Public pages
 
 **The hub `/news/`**
-- A hero with the h1 "Industry Updates" and a lede.
+- A hero with the h1 "Industry Updates", a lede and the **follow row** (`partials/news/follow.php`): the page's own RSS feed, the same feed in Feedly (`https://feedly.com/i/subscription/feed%2F{the feed's address, encoded}`) and in Inoreader (`https://www.inoreader.com/?add_feed={encoded}`), and Google's preferred sources page for the site's domain (`https://www.google.com/preferences/source?q={domain}`, where a reader adds the site to Top Stories; a plain link, never Google's button script). The readers' and Google's links open in a new tab (`rel="nofollow noopener"`). Feedly's and Inoreader's subscribe addresses are the forms their own buttons use, not documented by either.
 - The category list:
   - `<nav aria-label="Categories">` with a wrapping list (`news-cats`, 44px targets), showing "All" and each category that has live articles, with counts, each linking to its hub;
   - below 40rem, a GET form with a `<select>` and a Show button instead (`/news/?category=key` answers 302 to that category's hub, an empty one to `/news/`).
@@ -831,7 +882,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - **Head:** `CollectionPage` with `mainEntity` its `ItemList` of the page's articles at their own addresses, the BreadcrumbList, the news share card, and the RSS alternate for `/news/feed.xml`.
 
 **A category hub `/news/{key}/`**
-- The same layout, with the category's own title and description from `content/news.php` (each unique, the title 60 characters or fewer, the description 50 to 155) and its intro as the lede; its pages are `/news/{key}/page/2/` and on, with the same rules as the hub's.
+- The same layout, with the category's own title and description from `content/news.php` (each unique, the title 60 characters or fewer, the description 50 to 155) and its intro as the lede, and its follow row for its own feed; its pages are `/news/{key}/page/2/` and on, with the same rules as the hub's.
 - **Head:** a self-referencing canonical, `CollectionPage` + `ItemList`, the breadcrumbs Home › Industry Updates › the category, its own share card (`/assets/img/og/news-{key}.png`, built by `tools/og/build.mjs` from its artwork and headline), and RSS alternates for `/news/{key}/feed.xml` and `/news/feed.xml`.
 - **Silo navigation:** at its foot, "More Industry Updates": a link back to `/news/` and to each other category with live articles.
 - A known category with no live articles: 200, the empty state, `noindex, follow`.
@@ -841,20 +892,22 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 **Article `/news/{category}/{slug}/`**, in order:
 1. Breadcrumbs: Home › Industry Updates › the primary category (its hub) › `seo_title`.
 2. The category tags (each linking to its hub), the h1 `title`, and the `dek`.
-3. A meta line: the date and time in London, the read time, "Updated" if changed, and the byline.
-4. A follow-up banner (a `c-callout`): "Follow-up to:", linking to the earlier articles at their own addresses.
-5. The lead image (`<figure>` with `srcset`, width, height, alt, caption, credit), or the category artwork.
-6. The body.
-7. "What's confirmed": each item with a "Confirmed" done badge (green, with the word) and its source link.
-8. "Still speculation", only if any: each item with an "Unconfirmed" badge (amber, with the word).
-9. "What it means for freelancers and corporate events".
-10. The verdict callout.
-11. The other images.
-12. "Sources": a numbered list of real links (`rel="nofollow noopener"`, `target="_blank"`, `data-news-link`), each with its publisher, host and kind.
-13. "Later updates": the articles that follow up this one, at their own addresses.
-14. The AI note, on AI articles.
-15. "More in {Category}": up to 4 of the newest live articles in its primary category, never itself, each with its date and read time, then "Every article in {Category}", the link to that hub.
-16. Comments.
+3. A meta line: the date and time in London, the read time, "Updated" if changed or corrected (`dateModified`), and the byline.
+4. The corrections, when it has any (`news-corrections`, a `c-callout--info` with `id="corrections"`): "Correction" (or "Corrections"), each line with its date, then "How we correct articles", the way to `/news/standards/#corrections`.
+5. A follow-up banner (a `c-callout`): "Follow-up to:", linking to the earlier articles at their own addresses.
+6. The lead image (`<figure>` with `srcset`, width, height, alt, caption, credit), or the category artwork.
+7. The body.
+8. "What's confirmed": each item with a "Confirmed" done badge (green, with the word) and its source link.
+9. "Still speculation", only if any: each item with an "Unconfirmed" badge (amber, with the word).
+10. "What it means for freelancers and corporate events".
+11. The verdict callout.
+12. The other images.
+13. "Sources": a numbered list of real links (`rel="nofollow noopener"`, `target="_blank"`, `data-news-link`), each with its publisher, host and kind.
+14. "Later updates": the articles that follow up this one, at their own addresses.
+15. The AI note, on AI-written articles, then "How Industry Updates is made", the way to `/news/standards/`.
+16. "Share this article" (`partials/news/share.php`, not in the preview): LinkedIn (`/sharing/share-offsite/?url=`), X (`/intent/tweet?text=&url=`), Bluesky (`/intent/compose?text=` the headline and address), WhatsApp (`wa.me/?text=`), each the network's own share page in a new tab with the canonical address, every value encoded, a hidden "Share on" in its name; then a Copy link button worked by `site.js`'s `data-copy` hook, shown only with scripting (`news-js-only`). No network's script is loaded.
+17. "More in {Category}": up to 4 of the newest live articles in its primary category, never itself, each with its date and read time, then "Every article in {Category}", the link to that hub.
+18. Comments.
 
 **Article head and structured data**
 - `<title>` from `seo_title`, with " | Industry Updates" added only when the whole stays within 60 characters; the meta description from `summary`; `og:title` from `title` (`Seo::$ogTitle`).
@@ -865,7 +918,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
   - `NewsArticle`, `@id` = `url#article`, with:
     - `headline` = the title, cut to 110;
     - `description`;
-    - `datePublished`, `dateModified` (`ArticleStore::lastChange()`);
+    - `datePublished`, `dateModified` (`ArticleStore::lastChange()`, which a correction moves);
     - `articleSection` = the primary category's name;
     - `keywords`;
     - `image`, a list: the share card, then the lead image at its widest;
@@ -882,8 +935,22 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 
 **Feeds**
 - RSS 2.0 with the 30 newest live articles: every category's at `/news/feed.xml`, one category's at `/news/{key}/feed.xml` (its channel titled "Industry Updates from Patterns Show Control: {Category}", linking to its hub, described by its description). An unknown category's feed is a 404.
-- Item links go to the article's own address; each guid is its lasting `/news/{slug}/` (`isPermaLink="true"`, a 301 to the article), so a change of category never shows a reader the article twice. The description is the summary plus the source links through `/news/go/{id}/`.
+- Item links go to the article's own address; each guid is its lasting `/news/{slug}/` (`isPermaLink="true"`, a 301 to the article), so a change of category never shows a reader the article twice. The description is the summary plus the source links through `/news/go/{id}/` (a summary feed: the article stays the page people read).
+- **Each item's picture**: the lead image's 1200 x 630 share card (`/news/media/{base}-og.jpg`, `image/jpeg`), else its primary category's card (`/assets/img/og/news-{key}.png`, `image/png`), as one `enclosure` (with its `length` in bytes; an item whose file is missing has none) and as `media:content` (Media RSS, `xmlns:media="http://search.yahoo.com/mrss/"`, `medium="image"`, width, height, `fileSize`) holding `media:description` (its alt text) and `media:credit` when it has a credit.
+- **Each item's categories** carry `domain` = the section's hub, naming them as one taxonomy.
+- **The channel**: `ttl` 60 (minutes; `NewsController::FEED_TTL`), `image` (the brand mark at 144 x 144, `/assets/img/brand/icon-144.png`, its title and link the channel's), and, while `news.websub_hub` is set, `<atom:link rel="hub">` beside the `rel="self"` link, the same pair as an HTTP `Link` header. The self address is the one subscribers use, which the hub takes as the topic.
+- **Conditional GET**: an `ETag` (a hash of the feed) and `Last-Modified`; a request whose `If-None-Match` holds the ETag answers 304 with no body. `If-Modified-Since` alone is not trusted (a takedown can change a feed without moving its newest time).
+- Both feeds validate as RSS 2.0 in the W3C Feed Validation Service (checked 23 October 2026, with the site's own address: no errors; its one warning was the self link not matching a pasted copy).
 - Every news page carries `<link rel="alternate" type="application/rss+xml">`: the section's feed, and on a hub or an article its category's too.
+
+**Latest on other pages**
+- The home page (before its FAQ: "Latest from the news desk") and each product page (before its FAQ: "From Industry Updates", "The newest on video, streaming and automation, the areas Patterns works in.", each product's categories in `content/news.php` 'latest') carry a quiet row of the 3 newest articles (`partials/news/latest.php`, `pages/news-latest.css`): each its headline linking to its own address, its primary category and its date, then "All Industry Updates" and, on a product page, "{Category} news" for each hub it draws from that has an article in the file.
+- A product's categories are `content/news.php` 'products': Patterns video, technology and staging; StageWatch showcalling, production and automation; AGMessage production, legal and freelance; PlayMap interactive, video and lighting. An article in any of them counts, each once, the newest first.
+- **Data**: only `storage/cache/news-latest.json` (`Latest`), never the database and never a session, so the pages stay the same for every visitor and cacheable; with no file, or nothing in it, nothing is drawn. The tick writes it when the live set changes (so a scheduled article appears once its time has passed), and every article action in the admin writes it at once, so a takedown leaves the strips with the page. The strips then follow those pages' own cache (5 minutes, `app.page_cache_seconds`); Flush CDN clears them with the rest.
+
+**Editorial standards `/news/standards/`**
+- A registry page (`content/pages.php`, type `page`, parent `/news/`, section `news`), drawn by `PageController` with `templates/news/standards.php` from `content/news.php` 'standards' (Markdown; `:editor` is `content/site.php` publisher name, as the about page names it). Its sections, each with an id for the links that lead to them: how Industry Updates is made (the AI desk, the sources and references, verified facts apart from speculation, the AI note, the check before publishing, and that articles passing every check are published automatically), what the editor does, how to report a mistake (the contact form), the corrections policy, and who publishes it.
+- Linked from the AI note on every AI-written article, the footer's Company column on every page, the about page, the corrections note on an article, and `llms.txt`.
 
 **Click counting**
 - `news.js` sends `fetch('/api/news/links/{id}/click', {method: 'POST', keepalive: true, credentials: 'omit', headers: {'X-Requested-With': 'fetch'}})` on click and on middle click, at most once a second per link, and lets the browser follow the link.
@@ -906,11 +973,26 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - Code blocks are never rendered.
 
 **Design**
-- `public/assets/css/pages/news.css` uses the `news-` prefix and tokens only. Cards follow the stretched-link card (`support-wfcard`). The comments have `news-comments.css` and `news-comments.js` of their own, loaded by the comments partial (DESIGN.md 8.36).
-- **Category artwork:**
-  - Monochrome `<symbol>`s in `public/assets/img/news-art.svg`, drawn in `currentColor` with `--text-3` and `--line` through classes, used with `<use>` and `aria-hidden`.
-  - No SMPTE bars, no product colours, no inline styles.
-  - Motifs: a monitor wall for Video, a waveform for Audio, beams for Lighting, a truss for Staging, a cue stack for Production, a clock for Showcalling, a signal for Streaming, nodes for Automation, a grid for Interactive, a spark for AI, a network for Technology, a person for Freelance, a shield for Legal and a lightbulb for Tips.
+- `public/assets/css/pages/news.css` uses the `news-` prefix and tokens only; it also holds the follow and share rows (`news-follow`, `news-share`, 40px outlined links), the corrections note and the standards page's contents. `pages/news-latest.css` holds the strips on the other pages, under `news-latest`. Cards follow the stretched-link card (`support-wfcard`). The comments have `news-comments.css` and `news-comments.js` of their own, loaded by the comments partial (DESIGN.md 8.36).
+- **Category artwork** (DESIGN.md 8.36):
+  - A test card per category, printed inline by `Psc\News\Art::tile($key, $id, $wide, $lead)` through
+    `partials/news/art.php`, from the generated table `app/src/News/art-data.php`. `tools/news-art/build.mjs` draws
+    the table from its motifs and `tools/news-art/edges.mjs` measures each take's edges in a browser; neither runs at
+    request time. Nothing is loaded: no sprite, no `<use>`, no image.
+  - The seven SMPTE bars are the picture, painted only by classes in `pages/news.css` from the bar tokens, on a screen
+    that stays dark in both themes. Only Video shows the SMPTE card; a lone lamp, key or display takes the calm bars,
+    never green or red. No inline styles, no raw colours in the markup.
+  - Four compositions a category in three takes, and the bar that leads and the test card's edge, all picked by the
+    article's id (`Art::pick()`), so four cards in a row never share a composition. A card shows its primary
+    category's artwork, or on a category's hub that category's when the article is in it; the article page shows its
+    primary category's, as a 16:5 band from 40rem.
+  - Motifs: screens showing the SMPTE card for Video, waveforms, meters and faders for Audio, beams landing as the
+    bars for Lighting, truss, decks, risers and rigging for Staging, cue lists, timelines and cue cards for
+    Production, clocks and countdowns for Showcalling, masts, play buttons and an uplink for Streaming, node graphs for
+    Automation, keys and pads for Interactive, sparks for AI, chips and a wafer for Technology, a person with a lanyard
+    and pass for Freelance, a shield, scales and a seal for Legal and a bulb for Tips.
+  - Each category's share card (`news-{key}.png`) is built by `tools/og/build.mjs` from `Art::tile()` for its
+    `Art::SHARE` id.
 
 ## 11. Admin pages
 
@@ -933,8 +1015,9 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 6. The sources, as rows of URL, title, publisher and kind.
 7. "Follow-up of": a multiple select of the 60 most recent articles.
 8. The byline, whether comments are open, and "Written with AI help" (always ticked, and fixed, on an AI article).
-9. The schedule: a date and time in London, within the next year (not on a live article).
-10. The buttons the article's state allows: a draft has save draft, publish now and schedule; a scheduled article save changes, publish now, change the time and unpublish; a live one save changes and unpublish. Every button saves what is in the form first.
+9. **Corrections**, on an article that has been live: each earlier correction as a line of its own, labelled with its date (which never changes; emptying the line removes it; a form that does not post a line keeps it), and "Add a correction", one line saved with the time of the save. The article shows them under its headline, and its `dateModified` follows the newest. A draft that has never been live has none.
+10. The schedule: a date and time in London, within the next year (not on a live article).
+11. The buttons the article's state allows: a draft has save draft, publish now and schedule; a scheduled article save changes, publish now, change the time and unpublish; a live one save changes and unpublish. Every button saves what is in the form first.
 
 **Keeping the work**
 - A draft needs only a headline. Publishing, scheduling and every save of an article that is published or scheduled take the full rules. Every save is checked as a manual article, whatever its origin; the desk's story key is kept.
@@ -942,6 +1025,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - **Stale forms.** The form posts `loaded_at`, the `updated_at` of the article it was opened on (a kept copy keeps the one it was first opened on). A save, publish or schedule from a form opened before a later change (another administrator's, another tab's, a publish or an unpublish) is refused whole: the typed copy is kept and the flash says "Someone changed this article after you opened it, so your changes were not saved." (`CHANGED_SINCE`). `ArticleStore::update()` checks again as it writes, for a change made while the request runs.
 - **Unpublish is a takedown.** It takes the article down before the form is checked, so neither a rule the stored article now fails (a source banned since it went live, say) nor a later change keeps it on the site. If the rest of the form is then refused, the flash says "Unpublished. The article is a draft again, but your other changes were not saved." and the typed copy is kept.
 - A live article cannot be scheduled: unpublish it first.
+- Every action that changes an article (create, save, publish, schedule, unpublish, delete) rewrites the latest-articles file (`Latest::refresh()`; a failure is logged and the next tick writes it).
 
 **Images**
 - The images section comes after the article form, with the note "Save your changes first".
@@ -973,6 +1057,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 **Main page**
 - The state (`AdminNewsDeskController::state()`): On; Paused; or Stopped, with the reason: no key, SDK missing, no tick yet, cron not ticking, or cap reached. The desk is on only while the cron is ticking, since a session starts only at a tick.
 - The last tick, with a warning and the cron line to check when the cron has not ticked yet or its last tick is more than 35 minutes old (a session still running inside its time counts as ticking).
+- What the tick last told "Search engines (IndexNow)" and "Feed readers (WebSub hub)" (`Announcer::state()`): off with its setting, nothing told yet (and, off the live site, that only the live site tells them), "Last told {time} ({n} addresses)", or a "Failing" badge with the status, its time and when it tries again.
 - Buttons: "Pause the desk" or "Continue the desk", and "Run a session now" ("begins within 15 minutes, at the next tick"). Run now is refused unless the desk is on, and while a session is queued or running.
 - Pausing stops new sessions only; one already running finishes. Beside the buttons, a tick box, ticked by default: "When pausing, also hold the articles the desk has already scheduled (N now)". Ticked, every AI article that is published with a time still to come becomes a draft under Held, its time dropped and its `review_reason` "Held when the desk was paused" (one conditional UPDATE each, so an article that went live meanwhile is never taken down; each is audited as `news.unpublished`). While paused, the page says how many scheduled AI articles still go live, with a link to the Scheduled tab.
 - The next 6 sessions, in London time.
@@ -1001,7 +1086,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql.php` against the MySQL migrations.
 
 **Unit** (`tests/Unit/News/`)
-- `ProseTest`, `UrlsTest` (userinfo, IDN, trailing dot, sorting, the longest host), `MarkdownTest` (normalisation, headings, `data-news-link`, no code blocks), `CategoriesTest`, `PathsTest` (the addresses, `parse()`, `named()`, the slug rules, numbered and reserved slugs), `ValidatorTest` (every rule of §7, the AI fixes and the repairable errors, links inside items, nested links that never leave one unjudged), `ScheduleTest` (BST and GMT dates, the two-hour window, a late slot after midnight, overrides, the 60-minute gap, a paused desk, several due, the spring and autumn clock changes), `PricingTest`, `NewsAssetsTest` (the artwork, the stylesheets' tokens and prefix, the click script, the share cards, no inline style, script or dash).
+- `ProseTest`, `UrlsTest` (userinfo, IDN, trailing dot, sorting, the longest host), `MarkdownTest` (normalisation, headings, `data-news-link`, no code blocks), `CategoriesTest`, `PathsTest` (the addresses, `parse()`, `named()`, the slug rules, numbered and reserved slugs), `ValidatorTest` (every rule of §7, the AI fixes and the repairable errors, links inside items, nested links that never leave one unjudged), `ScheduleTest` (BST and GMT dates, the two-hour window, a late slot after midnight, overrides, the 60-minute gap, a paused desk, several due, the spring and autumn clock changes), `PricingTest`, `NewsAssetsTest` (the artwork: every category in order, four compositions of three takes; decoration only, painted by the stylesheet's classes, well-formed; the palette the seven bars with a calm run that has no green or red; the id's pick, four in a row, nine in a row and the 336 period; every take measured as drawn and printed only on an edge it leaves clear; nothing reaching another document; twelve of the heaviest under 25,000 bytes. Then the stylesheets' tokens and prefix, the click script, the share cards, no inline style, script or dash).
 - `AnthropicNewsModelTest`, against a Guzzle `MockHandler`, checking:
   - the request JSON (tools, `blocked_domains`, `max_uses`, `user_location`, `output_config.format`, `fallbacks` and the beta header, the cache markers) and the stream client's timeouts;
   - a `pause_turn` resumed as it is, with the container id, and a spent allowance or the fourth continuation writing the brief in a fresh call;
@@ -1015,7 +1100,9 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 - `NewsSiloTest`: the canonical address and every 301 to it (another category, the lasting address, the comment page before any session starts, the old category address, `?page=N`, each with the rest of its query, and never to a page past the end), no redirect for an unknown slug, one not live or one in capitals, a deleted article's slug never given again and answering 410, links to other articles drawn at their addresses of the day, reserved slugs, slugs from the SEO title, the hubs' heads and pages, "More in", the category feeds and share cards, the month and news sitemaps, every page of the silo at one address.
 - `NewsMediaTest`: the copies at every width and the share card, the picture redrawn, EXIF orientation, transparency, the 25-megapixel, memory and size limits, files that are not images, the words, live, draft and admin media, `srcset`, `file()`, deleting and the lead.
 - `FoundationTest`: the route table and its middleware, the index the same for every visitor, the share title, the link host column, `dbAlive` (with a real reconnect on the MariaDB leg).
-- The SiteTest fences still pass.
+- `ExposureTest`: the first announcement (every live article, not a scheduled one or a draft, then the hubs and feeds they touched, in one IndexNow POST with its host, key and key location, and one hub ping), the key file, nothing told twice, a scheduled article told once its time has passed, a change, a correction, a takedown, a deletion and a move each told once, a failure marking nothing and retried with doubling backoff while the other channel goes on, each channel's switch and nothing sent off production, the desk page's lines, the tick's two steps; the feeds' pictures (enclosure and Media RSS with their sizes), taxonomy, ttl, channel picture, hub link and header, and ETag 304; the follow row on the hubs; the share row and copy button on an article and none in the preview; the latest-articles file (the newest of each list, written only when it changes, a damaged one showing nothing), the home and product pages' strips drawn from the file with a database that has no tables, and an administrator's takedown leaving the strip at once. Every ping goes through `FakePingTransport`.
+- `StandardsTest`: the standards page (its route, its reserved word, its sections, the editor named, the way to the contact form, its breadcrumbs) and every link to it (footer, about, AI note, sitemap, `llms.txt`); a correction added, edited and removed in the editor, shown under the headline with its date, followed by `dateModified` and the month sitemap, one too long or holding an email refused on its own field; the ownership tokens on the home page only; the organisation's https profiles as `sameAs`; robots.txt as `content/site.php` ships it (the owner's choice: the training group, AI search welcome) and each switch's group with its exact user agents.
+- The SiteTest fences still pass, and `SiteTest::testEveryRegistryPageStillAnswersWithTheNewsStripsInPlace` holds every registry page whole with the latest-articles file present: the strip on the home and product pages only, three articles each.
 
 **Feature: comments**
 - `NewsCommentsTest`: posting, the API's same-origin rule, the limits, the same words twice, the rate limits, the pending rules and their email, `state`, reports with auto-hide, staff and their daily limit, deleting one's own comment (hidden, and on an article no longer live), the article row taken first, a delete racing an approval, closed comments, 404 on articles that are not live, the cached section (no session, no cookie), the no-JS page and its forms, the emails.
@@ -1033,7 +1120,7 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 - The happy path, with staggered times, and each call sent what this design says (models, effort, tools, cache markers, the untrusted-data rules).
 - The check reads every part of the article, its tags too, and no marker inside it survives; a nested link never reaches the page; references told apart by their addresses.
 - Slow news skipped; the 7 and 14-day windows.
-- Refs: an unknown ref dropped, no valid source rejected, an unfetched confirmed item moved to speculation.
+- Refs: an unknown ref dropped, no valid source rejected, an unfetched confirmed item moved to speculation, a confirmed item citing coverage without naming whose report it is moved too (a government host counted primary; a trade-press-only story still published), and what was moved kept on the run.
 - A banned domain and a banned topic.
 - A duplicate refused, a follow-up with new sources allowed, a follow-up without new sources refused, only live articles followed up or linked, one following up an article not live held, two candidates on one story writing one article.
 - The repair path (phrases, and a length only a rewrite can fix) and the hold path.
@@ -1060,7 +1147,11 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 
 ## 13. What this does not do
 
-- No email newsletter, and no social posting.
+- No email newsletter, and no social posting: the share links open each network's own page for a person to post from.
+- Nothing pings Google: it takes no IndexNow, its sitemap ping is retired, and its Indexing API is for job postings and live video only. It reads the sitemaps (named in `robots.txt`) and Search Console, where the owner submits them. Google News and Publisher Center need nothing: publications are made automatically, and Publisher Center no longer reads feeds.
+- No third-party script anywhere: no share buttons' or Google's preferred-source button's script, only links.
+- No full-text feed: the feeds carry the summary and the sources, so a reader comes to the article.
+- No `publishingPrinciples` or `correctionsPolicy` in the structured data: nothing found shows Google reads them. The standards page stands on its own.
 - The AI desk takes no images from sources. Press images can be added by hand, with their credit.
 - No CDN purge from the server; the API token lives only in GitHub. The short news cache and the takedown flash are the mitigation, and the admin can run the "Flush CDN" workflow.
 - No full-text search engine. Search is `LIKE` over the title and the standfirst.

@@ -41,6 +41,8 @@ return static function (Router $r, App $app): void {
     $r->get('/manifest.webmanifest', [SeoController::class, 'manifest']);
     $r->get('/.well-known/security.txt', [SeoController::class, 'security']);
     $r->get('/health', [SeoController::class, 'health']);
+    // The IndexNow key file (docs/NEWS.md §5): the key the tick's pings carry, at the site's root.
+    $r->get('/{key:[a-f0-9]{32}}.txt', [SeoController::class, 'indexNowKey']);
 
     // Contact (a form, so it carries a session for its CSRF token).
     $r->get('/contact/', [ContactController::class, 'show'], ['session', 'nostore']);
@@ -55,8 +57,8 @@ return static function (Router $r, App $app): void {
     $adPost = ['session', 'csrf', 'auth', 'admin', 'nostore'];
 
     // Industry Updates (docs/NEWS.md §5), one silo under /news/: the hub and its pages, the section's feed and
-    // sitemaps, the old category address, the tracked links and the media first, then each category's hub, pages and
-    // feed, then the articles under their category and the lasting /news/{slug}/ (which answers 301 to where its
+    // sitemaps, the old category address, the tracked links, the media and the editorial standards page (a registry
+    // page, drawn by PageController) first, then each category's hub, pages and feed, then the articles under their category and the lasting /news/{slug}/ (which answers 301 to where its
     // category puts it). The first match wins, so every word these use is a reserved slug (Paths::RESERVED), and
     // {category} is only ever one of the fourteen keys. Its pages are the same for every visitor: no session, no
     // cookie, except the comment page and the API, which carry their own; news-address sends a comment page asked
@@ -74,6 +76,7 @@ return static function (Router $r, App $app): void {
     $r->get('/news/category/{key:[a-z]+}/', [NewsController::class, 'oldCategory']);
     $r->get('/news/go/{id:\d+}/', [NewsController::class, 'go'], ['nostore']);
     $r->get('/news/media/' . $media, [NewsMediaController::class, 'public']);
+    $r->get(Paths::standards(), [PageController::class, 'show']);
     $r->get('/news/' . $category . '/', [NewsController::class, 'category']);
     $r->get('/news/' . $category . '/page/' . $page . '/', [NewsController::class, 'category']);
     $r->get('/news/' . $category . '/feed.xml', [NewsController::class, 'feed']);
@@ -108,9 +111,10 @@ return static function (Router $r, App $app): void {
     $r->post('/portal/admin/news/desk/prompt/', [AdminNewsDeskController::class, 'savePrompt'], $adPost);
     $r->get('/portal/admin/news/desk/runs/{id:\d+}/', [AdminNewsDeskController::class, 'run'], $ad);
 
-    // Every public page in the registry (the contact page and the news index have their own controllers above).
+    // Every public page in the registry (the contact page and the news index have their own controllers above, and
+    // the news standards page its route among the section's, before the articles' /news/{slug}/ could take it).
     foreach (array_keys(Content::pages()) as $path) {
-        if ($path === '/contact/' || $path === '/news/') {
+        if ($path === '/contact/' || $path === '/news/' || $path === Paths::standards()) {
             continue;
         }
         $r->get((string) $path, [PageController::class, 'show']);

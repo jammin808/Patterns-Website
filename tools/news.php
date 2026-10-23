@@ -7,10 +7,11 @@ declare(strict_types=1);
  *   /usr/bin/php /home/<user>/domains/<domain>/public_html/tools/news.php tick
  *
  *   tick    write the heartbeat, reap runs whose process died (and tell the admins), import
- *           content/news/articles/*.json, run the queued or due session (which keeps the heartbeat fresh), write the
+ *           content/news/articles/*.json, run the queued or due session (which keeps the heartbeat fresh), refresh
+ *           the latest-articles file, tell IndexNow and the WebSub hub what changed (production only), write the
  *           heartbeat again (each step on its own, so one failing never stops the others)
  *   run     run a session now (refused while one is queued or running)
- *   import  only import the article files
+ *   import  only import the article files (and refresh the latest-articles file the other pages read)
  *
  * One process at a time: the lock is held for the whole command, and a second one exits at once. Prints one JSON
  * line; its usage keys are usage_in and usage_out, never "tokens", so the log does not mask them.
@@ -48,6 +49,16 @@ try {
     } else {
         $model = Psc\News\AnthropicNewsModel::fromConfig($app);
         $report = $command === 'tick' ? $pipeline->tick($now, $model) : $pipeline->runNow($model, $now);
+    }
+    // The other pages' strips of the newest articles show what an import or a session by hand just published (the
+    // tick refreshes them itself).
+    if ($command !== 'tick') {
+        try {
+            $report['latest'] = Psc\News\Latest::refresh($app);
+        } catch (Throwable $e) {
+            $app->log->exception($e, 'news latest');
+            $report['latest'] = false;
+        }
     }
     if ($command !== 'tick') {
         $app->log->info('news ' . $command, $report);

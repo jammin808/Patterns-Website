@@ -4,9 +4,9 @@
  * summary; the headline, SEO title, address and meta description (the address is the administrator's to change only
  * until the article has been live; after that it is shown, never offered); the standfirst, the body, what is confirmed and what is
  * still speculation; what it means, the verdict and its note; the categories and tags; the sources; the articles it
- * follows up; the byline and the ticks; the schedule; then the buttons the article's state allows. Every button
- * saves what is in the form first (Unpublish takes the article down even when the save is refused), and a save over
- * a change made after the form was opened is refused.
+ * follows up; the byline and the ticks; the corrections (on an article that has been live); the schedule; then the
+ * buttons the article's state allows. Every button saves what is in the form first (Unpublish takes the article
+ * down even when the save is refused), and a save over a change made after the form was opened is refused.
  *
  * @var array<string, mixed>|null $article
  * @var string|null $state live | scheduled | held | draft, null for a new article
@@ -60,7 +60,13 @@ $summary += [
     'tags' => 'f-tags',
 ];
 $summary += $rowLinks('sources');
-$summary += ['follow_up_of' => 'f-follow-up-of', 'byline' => 'f-byline', 'publish_at' => 'f-publish-date'];
+$summary += ['follow_up_of' => 'f-follow-up-of', 'byline' => 'f-byline'];
+// The corrections: an article that has been live keeps its dated lines here, and takes a new one.
+$storedCorrections = $frozen && is_array($article['corrections'] ?? null) ? $article['corrections'] : [];
+foreach (array_keys($storedCorrections) as $i) {
+    $summary['corrections.' . $i] = 'f-corrections-' . $i;
+}
+$summary += ['correction_new' => 'f-correction-new', 'publish_at' => 'f-publish-date'];
 
 $buttons = match ($state) {
     'live' => ['save' => ['Save changes', 'primary', 'Saving…'], 'unpublish' => ['Unpublish', 'secondary', 'Unpublishing…']],
@@ -165,6 +171,19 @@ $buttons = match ($state) {
     <?php else: ?>
         <?= $field(['name' => 'ai_written', 'label' => 'Written with AI help', 'kind' => 'checkbox', 'checked' => (bool) $values['ai_written'],
             'help' => 'Adds the note that says so under the article.']) ?>
+    <?php endif; ?>
+
+    <?php if ($frozen): ?>
+        <fieldset class="pt-fieldset" aria-describedby="f-corrections-help">
+            <legend>Corrections</legend>
+            <p class="pt-help" id="f-corrections-help">When a correction changes what the article says, add one line saying what changed. The article shows it under its headline with today's date, and its updated time moves with it. Typos and broken links need no note. Empty an earlier line to remove it.</p>
+            <?php foreach ($storedCorrections as $i => $c): ?>
+                <?= $field(['name' => 'corrections[' . $i . '][text]', 'id' => 'f-corrections-' . $i, 'label' => 'Correction of ' . date('j F Y, H:i', (int) $c['at']), 'value' => (string) ($values['corrections'][$i]['text'] ?? $c['text']),
+                    'error' => $err('corrections.' . $i), 'count' => Validator::CORRECTION_MAX, 'markOptional' => false, 'attrs' => ['autocomplete' => 'off']]) ?>
+            <?php endforeach; ?>
+            <?= $field(['name' => 'correction_new', 'label' => 'Add a correction', 'value' => (string) $values['correction_new'], 'error' => $err('correction_new'), 'count' => Validator::CORRECTION_MAX,
+                'help' => 'For example: An earlier version gave the firmware as 4.2; it is 4.3.', 'attrs' => ['autocomplete' => 'off']]) ?>
+        </fieldset>
     <?php endif; ?>
 
     <?php if ($state !== 'live'): ?>

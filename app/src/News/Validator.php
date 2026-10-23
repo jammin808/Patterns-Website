@@ -49,6 +49,10 @@ final class Validator
     public const ITEM_MARKDOWN_MAX = 4000;
     public const VERDICT_NOTE_MAX = 320;
     public const BYLINE_MAX = 120;
+    /** A correction's line, and how many an article keeps (each JSON entry is about 330 bytes: all fit their TEXT column). */
+    public const CORRECTION_MAX = 300;
+    public const CORRECTIONS_MAX = 20;
+    public const CORRECTION = 'Keep each correction to one line of up to 300 characters.';
     public const KEY_MAX = 190;
     /** The most times a field's links are judged; a pass that unlinks one judges the text again, until it settles. */
     public const LINK_PASSES = 10;
@@ -266,6 +270,14 @@ final class Validator
         }
         if ($len($d->byline) > self::BYLINE_MAX) {
             $r->error('byline', 'Keep the byline to 120 characters.');
+        }
+        foreach ($d->corrections as $i => $c) {
+            if ($len($c['text']) > self::CORRECTION_MAX) {
+                $r->error('corrections.' . $i, self::CORRECTION);
+            }
+        }
+        if (count($d->corrections) > self::CORRECTIONS_MAX) {
+            $r->error('corrections', 'Keep to ' . self::CORRECTIONS_MAX . ' corrections: fold older ones into one line.');
         }
         if ($ctx->origin === 'import' && ($d->importKey === '' || $len($d->importKey) > self::KEY_MAX)) {
             $r->error('key', 'Give the file a key of up to 190 characters.');

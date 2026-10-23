@@ -409,6 +409,25 @@ final class PipelineTest extends TestCase
         self::assertSame('published', $a['status']);
     }
 
+    /** What the references rule moved, dropped or unlinked in an article it kept is on the run, beside its outcome. */
+    public function testAKeptArticlesRunShowsWhatTheReferencesRuleMoved(): void
+    {
+        $id = $this->queued();
+        $model = (new FakeNewsModel())->queue('compose', ['data' => FakeNewsModel::article([
+            'confirmed' => [
+                ['text' => 'Firmware 4.2 adds frame-accurate genlock to the processor.', 'ref' => 'S1'],
+                ['text' => 'The bars were gone at every shutter speed tried.', 'ref' => 'S2'],
+            ],
+        ])]);
+        $this->pipeline()->run($id, $model, $this->now());
+
+        $outcome = $this->runRow($id)['considered'][0]['outcome'];
+        self::assertSame('published', $outcome['status']);
+        self::assertSame([['rule' => 'refs', 'detail' => 'Moved a confirmed item to speculation: S2 is press (Trade Weekly), and the item neither cites a primary source nor names whose report it is.']], $outcome['rules']);
+        $row = (new ArticleStore($this->app))->find((int) $outcome['article']);
+        self::assertSame(['Firmware 4.2 adds frame-accurate genlock to the processor.'], array_column($row['confirmed'], 'text'));
+    }
+
     public function testAnArticleWithNoValidSourceIsRejected(): void
     {
         $id = $this->queued();

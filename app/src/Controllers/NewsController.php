@@ -8,6 +8,7 @@ use Psc\App;
 use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\Announcer;
 use Psc\News\ArticleStore;
 use Psc\News\Categories;
 use Psc\News\Comments;
@@ -24,7 +25,8 @@ use Psc\View\Schema;
  * Industry Updates' public pages, one silo (Psc\News\Paths): the hub (/news/) and each category's hub, their pages
  * (/news/page/2/, /news/{key}/page/2/), the articles under their primary category, the RSS feeds and the tracked
  * links out to sources. They read the same for every visitor, never start a session and never set a cookie, and are
- * cached briefly (CACHE) so a correction or a takedown leaves the CDN within minutes. Every page of a list has an
+ * cached briefly (CACHE) so a correction or a takedown leaves the CDN within minutes; the feeds are kept by no shared
+ * cache at all (FEED_CACHE). Every page of a list has an
  * address of its own and names itself as canonical, so each is indexed; ?page=N and page 1's own path answer 301
  * to the clean address, and a page number past the end is a 404 wherever it is asked for, never a move to one. A
  * search is the one list paged by its query, private, never stored and never indexed, as is an empty category
@@ -47,6 +49,13 @@ final class NewsController extends Controller
      * and then, served stale, its stale-while-revalidate (TAKEDOWN).
      */
     public const CACHE = 'public, max-age=120, stale-while-revalidate=60';
+
+    /**
+     * The feeds' Cache-Control: a reader may keep a feed for its max-age, but no shared cache (the CDN) may keep it,
+     * so the WebSub hub, which fetches a feed the moment the tick tells it of a change, always reads the current one,
+     * and a takedown leaves the feeds at once. The ETag keeps a reader's poll to a 304 while nothing has changed.
+     */
+    public const FEED_CACHE = 'private, max-age=120';
 
     /** Articles on one page of a list. */
     public const PER_PAGE = 12;
@@ -71,6 +80,17 @@ final class NewsController extends Controller
 
     /** The share card of the hub, and of a page with no card of its own. */
     public const SHARE_CARD = '/assets/img/og/news.png';
+
+    /** Minutes a feed reader may keep a feed before it asks again (RSS ttl); WebSub tells subscribers sooner. */
+    public const FEED_TTL = 60;
+
+    /** The feeds' channel picture: the brand mark at the largest width RSS allows. */
+    public const FEED_IMAGE = '/assets/img/brand/icon-144.png';
+    public const FEED_IMAGE_SIZE = 144;
+
+    /** Every share card's size: an article image's -og.jpg and each category's card. */
+    public const CARD_WIDTH = 1200;
+    public const CARD_HEIGHT = 630;
 
     /** The longest title tag a news page has; an article's gets the section's name only within it. */
     public const TITLE_MAX = 60;
@@ -188,10 +208,11 @@ final class NewsController extends Controller
         $publisher = $this->app->config->string('app.publisher');
         $authorId = !$aiWritten && $publisher !== '' && $byline === $publisher ? Schema::personId($base) : Schema::organizationId($base);
 
-        // Updated is a change after the article went live and after it was stored (an import dated earlier is not one).
+        // Updated is a change after the article went live and after it was stored (an import dated earlier is not one),
+        // or a correction, which counts however soon it came: the visible line says what dateModified says.
         $published = $article['published_at'] !== null ? (int) $article['published_at'] : null;
-        $updated = ArticleStore::updatedAfterLive($article);
         $modified = ArticleStore::lastChange($article);
+        $updated = ArticleStore::updatedAfterLive($article) !== null || ($article['corrected_at'] ?? null) !== null ? $modified : null;
         $registry = Content::page(Paths::index()) ?? [];
 
         $seo = $this->app->seo($titleTag, $summary, $path);
@@ -281,6 +302,7 @@ final class NewsController extends Controller
             'lead' => $lead,
             'images' => array_slice($images, 1),
             'aiNote' => $aiWritten ? (string) (new Settings($this->app))->get('ai_note') : '',
+            'corrections' => is_array($article['corrections'] ?? null) ? $article['corrections'] : [],
             'comments' => $preview ? [] : $this->comments($id),
             'feeds' => $feeds,
         ], $seo);
@@ -288,9 +310,14 @@ final class NewsController extends Controller
     }
 
     /**
-     * RSS 2.0: the newest live articles, every category's at /news/feed.xml and one category's at /news/{key}/feed.xml,
-     * each described by its summary and its sources through the tracked links. An item's link is the article's own
-     * address; its guid is the lasting /news/{slug}/, so a change of category never shows a reader the article twice.
+     * RSS 2.0 (docs/NEWS.md §10, Feeds): the newest live articles, every category's at /news/feed.xml and one
+     * category's at /news/{key}/feed.xml, each described by its summary and its sources through the tracked links.
+     * An item's link is the article's own address; its guid is the lasting /news/{slug}/, so a change of category never
+     * shows a reader the article twice. Each item carries its categories (in the section's taxonomy) and its picture:
+     * the lead image's 1200 x 630 share card, else its category's, as one enclosure and as Media RSS with its size and
+     * description. The channel has its picture, a ttl and, while WebSub is on, the hub beside its self link (in the
+     * Link header too), so a reader that subscribed is told of a change at once. A reader that sends back the ETag it
+     * was given gets 304 while the feed is unchanged. No shared cache keeps a feed (FEED_CACHE).
      */
     public function feed(Request $request): Response
     {
@@ -302,6 +329,7 @@ final class NewsController extends Controller
         $base = $this->app->baseUrl();
         $copy = Content::get('news');
         $feed = is_array($copy['feed'] ?? null) ? $copy['feed'] : [];
+        $name = (string) ($copy['name'] ?? 'Industry Updates');
         $store = new ArticleStore($this->app);
         $x = static fn (string $s): string => htmlspecialchars($s, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $items = [];
@@ -327,30 +355,69 @@ final class NewsController extends Controller
                 '      <pubDate>' . $x(date(DATE_RSS, (int) $a['published_at'])) . '</pubDate>',
             ];
             foreach ($a['categories'] as $k) {
-                $lines[] = '      <category>' . $x(Categories::name((string) $k)) . '</category>';
+                $lines[] = '      <category domain="' . $x($base . Paths::index()) . '">' . $x(Categories::name((string) $k)) . '</category>';
             }
             $lines[] = '      <description>' . $x($html) . '</description>';
+            $picture = $this->feedPicture($a, $name);
+            if ($picture !== null) {
+                $url = $x($base . $picture['path']);
+                $lines[] = '      <enclosure url="' . $url . '" length="' . $picture['bytes'] . '" type="' . $picture['type'] . '"/>';
+                $lines[] = '      <media:content url="' . $url . '" type="' . $picture['type'] . '" medium="image" width="' . self::CARD_WIDTH . '" height="' . self::CARD_HEIGHT . '" fileSize="' . $picture['bytes'] . '">';
+                $lines[] = '        <media:description type="plain">' . $x($picture['alt']) . '</media:description>';
+                if ($picture['credit'] !== '') {
+                    $lines[] = '        <media:credit>' . $x($picture['credit']) . '</media:credit>';
+                }
+                $lines[] = '      </media:content>';
+            }
             $lines[] = '    </item>';
             $items[] = implode("\n", $lines);
         }
         $title = (string) ($feed['title'] ?? 'Industry Updates');
+        $channelTitle = $category !== null ? strtr((string) ($feed['category_title'] ?? ':title: :category'), [':title' => $title, ':category' => $category['name']]) : $title;
+        $channelLink = $base . ($category !== null ? Paths::category($key) : Paths::index());
+        $self = $base . Paths::feed($category !== null ? $key : null);
+        $hub = Announcer::hub($this->app);
         $xml = [
             '<?xml version="1.0" encoding="UTF-8"?>',
-            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">',
             '  <channel>',
-            '    <title>' . $x($category !== null ? strtr((string) ($feed['category_title'] ?? ':title: :category'), [':title' => $title, ':category' => $category['name']]) : $title) . '</title>',
-            '    <link>' . $x($base . ($category !== null ? Paths::category($key) : Paths::index())) . '</link>',
+            '    <title>' . $x($channelTitle) . '</title>',
+            '    <link>' . $x($channelLink) . '</link>',
             '    <description>' . $x($category !== null ? $category['description'] : (string) ($feed['description'] ?? '')) . '</description>',
             '    <language>en-gb</language>',
-            '    <atom:link href="' . $x($base . Paths::feed($category !== null ? $key : null)) . '" rel="self" type="application/rss+xml"/>',
+            '    <atom:link href="' . $x($self) . '" rel="self" type="application/rss+xml"/>',
         ];
+        if ($hub !== '') {
+            $xml[] = '    <atom:link href="' . $x($hub) . '" rel="hub"/>';
+        }
         if ($built > 0) {
             $xml[] = '    <lastBuildDate>' . $x(date(DATE_RSS, $built)) . '</lastBuildDate>';
         }
+        $xml[] = '    <ttl>' . self::FEED_TTL . '</ttl>';
+        $xml[] = '    <image>';
+        $xml[] = '      <url>' . $x($base . self::FEED_IMAGE) . '</url>';
+        $xml[] = '      <title>' . $x($channelTitle) . '</title>';
+        $xml[] = '      <link>' . $x($channelLink) . '</link>';
+        $xml[] = '      <width>' . self::FEED_IMAGE_SIZE . '</width>';
+        $xml[] = '      <height>' . self::FEED_IMAGE_SIZE . '</height>';
+        $xml[] = '    </image>';
         array_push($xml, ...$items);
         $xml[] = '  </channel>';
         $xml[] = '</rss>';
-        return Response::text(implode("\n", $xml) . "\n", 200, 'application/rss+xml')->header('Cache-Control', self::CACHE);
+        $body = implode("\n", $xml) . "\n";
+        $etag = '"' . substr(hash('sha256', $body), 0, 32) . '"';
+        $asked = array_map('trim', explode(',', $request->header('if-none-match')));
+        $fresh = in_array($etag, $asked, true) || in_array('W/' . $etag, $asked, true);
+        $response = Response::text($fresh ? '' : $body, $fresh ? 304 : 200, 'application/rss+xml')
+            ->header('Cache-Control', self::FEED_CACHE)
+            ->header('ETag', $etag);
+        if ($built > 0) {
+            $response->header('Last-Modified', gmdate('D, d M Y H:i:s', $built) . ' GMT');
+        }
+        if ($hub !== '') {
+            $response->header('Link', '<' . $hub . '>; rel="hub", <' . $self . '>; rel="self"');
+        }
+        return $response;
     }
 
     /**
@@ -420,6 +487,36 @@ final class NewsController extends Controller
     }
 
     // ------------------------------------------------------------------------------------------------- internals
+
+    /**
+     * A feed item's picture: the lead image's share card (a JPEG), else the primary category's (a PNG), with its size
+     * in bytes, its type, its description and its credit. Null when the file is not there, since an enclosure must
+     * give its length.
+     *
+     * @param array<string, mixed> $a an ArticleStore::live() item
+     * @return array{path: string, bytes: int, type: string, alt: string, credit: string}|null
+     */
+    private function feedPicture(array $a, string $name): ?array
+    {
+        $image = is_array($a['image'] ?? null) ? $a['image'] : null;
+        $picture = $image !== null ? $this->picture($image) : null;
+        if ($picture !== null) {
+            $file = (new Images($this->app))->file(basename($picture['og']));
+            if ($file !== null) {
+                return ['path' => $picture['og'], 'bytes' => (int) filesize($file), 'type' => 'image/jpeg', 'alt' => $picture['alt'], 'credit' => $picture['credit']];
+            }
+        }
+        $key = (string) ($a['category'] ?? '');
+        if (!Categories::has($key)) {
+            return null;
+        }
+        $card = Categories::shareCard($key);
+        $file = PSC_ROOT . '/public' . $card;
+        if (!is_file($file)) {
+            return null;
+        }
+        return ['path' => $card, 'bytes' => (int) filesize($file), 'type' => 'image/png', 'alt' => Categories::headline($key) . ', from ' . $name, 'credit' => ''];
+    }
 
     /**
      * The hub ($key null) or a category's hub, at one of its pages: its live articles, the category bar with its

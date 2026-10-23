@@ -2,7 +2,8 @@
 /**
  * Home (/): the one bold thing is the live vision mixer (docs/DESIGN.md 8.11). Then the colour legend, the four apps
  * as a multiview, how they connect, one workflow as a cue ladder (the steps' titles only; the workflow page has the
- * detail), the licensing status, help, a short FAQ and the closing call to action. Facts come from content/; the FAQ
+ * detail), the licensing status, help, the newest Industry Updates articles (a quiet row, from the latest-articles
+ * file, so no database is read), a short FAQ and the closing call to action. Facts come from content/; the FAQ
  * questions carry their FAQPage schema here only.
  *
  * @var \Psc\View\Seo $seo
@@ -227,6 +228,15 @@ $faqs = array_values($faqs);
         </div>
     </div>
 </section>
+
+<?php $latest = content('news')['latest'] ?? []; ?>
+<?= $this->partial('news/latest', [
+    'items' => \Psc\News\Latest::forCategories(\Psc\App::get(), []),
+    'hubs' => [],
+    'title' => (string) ($latest['home_title'] ?? 'Latest from the news desk'),
+    'lede' => (string) ($latest['home_lede'] ?? ''),
+    'id' => 'news-latest-title',
+]) ?>
 
 <?php if ($faqs !== []): ?>
 <section class="l-section l-section--tint" id="faq" aria-labelledby="faq-title">

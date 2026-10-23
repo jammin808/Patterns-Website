@@ -13,6 +13,7 @@ use Psc\Db\Migrator;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\Mail\Mailer;
+use Psc\News\Announcer;
 use Psc\News\ArticleStore;
 use Psc\News\Draft;
 use Psc\Support\FormGuard;
@@ -153,6 +154,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected function tearDown(): void
     {
         ChatController::useGateway(null);
+        Announcer::useTransport(null);
         $_SESSION = [];
         if (isset($this->storage) && is_dir($this->storage)) {
             self::rmrf($this->storage);

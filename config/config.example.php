@@ -40,5 +40,13 @@ return [
         // Industry Updates' AI desk: a key in a workspace of its own, so news cannot use up the assistant's limit.
         // Leave it out to use chat.api_key.
         // 'api_key' => 'REPLACE_WITH_ANTHROPIC_API_KEY',
+        // Each tick tells IndexNow and the feeds' WebSub hub what changed (on by default, production only):
+        // 'indexnow' => false,     // stop the IndexNow pings
+        // 'websub_hub' => '',      // stop the WebSub pings (and the feeds' hub link)
+    ],
+    'seo' => [
+        // Ownership tokens for the home page's <head>: the content="..." part of each service's meta tag.
+        // 'google_site_verification' => 'REPLACE_WITH_SEARCH_CONSOLE_TOKEN',
+        // 'bing_site_verification' => 'REPLACE_WITH_BING_TOKEN',
     ],
 ];

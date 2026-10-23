@@ -62,6 +62,7 @@ def main():
     # the maskable icon keeps the whole mark inside the 80% safe circle (half-diagonal 196 px < 204.8 px).
     outputs = {
         "apple-touch-icon.png": icon(180, 0, proportional(180, 4), full_bleed=True),
+        "icon-144.png": icon(144, 27, proportional(144, 4)),
         "icon-192.png": icon(192, 36, proportional(192, 5)),
         "icon-512.png": icon(512, 96, proportional(512, 13)),
         "icon-maskable-512.png": icon(512, 0, proportional(512, 11), full_bleed=True),

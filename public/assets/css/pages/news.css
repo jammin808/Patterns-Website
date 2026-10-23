@@ -8,6 +8,8 @@
   @media (width >= 64rem) {
     .news-hero .c-hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap) clamp(40px, 5vw, 80px); align-items: end; }
     .news-hero .c-hero-lede { margin-top: 0; }
+    /* The follow row goes under the lede, in its column, so the title keeps its place beside the lede. */
+    .news-hero .news-follow { grid-column: 2; margin-top: 0; }
   }
   .news-list { padding-block: clamp(24px, 3vw, 40px) var(--section-y); }
 
@@ -66,12 +68,114 @@
   .news-card-meta { gap: 4px 0; font-size: var(--fs-0); color: var(--text-2);
     & > :not(:last-child)::after { content: "·" / ""; margin-inline: 10px; color: var(--text-3); } }
 
-  /* ===== Artwork: a category's symbol in --text-3 on a hairline grid in --line, where there is no picture ===== */
-  .news-art { display: grid; place-items: center; aspect-ratio: 16 / 9; color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-2);
-    background: linear-gradient(color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 1px) 50% 50% / 24px 24px,
-      linear-gradient(90deg, color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 1px) 50% 50% / 24px 24px, var(--s2); }
-  .news-art--wide { aspect-ratio: 12 / 5; }
-  .news-art-svg { width: 76%; height: 76%; overflow: visible; }
+  /* ===== Artwork (8.36): where an article has no picture, a test card drawn for its category, on a screen that
+     stays dark in both themes. The bars are the picture it shows; the structure is drawn in the screen's greys.
+     The picture is decoration: the card's link covers it, so a click on it opens the article. ===== */
+  .news-art { color-scheme: dark; position: relative; isolation: isolate; display: block; overflow: hidden; aspect-ratio: 16 / 9; border: 0; border-radius: var(--r-2);
+    background: var(--bg); pointer-events: none; forced-color-adjust: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* The picture sits over the test card's furniture (the pseudo-elements below), so a figure is never crossed by it;
+     the tile is its own stacking context, so that order never reaches the page around it. */
+  .news-art-svg { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; overflow: hidden; fill: none; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; }
+
+  /* The article's band: 16:5 from 40rem, its own wide picture; narrower, the card's picture at 16:9. */
+  .news-art--wide { aspect-ratio: 16 / 9; border: 1px solid var(--line); }
+  .news-art--wide .news-art-band { display: none; }
+  @media (width >= 40rem) {
+    .news-art--wide { aspect-ratio: 16 / 5; }
+    .news-art--wide .news-art-band { display: block; }
+    .news-art--wide .news-art-tile { display: none; }
+  }
+
+  /* The palette: which bar leads. Slots na0 to na6 run along the bars in their order from the bar it names, so a
+     tile always shows the spectrum, never one app's colour alone; nq0 to nq4 are the same run without green and
+     red, for a lone lamp, key or node, so nothing alone reads as PVW or PGM. */
+  .news-art, .news-art--p0 { --na0: var(--bar-grey); --na1: var(--bar-yellow); --na2: var(--bar-cyan); --na3: var(--bar-green); --na4: var(--bar-magenta); --na5: var(--bar-red); --na6: var(--bar-blue);
+    --nq0: var(--bar-grey); --nq1: var(--bar-yellow); --nq2: var(--bar-cyan); --nq3: var(--bar-magenta); --nq4: var(--bar-blue); }
+  .news-art--p1 { --na0: var(--bar-yellow); --na1: var(--bar-cyan); --na2: var(--bar-green); --na3: var(--bar-magenta); --na4: var(--bar-red); --na5: var(--bar-blue); --na6: var(--bar-grey);
+    --nq0: var(--bar-yellow); --nq1: var(--bar-cyan); --nq2: var(--bar-magenta); --nq3: var(--bar-blue); --nq4: var(--bar-grey); }
+  .news-art--p2 { --na0: var(--bar-cyan); --na1: var(--bar-green); --na2: var(--bar-magenta); --na3: var(--bar-red); --na4: var(--bar-blue); --na5: var(--bar-grey); --na6: var(--bar-yellow);
+    --nq0: var(--bar-cyan); --nq1: var(--bar-magenta); --nq2: var(--bar-blue); --nq3: var(--bar-grey); --nq4: var(--bar-yellow); }
+  .news-art--p3 { --na0: var(--bar-green); --na1: var(--bar-magenta); --na2: var(--bar-red); --na3: var(--bar-blue); --na4: var(--bar-grey); --na5: var(--bar-yellow); --na6: var(--bar-cyan);
+    --nq0: var(--bar-magenta); --nq1: var(--bar-blue); --nq2: var(--bar-grey); --nq3: var(--bar-yellow); --nq4: var(--bar-cyan); }
+  .news-art--p4 { --na0: var(--bar-magenta); --na1: var(--bar-red); --na2: var(--bar-blue); --na3: var(--bar-grey); --na4: var(--bar-yellow); --na5: var(--bar-cyan); --na6: var(--bar-green);
+    --nq0: var(--bar-magenta); --nq1: var(--bar-blue); --nq2: var(--bar-grey); --nq3: var(--bar-yellow); --nq4: var(--bar-cyan); }
+  .news-art--p5 { --na0: var(--bar-red); --na1: var(--bar-blue); --na2: var(--bar-grey); --na3: var(--bar-yellow); --na4: var(--bar-cyan); --na5: var(--bar-green); --na6: var(--bar-magenta);
+    --nq0: var(--bar-blue); --nq1: var(--bar-grey); --nq2: var(--bar-yellow); --nq3: var(--bar-cyan); --nq4: var(--bar-magenta); }
+  .news-art--p6 { --na0: var(--bar-blue); --na1: var(--bar-grey); --na2: var(--bar-yellow); --na3: var(--bar-cyan); --na4: var(--bar-green); --na5: var(--bar-magenta); --na6: var(--bar-red);
+    --nq0: var(--bar-blue); --nq1: var(--bar-grey); --nq2: var(--bar-yellow); --nq3: var(--bar-cyan); --nq4: var(--bar-magenta); }
+
+  /* The test card's edge and its furniture, one of four: the bars across the top with the safe-area corners and a
+     grey staircase; castellations with centre crosses and a multiburst; the bars down the side; the bars along the
+     foot with crosses at the sides. Drawn here, not in each tile's markup, so they reach the screen's edges at any
+     ratio and cost a list nothing; the bars are always in SMPTE order. The staircase and the multiburst stand in the
+     right-hand margin, outside the motif's area. The tile prints only an edge its picture leaves clear (each take is
+     measured against these rules by tools/news-art/edges.mjs), so no figure stands on a strip and no furniture shows
+     in fragments beside a motif. */
+  .news-art { --na-g: var(--line-2); --na-arm: linear-gradient(var(--na-g), var(--na-g)); }
+  .news-art::before, .news-art::after { content: ""; position: absolute; }
+  .news-art::before { inset: 8.9% 7.5%; }
+  .news-art--f0::before, .news-art--f2::before, .news-art--f3::before { background:
+      var(--na-arm) 0 0 / 12px 1.5px no-repeat, var(--na-arm) 0 0 / 1.5px 12px no-repeat,
+      var(--na-arm) 100% 0 / 12px 1.5px no-repeat, var(--na-arm) 100% 0 / 1.5px 12px no-repeat,
+      var(--na-arm) 0 100% / 12px 1.5px no-repeat, var(--na-arm) 0 100% / 1.5px 12px no-repeat,
+      var(--na-arm) 100% 100% / 12px 1.5px no-repeat, var(--na-arm) 100% 100% / 1.5px 12px no-repeat; }
+  .news-art::after { right: 2.2%; bottom: 8.9%; width: 1.8%; height: 24%; }
+  .news-art--f0::after { background: linear-gradient(var(--text) 0 20%, var(--text-3) 0 40%, var(--line-2) 0 60%, var(--s3) 0 80%, var(--s1) 0); }
+  .news-art--f1::after { height: 30%; background:
+      repeating-linear-gradient(var(--text-3) 0 3px, transparent 0 6px) 0 0 / 100% 34% no-repeat,
+      repeating-linear-gradient(var(--text-3) 0 2px, transparent 0 4px) 0 50% / 100% 28% no-repeat,
+      repeating-linear-gradient(var(--text-3) 0 1px, transparent 0 2px) 0 100% / 100% 24% no-repeat; }
+  .news-art--f0 { background: var(--bars) 0 0 / 100% 3% no-repeat, var(--bg); }
+  .news-art--f1 { background:
+      var(--na-arm) left 50% top 9px / 10px 1px no-repeat, var(--na-arm) left 50% top 4.5px / 1px 10px no-repeat,
+      var(--na-arm) left 50% bottom 9px / 10px 1px no-repeat, var(--na-arm) left 50% bottom 4.5px / 1px 10px no-repeat,
+      repeating-linear-gradient(90deg, var(--line-2) 0 2.5%, transparent 0 5%) 0 0 / 100% 2% no-repeat,
+      repeating-linear-gradient(90deg, transparent 0 2.5%, var(--line-2) 0 5%) 0 100% / 100% 2% no-repeat, var(--bg); }
+  .news-art--f2 { background: linear-gradient(var(--bar-grey) 0 14.2857%, var(--bar-yellow) 0 28.5714%, var(--bar-cyan) 0 42.8571%, var(--bar-green) 0 57.1428%,
+      var(--bar-magenta) 0 71.4285%, var(--bar-red) 0 85.7142%, var(--bar-blue) 0) 0 0 / 1.6% 100% no-repeat, var(--bg); }
+  .news-art--f3 { background:
+      var(--na-arm) left 7px top 50% / 10px 1px no-repeat, var(--na-arm) left 11.5px top 50% / 1px 10px no-repeat,
+      var(--na-arm) right 7px top 50% / 10px 1px no-repeat, var(--na-arm) right 11.5px top 50% / 1px 10px no-repeat,
+      var(--bars) 0 calc(100% + 1px) / 100% calc(3% + 1px) no-repeat, var(--bg); }
+  @media (width >= 40rem) {
+    .news-art--wide::before { inset: 8.9% 4.2%; }
+    .news-art--wide::after { right: 1.2%; width: 1%; }
+  }
+
+  /* Paints. f fills and s/l stroke with the palette's slots; q fills and k strokes with the calm run; c fills with
+     a bar fixed in SMPTE order, where the picture is the test signal itself. */
+  .news-art-f0 { fill: var(--na0); } .news-art-f1 { fill: var(--na1); } .news-art-f2 { fill: var(--na2); } .news-art-f3 { fill: var(--na3); }
+  .news-art-f4 { fill: var(--na4); } .news-art-f5 { fill: var(--na5); } .news-art-f6 { fill: var(--na6); }
+  .news-art-s0, .news-art-l0 { stroke: var(--na0); } .news-art-s1, .news-art-l1 { stroke: var(--na1); } .news-art-s2, .news-art-l2 { stroke: var(--na2); }
+  .news-art-s3, .news-art-l3 { stroke: var(--na3); } .news-art-s4, .news-art-l4 { stroke: var(--na4); } .news-art-s5, .news-art-l5 { stroke: var(--na5); }
+  .news-art-s6, .news-art-l6 { stroke: var(--na6); }
+  .news-art-q0 { fill: var(--nq0); } .news-art-q1 { fill: var(--nq1); } .news-art-q2 { fill: var(--nq2); } .news-art-q3 { fill: var(--nq3); } .news-art-q4 { fill: var(--nq4); }
+  .news-art-k0 { stroke: var(--nq0); } .news-art-k1 { stroke: var(--nq1); } .news-art-k2 { stroke: var(--nq2); } .news-art-k3 { stroke: var(--nq3); } .news-art-k4 { stroke: var(--nq4); }
+  .news-art-c0 { fill: var(--bar-grey); } .news-art-c1 { fill: var(--bar-yellow); } .news-art-c2 { fill: var(--bar-cyan); } .news-art-c3 { fill: var(--bar-green); }
+  .news-art-c4 { fill: var(--bar-magenta); } .news-art-c5 { fill: var(--bar-red); } .news-art-c6 { fill: var(--bar-blue); }
+  /* The screen's greys: panels, the haze a beam lights, lines and bands in white, mid, dim and the screen's black. */
+  .news-art-p0 { fill: var(--s1); } .news-art-p1 { fill: var(--s3); } .news-art-p2 { fill: var(--line-2); } .news-art-p3 { fill: var(--text-3); }
+  .news-art-p4 { fill: var(--text); } .news-art-p5 { fill: var(--bg); } .news-art-h { fill: color-mix(in srgb, var(--text) 9%, transparent); }
+  .news-art-w { stroke: var(--text); } .news-art-m, .news-art-mb { stroke: var(--text-3); } .news-art-d, .news-art-db { stroke: var(--line-2); }
+  .news-art-u, .news-art-ub { stroke: var(--line); } .news-art-x { stroke: var(--bg); }
+  .news-art-pw { fill: var(--s1); stroke: var(--text); } .news-art-pm { fill: var(--s1); stroke: var(--text-3); } .news-art-pd { fill: var(--s1); stroke: var(--line-2); }
+  .news-art-qw { fill: var(--s3); stroke: var(--text); }
+
+  /* From 40rem the lead card shows the picture up to twice a card's size: its lines keep their own weight rather
+     than grow with it, so the lead reads as the cards do. Bands (bars drawn as strokes) still scale. */
+  @media (width >= 40rem) {
+    .news-card--lead .news-art-svg {
+      & :is(.news-art-w, .news-art-m, .news-art-d, .news-art-u, .news-art-x, .news-art-pw, .news-art-pm, .news-art-pd, .news-art-qw,
+        .news-art-l0, .news-art-l1, .news-art-l2, .news-art-l3, .news-art-l4, .news-art-l5, .news-art-l6,
+        .news-art-k0, .news-art-k1, .news-art-k2, .news-art-k3, .news-art-k4) { vector-effect: non-scaling-stroke; }
+    }
+  }
+
+  /* On a card's hover or focus the picture comes a little closer, once; never by itself, never under reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .news-card .news-art-svg { transition: scale var(--d-2) var(--e-std); }
+    .news-card:is(:hover, :has(.c-card-title a:focus-visible)) .news-art-svg { scale: 1.035; }
+  }
 
   /* ===== The article: one reading column, the hero's width (the hero stays one column at every width) ===== */
   .news-story-hero .c-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--sp-4); padding-bottom: clamp(28px, 4vw, 48px); }
@@ -134,4 +238,31 @@
     & a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
       font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; transition: border-color var(--d-1) var(--e-cut); }
     & a:hover { border-color: var(--text-2); } }
+
+  /* ===== Follow and share: plain links to the page's feed, two readers and Google (the hub's hero), as quiet text
+     links with their icons, so they never read as the category bar's filters just below; and to each network's share
+     page (the article's end), as 40px outlined targets with their words. The copy button is one of them and shows
+     only with scripting, which works it (site.js data-copy) ===== */
+  .news-follow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; margin-top: var(--sp-5); }
+  .news-follow-label { margin: 0; font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); }
+  .news-follow-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 20px;
+    & a { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: var(--fs-1); font-weight: 600; color: var(--text); }
+    & .c-icon { color: var(--text-2); } }
+  .news-share-list, .news-standards-toc ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;
+    & a, & button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
+      font: inherit; font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; cursor: pointer; transition: border-color var(--d-1) var(--e-cut); }
+    & a:hover, & button:hover { border-color: var(--text-2); }
+    & .c-icon { color: var(--text-2); } }
+  .news-share-list .is-copied { border-color: var(--text); }
+  .news-share .news-share-title { font-size: var(--fs-3); }
+  @media (scripting: none) { .news-js-only { display: none; } }
+
+  /* ===== An article's corrections, under its headline: each dated line, then the way to the policy. The lines
+     start where the note's title and link do (over the callout's own list indent). ===== */
+  .news-corrections .news-corrections-list { list-style: none; padding: 0; display: grid; gap: 6px;
+    & time { font-weight: 600; } }
+
+  /* ===== The editorial standards page: the sections as links, then one reading column ===== */
+  .news-standards-toc { padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
+  .news-standards-back { margin: 0; }
 }

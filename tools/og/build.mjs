@@ -7,8 +7,8 @@
 // CSS, fonts and icon sprite. The words come from content/ (read through PHP), and every 'og' image named in
 // content/pages.php must have a card here: a new one fails the build until it is added. Cards are optimised by
 // tools/og/optimise.py (Pillow) and should stay under 150 KB. Each Industry Updates category has a card of its own
-// (news-{key}: its headline and its artwork from public/assets/img/news-art.svg), its hub's and its articles' without a
-// picture; a category in content/news.php without one fails the build too.
+// (news-{key}: its headline and its artwork, the picture its pages print for Art::SHARE's id), its hub's and its
+// articles' without a picture; a category in content/news.php without one fails the build too.
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import http from 'node:http';
@@ -56,12 +56,14 @@ const P = data.products;
 const order = ['patterns', 'stagewatch', 'agmessage', 'playmap'];
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const icon = (n) => `<svg class="c-icon" aria-hidden="true"><use href="/assets/img/icons.svg#i-${n}"/></svg>`;
-// A category's artwork, drawn inline from its symbol with the hairlines doubled, so they still read at a thumbnail.
-const artSprite = fs.readFileSync(path.join(root, 'public/assets/img/news-art.svg'), 'utf8');
+// A category's artwork: what its pages print for the category's share id (Art::SHARE, its strongest picture), by the
+// same PHP class from the same table, painted by pages/news.css, so the share card never drifts from the site.
+const artPhp = `require $argv[1] . '/app/src/News/Art.php'; $o = [];
+foreach (\\Psc\\News\\Art::SHARE as $k => $id) { $o[$k] = \\Psc\\News\\Art::tile($k, $id); } echo json_encode($o, JSON_UNESCAPED_SLASHES);`;
+const artTiles = JSON.parse(execFileSync('php', ['-r', artPhp, root], { encoding: 'utf8' }));
 const art = (key) => {
-  const m = new RegExp(`<symbol id="art-${key}" viewBox="0 0 160 90">([\\s\\S]*?)</symbol>`).exec(artSprite);
-  if (!m) throw new Error(`No artwork for the category ${key} in news-art.svg.`);
-  return `<svg viewBox="0 0 160 90" aria-hidden="true">${m[1].replace(/stroke-width="1\.5"/g, 'stroke-width="3"')}</svg>`;
+  if (!artTiles[key]) throw new Error(`No artwork for the category ${key}: add it to Art::SHARE and tools/news-art.`);
+  return artTiles[key];
 };
 
 // ---------------------------------------------------------------------------------------------- the visuals

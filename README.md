@@ -4,8 +4,9 @@ The marketing, support and client-portal website for the Patterns Show Control e
 **StageWatch**, **AGMessage** and **PlayMap**) at [patternsshowcontrol.co.uk](https://patternsshowcontrol.co.uk).
 
 - **Public site**: product, features, licensing and workflow pages, support guides and FAQ, contact; server
-  rendered, cacheable, with full SEO (titles, canonical URLs, Open Graph, JSON-LD, sitemap, `robots.txt`,
-  `llms.txt`).
+  rendered, cacheable, with full SEO (titles, canonical URLs, Open Graph, JSON-LD with the organisation's `sameAs`,
+  sitemap, Search Console and Bing verification, `robots.txt`, which asks model-training crawlers to stay away and
+  welcomes search and AI answer engines, `llms.txt`).
 - **Client portal**: accounts with email confirmation, downloads, licence requests and licence files, bug reports,
   questions, a feature-request board with votes, and administration.
 - **Support assistant**: a chat on every page, answered by Claude and kept strictly to the Patterns Show Control
@@ -15,7 +16,11 @@ The marketing, support and client-portal website for the Patterns Show Control e
   articles a session (by default twice a day, around 06:00 and 14:30 London time), each split into what is
   confirmed and what is still speculation, with tracked links to its sources; anything risky waits for a person.
   Administrators write, edit, schedule and take down articles with images, run and pause the desk, and moderate
-  the comments signed-in clients leave. See [docs/NEWS.md](docs/NEWS.md).
+  the comments signed-in clients leave. Each tick tells IndexNow and a WebSub hub what went live, changed or went;
+  the feeds carry each article's picture; the hubs carry follow links and the articles share links (plain links, no
+  third-party script); the home and product pages show the newest articles; and an editorial standards page
+  (`/news/standards/`) says how the section is made and corrected, with dated corrections on the articles. See
+  [docs/NEWS.md](docs/NEWS.md).
 
 ## Stack
 

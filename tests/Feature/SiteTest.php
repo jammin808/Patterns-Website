@@ -231,6 +231,32 @@ final class SiteTest extends TestCase
         self::assertArrayNotHasKey('email', $org);
     }
 
+    /**
+     * With the latest-articles file in place, the home page and each product page carry their strip of Industry Updates
+     * articles, and every registry page still answers whole, public, without a cookie and without an email address;
+     * the strip leads to the section and to the hubs it draws from.
+     */
+    public function testEveryRegistryPageStillAnswersWithTheNewsStripsInPlace(): void
+    {
+        foreach (['video', 'streaming', 'automation', 'showcalling', 'production', 'legal', 'ai', 'interactive', 'lighting'] as $i => $key) {
+            $this->makeArticle(['title' => 'A strip story about ' . $key . ' for the registry pages', 'categories' => [$key], 'published_at' => time() - 60 * ($i + 1)]);
+        }
+        self::assertTrue(\Psc\News\Latest::refresh($this->app));
+        $address = '/[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/i';
+        foreach (array_keys(Content::pages()) as $path) {
+            $r = $this->request('GET', (string) $path);
+            self::assertSame(200, $r->status, (string) $path);
+            self::assertSame([], $r->cookies(), (string) $path);
+            self::assertSame(0, preg_match($address, $r->body), (string) $path);
+            $strip = str_contains($r->body, 'class="l-section l-section--tight news-latest"');
+            self::assertSame(in_array($path, ['/', '/patterns/', '/stagewatch/', '/agmessage/', '/playmap/'], true), $strip, $path . ': the strip only where it belongs');
+            if ($strip) {
+                self::assertStringContainsString('<a href="/news/">All Industry Updates</a>', $r->body, (string) $path);
+                self::assertSame(3, substr_count($r->body, '<li class="news-latest-item">'), $path . ': three articles');
+            }
+        }
+    }
+
     /** The manifest's colours are the dark theme's page colour, the same as the layout's theme-color meta. */
     public function testManifestColoursMatchTheBrandDark(): void
     {

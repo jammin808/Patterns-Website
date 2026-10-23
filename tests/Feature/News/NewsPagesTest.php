@@ -8,6 +8,7 @@ use Psc\Controllers\NewsController;
 use Psc\Controllers\SeoController;
 use Psc\Db\Database;
 use Psc\Http\Response;
+use Psc\News\Art;
 use Psc\News\ArticleStore;
 use Psc\News\Categories;
 use Psc\News\Paths;
@@ -443,7 +444,7 @@ final class NewsPagesTest extends TestCase
         self::assertStringContainsString('<h3>For freelancers</h3>', $b, 'one level under the section');
         self::assertStringContainsString('<h2>What changed</h2>', $b);
         self::assertMatchesRegularExpression('#<div class="c-callout c-callout--info news-verdict" role="note">\s*<svg[^>]*><use href="\#i-idea"/></svg>\s*<h2 class="c-callout-title"><span class="u-visually-hidden">Our verdict: </span>Worth testing</h2>\s*<p>Try the new wording on your next invoice.</p>#', $b);
-        self::assertStringContainsString('Spotted something off? <a href="/contact/">Tell us</a> and we will put it right.', $b);
+        self::assertStringContainsString('Spotted something off? <a href="/contact/?topic=other">Tell us</a> and we will put it right.', $b);
 
         // The follow-ups both ways, at their own addresses.
         self::assertMatchesRegularExpression('#news-followup.*?Follow-up to:</strong>\s*<ul>\s*<li><a href="/news/legal/first-report/">The first report on the new pay rules</a></li>#s', $b);
@@ -541,10 +542,25 @@ final class NewsPagesTest extends TestCase
         $card = $this->body('/news/');
         self::assertMatchesRegularExpression('#<div class="news-card-media">\s*<img src="/news/media/' . $lead . '-960\.webp" srcset="[^"]+" sizes="[^"]+" width="1600" height="900" alt="" decoding="async">#', $card, 'the card\'s picture is decoration: its title says it');
 
-        $this->makeArticle(['slug' => 'no-pictures', 'categories' => ['streaming']]);
-        $plain = $this->body('/news/streaming/no-pictures/');
-        self::assertMatchesRegularExpression('#<div class="news-lead-art"><span class="news-art news-art--wide"><svg class="news-art-svg" viewBox="0 0 160 90" aria-hidden="true" focusable="false"><use href="/assets/img/news-art\.svg\?v=[a-f0-9]+\#art-streaming"/></svg></span>#', $plain);
-        self::assertStringContainsString('#art-streaming"/>', $this->body('/news/'), 'the card has the artwork too');
+        $plainId = $this->makeArticle(['slug' => 'no-pictures', 'categories' => ['streaming']]);
+        $page = $this->body('/news/streaming/no-pictures/');
+        self::assertStringContainsString('<div class="news-lead-art">' . Art::tile('streaming', $plainId, true) . '</div>', $page, 'the band: its category\'s artwork, picked by its id');
+        self::assertMatchesRegularExpression('#<div class="news-lead-art"><span class="news-art news-art--p[0-6] news-art--f[0-3] news-art--wide"><svg class="news-art-svg news-art-band" viewBox="0 0 576 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">.*?</svg><svg class="news-art-svg news-art-tile" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">.*?</svg></span></div>#s', $page, 'its wide picture, and the card\'s for a phone');
+        $hub = $this->body('/news/');
+        self::assertTrue(str_contains($hub, Art::tile('streaming', $plainId)) || str_contains($hub, Art::tile('streaming', $plainId, false, true)), 'the card has the artwork too');
+    }
+
+    /** A card shows its primary category's artwork, and on a category's hub that category's when the article is in it. */
+    public function testACategorysHubShowsItsOwnArtworkOnItsCards(): void
+    {
+        $id = $this->makeArticle(['slug' => 'two-categories', 'categories' => ['legal', 'production']]);
+        $shows = static fn (string $page, string $key): bool => str_contains($page, Art::tile($key, $id)) || str_contains($page, Art::tile($key, $id, false, true));
+        $production = $this->body('/news/production/');
+        self::assertTrue($shows($production, 'production'), 'the hub\'s own category');
+        self::assertFalse($shows($production, 'legal'));
+        self::assertTrue($shows($this->body('/news/legal/'), 'legal'));
+        self::assertTrue($shows($this->body('/news/'), 'legal'), 'the primary category everywhere else');
+        self::assertStringContainsString('<div class="news-lead-art">' . Art::tile('legal', $id, true) . '</div>', $this->body('/news/legal/two-categories/'), 'and on the article page');
     }
 
     public function testThePreviewShowsAnyArticleUnpublishedAndUncounted(): void
@@ -587,7 +603,7 @@ final class NewsPagesTest extends TestCase
         $r = $this->request('GET', '/news/feed.xml');
         self::assertSame(200, $r->status);
         self::assertSame('application/rss+xml; charset=utf-8', $r->getHeader('Content-Type'));
-        self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
+        self::assertSame(NewsController::FEED_CACHE, $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies());
         $xml = simplexml_load_string($r->body);
         self::assertNotFalse($xml);
@@ -797,8 +813,9 @@ final class NewsPagesTest extends TestCase
         self::assertSame(1, preg_match('/^## Industry Updates\n\n(.*?)(?:\n\n|\z)/ms', $llms, $m));
         $lines = explode("\n", trim($m[1]));
         self::assertSame('- [Industry Updates](' . self::BASE . '/news/): ' . \Psc\Content\Content::page('/news/')['description'], $lines[0]);
-        self::assertCount(11, $lines, 'the section and its ten newest articles');
-        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[1]);
+        self::assertCount(12, $lines, 'the section, its editorial standards and its ten newest articles');
+        self::assertSame('- [Editorial standards](' . self::BASE . '/news/standards/): ' . \Psc\Content\Content::page('/news/standards/')['description'], $lines[1]);
+        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[2]);
         self::assertStringNotContainsString('llms-story-11', $llms);
         self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
         self::assertStringNotContainsString('llms-draft', $llms);

@@ -12,6 +12,7 @@ use Psc\Controllers\Admin\AdminNewsDeskController;
 use Psc\Controllers\NewsCommentController;
 use Psc\Controllers\NewsController;
 use Psc\Controllers\NewsMediaController;
+use Psc\Controllers\PageController;
 use Psc\Controllers\SeoController;
 use Psc\News\Urls;
 use Psc\Tests\TestCase;
@@ -35,6 +36,7 @@ final class FoundationTest extends TestCase
             ['GET', '/news/category/video/', NewsController::class, 'oldCategory', []],
             ['GET', '/news/go/12/', NewsController::class, 'go', ['nostore']],
             ['GET', '/news/media/' . $file, NewsMediaController::class, 'public', []],
+            ['GET', '/news/standards/', PageController::class, 'show', []],
             ['GET', '/news/video/', NewsController::class, 'category', []],
             ['GET', '/news/video/page/2/', NewsController::class, 'category', []],
             ['GET', '/news/video/feed.xml', NewsController::class, 'feed', []],
@@ -81,6 +83,9 @@ final class FoundationTest extends TestCase
             self::assertTrue(method_exists($class, $action), $class . '::' . $action);
         }
         self::assertSame(1, count(array_keys($this->app->router->staticGetPaths(), '/news/', true)), 'the registry loop leaves /news/ to its controller');
+        self::assertSame(1, count(array_keys($this->app->router->staticGetPaths(), '/news/standards/', true)), 'and the standards page to its place among the section\'s');
+        $key = $this->app->router->match('GET', '/' . str_repeat('0f', 16) . '.txt');
+        self::assertSame([[SeoController::class, 'indexNowKey'], []], [$key['route']['handler'] ?? null, $key['route']['middleware'] ?? null], 'the IndexNow key file, with no session');
         self::assertNull($this->app->router->match('GET', '/news/category/Video/'), 'category keys are lower case');
         self::assertNull($this->app->router->match('GET', '/news/media/' . str_repeat('a', 32) . '-960.png'));
         self::assertSame(['redirect' => '/news/a-story/'], $this->app->router->match('GET', '/news/a-story'));

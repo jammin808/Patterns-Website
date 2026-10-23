@@ -9,10 +9,13 @@ the browser blocks the fonts and the module scripts.
 | File | What it is |
 |---|---|
 | `public/assets/css/site.css` | The whole system in one file, in the cascade layers `reset, tokens, base, layout, components, utilities` |
+| `public/assets/js/theme-init.js` | Every page, a classic script in `<head>` before `site.js`: applies the stored theme and the dismissed notices before the first frame of every reveal, and keeps each page dissolve to one theme (2, 7) |
 | `public/assets/js/site.js` | On every page: theme, drawer, mega-menu, header shadow, reveal, comparison-table affordance, copy, the account link, dismissibles, the launcher tuck, the cue ladder, tabs, form helpers |
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
-| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `public/assets/img/news-art.svg` | Industry Updates' article pages (counting source clicks), its pages' styles and its category artwork (8.36) |
+| `public/assets/js/particles.js` | Ecosystem page only: the tagline gathering out of particles; its hold and canvas rules are in `pages/hub.css` (8.10) |
+| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `app/src/News/Art.php` and its table `app/src/News/art-data.php` (written by `tools/news-art/build.mjs`) | Industry Updates' article pages (counting source clicks), its pages' styles (the follow and share rows, the corrections note and the standards page among them) and its category artwork, printed inline by `Psc\News\Art` (8.36) |
+| `public/assets/css/pages/news-latest.css` | The latest strip, the newest Industry Updates articles on the home and product pages, pushed by `partials/news/latest.php` only when it draws (8.36) |
 | `public/assets/js/news-comments.js`, `public/assets/css/pages/news-comments.css` | The comments under an article and the comment page for readers without scripting (8.36) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
 | `public/assets/img/icons.svg` | The icon sprite (96 symbols, 8.30) |
@@ -30,9 +33,12 @@ the browser blocks the fonts and the module scripts.
    ecosystem and Show Bus. Green (PVW, GO, done) and red (PGM, over time, errors) keep their broadcast meaning and
    never stand for a product. **Amber always means standing by**: the STANDBY cue, the AI approval gate, warnings
    and the keyboard focus ring. The legend under the home hero teaches this once (`.c-legend`).
-2. **Colour is a signal, not decoration.** Every coloured pixel answers "which app?" or "what state?". Status
-   never uses a product colour. Colour is never the only cue: tallies carry PGM/PVW, lamps sit beside a word, badges
-   have a dot and a word, and table cells pair an icon with hidden text.
+2. **Colour is a signal, not decoration.** Every coloured pixel answers "which app?" or "what state?". Status never
+   uses a product colour. Colour is never the only cue: tallies carry PGM/PVW, lamps sit beside a word, badges have
+   a dot and a word, and table cells pair an icon with hidden text. The one exception is Industry Updates' artwork
+   (8.36): it is drawn as a screen showing a picture, and that picture is the brand's, the seven bars together, so
+   there colour is the picture on the screen rather than a signal, and no single bar in it stands for an app or a
+   state.
 3. **Screens stay dark.** Anything drawn as a monitor (`.c-screen`, `.c-monitor`, `.c-cm`, `.c-shot-frame`, the
    UMD strip) is dark in the light theme too. The theme changes the room, not the picture.
 4. **One bold thing per page.** On the home page that is the live mixer. On a product page it is the product
@@ -56,9 +62,11 @@ the browser blocks the fonts and the module scripts.
   <link rel="preload" href="/assets/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/css/site.css">
+  <script src="/assets/js/theme-init.js"></script>   <!-- classic, not a module: it runs before the body is parsed -->
   <script type="module" src="/assets/js/site.js"></script>
   <!-- home only: --> <script type="module" src="/assets/js/hero.js"></script>
   <!-- StageWatch sections: --> <script type="module" src="/assets/js/countdown.js"></script>
+  <!-- Ecosystem only: --> <script type="module" src="/assets/js/particles.js"></script>
   <script type="module" src="/assets/js/chat.js"></script>
 </head>
 <body class="l-page">
@@ -74,7 +82,8 @@ the browser blocks the fonts and the module scripts.
   (`psc-theme`, exactly `light` or `dark`; none means "follow the system"). `theme-init.js`, a classic script in
   `<head>`, copies it to `<html data-theme="…">` before the body is parsed. The server never renders the attribute:
   public pages are the same for every visitor and are cached. With no attribute, the CSS follows
-  `prefers-color-scheme` and falls back to dark. When storage is blocked the page follows the system.
+  `prefers-color-scheme` and falls back to dark. When storage is blocked the page follows the system. It applies
+  the choice again whenever a page is revealed, so a page restored by Back shows the choice made since (7).
 - **Signed-in state on cached pages.** The portal sets a non-HttpOnly cookie `psc_li=1` while someone is signed in.
   It carries no identity; the session cookie stays HttpOnly. `site.js` then turns `[data-account-link]` ("Client
   login") into "My account".
@@ -104,7 +113,12 @@ the browser blocks the fonts and the module scripts.
 
 Scripts never select by class, and classes never trigger behaviour. The one exception: `site.js` makes the
 portal's `.pt-table-wrap` (and `.c-table-wrap`, `.c-shots`) keyboard-reachable when they scroll, because those
-templates carry no data hook. The `c-` and `pt-` names share their rules
+templates carry no data hook. A few hooks are also styled, where the look must be right before or without a
+script: the theme control's pressed look reads `[data-theme-set]` against `html[data-theme]`, so it is right before
+any script runs (8.3); dismissed strips hide by `data-dismissible` against `html[data-dismissed]` (2); and the
+Ecosystem tagline's words wait unseen on `[data-particles]` until its script takes them (8.10). The others style a
+state their script keeps (`data-overflow`, `data-cue`, `data-reveal`, `data-busy`) or show a stacked cell's
+`data-label`. The `c-` and `pt-` names share their rules
 (`:is(.c-btn, .pt-btn)`), so a portal page and a marketing page look the same.
 
 ---
@@ -266,14 +280,39 @@ Two OFL families, both variable and self-hosted: **Archivo** (wght 400 to 800, w
   press), `--d-2` 200ms (toggles, rows), `--d-3` 320ms (panels, timer colour). Easing: `--e-cut`
   `cubic-bezier(.2,0,0,1)` (settles like a fader) and `--e-std`. Every keyframe animation sits behind the same media
   query, so reduced motion stops everything.
-- Progressive enhancements: the SMPTE scroll-progress line under the header (`animation-timeline: scroll()`),
-  the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening with `interpolate-size`, and
-  reveal-on-scroll (`data-reveal`).
-- No view transitions, for a theme change or between pages. A theme change sets `data-theme` at once, and a
-  page restored from the back/forward cache (or open in another tab) re-reads the stored choice. Snapshots could
-  show one theme while the live page painted the other.
-- Anything that updates by itself has a visible pause control (WCAG 2.2.2): the mixer's **Auto** key and the
-  countdown's **Pause**. Both stop when off screen or when the tab is hidden. Under reduced motion the mixer never
+- Progressive enhancements: the page dissolve (below), the SMPTE scroll-progress line under the header
+  (`animation-timeline: scroll()`), the Show Bus stripe drawing in as it enters (`view()`), FAQ answers opening
+  with `interpolate-size`, reveal-on-scroll (`data-reveal`), the menus' fade (8.3), and the Ecosystem tagline
+  gathering out of particles (`particles.js`, 8.10).
+- **Pages dissolve.** A page change within the site is a cross-document view transition (`@view-transition {
+  navigation: auto }`, only under `prefers-reduced-motion: no-preference`): the page cross-fades in 240ms
+  (`--d-2` × 1.2, `--e-std`) while the header holds still. The header (`.l-page > .c-header`,
+  `view-transition-name: site-header`) is the only named element, so no name is ever on a page twice (a duplicate
+  aborts the transition; `tools/e2e/tests/transitions.spec.mjs` checks every page). The new header is drawn over
+  the old one with no animation and no blending, and the old one fades from under it, taking an open menu, the
+  scroll line's old length and the scrolled shadow with it. When the new page opens at the top, the header slides
+  to its place under the announcement strip. While a page dissolves in, the assistant's launcher takes its place
+  without sliding (`:active-view-transition`), so it never shows twice.
+- **A dissolve never shows the other theme.** The old fault (choosing dark could leave the page light, and after a
+  page change the dark page went back to light once the transition ended) was not the transition's own: a page
+  restored from the back/forward cache kept the theme it had when the visitor left it, and the dissolve showed the
+  step from a snapshot in the new choice back to that stale page. The rules now:
+  - A theme change is never a view transition: `site.js` sets `data-theme` at once.
+  - `theme-init.js` applies the stored theme (and the dismissed notices) before the first frame of every reveal
+    (`pagereveal`, or `pageshow` where that is missing): a fresh load and a page restored from the cache alike.
+  - A theme change tells the site's other pages (a `BroadcastChannel`, `psc-prefs`). A page open in another tab
+    follows at once. A page held in the back/forward cache cannot run, and its frozen frame would show the old
+    theme on Back before any script could fix it, so the message evicts it (Chrome's behaviour) and Back loads it
+    afresh. A change of the system's scheme sends the same message from a page that follows it. A change made while
+    no page of the site is open (on another site, say) reaches no cached page, and script cannot catch it. With
+    storage blocked the pages tell each other nothing and each holds its own choice.
+  - The outgoing page records its colour scheme (`pageswap`, in `sessionStorage`), and the incoming page cuts
+    instead of dissolving when its own differs, or when it cannot tell (storage blocked).
+  - A theme change while a dissolve runs (a click, another tab, the system's scheme) cuts the dissolve short.
+- Anything that moves or updates by itself for more than five seconds has a visible pause control (WCAG 2.2.2):
+  the mixer's **Auto** key and the countdown's **Pause**. Both stop when off screen or when the tab is hidden. A
+  one-shot entrance that ends sooner, runs only under `no-preference` and leaves the real content in place (the
+  reveals, the dissolve, the menus' fade, the tagline's gather) needs none. Under reduced motion the mixer never
   auto-takes, TAKE is a cut, and the timecode shows whole seconds. The countdown keeps ticking because the numbers
   are information.
 - Nothing loops for ever. The typing dots run only while an answer is coming.
@@ -368,9 +407,22 @@ One line, 40px tall, ellipsis when narrow, so put the key fact first.
 - Below 72rem the same `nav` is a drawer (`.is-nav-open` on the header). Escape, an outside click, a link or
   widening the window closes it. The button always says **Menu** or **Close**.
 - Mega-menu keys: Enter, Space or click toggles; ArrowDown opens it and enters the panel; ArrowUp, ArrowDown, Home
-  and End move between links; Escape closes it and returns focus. Leaving the menu closes it.
-- `site.js` sets `aria-pressed` on the theme button the stored choice names. A single `<button data-theme-toggle>` without
-  `data-theme-set` children also works and toggles between light and dark.
+  and End move between links; Escape closes it and returns focus. Leaving the menu, or following one of its links,
+  closes it.
+- **Motion.** The Products panel and the drawer fade in from 8px above over `--d-2` (`--e-cut`) and fade out a
+  quarter quicker (150ms, `--e-std`); the four products follow 20ms apart (`--d-1` ÷ 6). `aria-expanded`,
+  `.is-nav-open` and `display` stay the source of truth: `@starting-style` gives the opening its first frame, and
+  `transition-behavior: allow-discrete` keeps a closing panel displayed until it has faded, taking no pointer.
+  The panel is displayed the moment it opens, so ArrowDown focuses its first link in the same keystroke. The
+  drawer fades out only when it is closed from the drawer (the Menu button, a link, Escape or a click outside:
+  `site.js` sets `.is-nav-closing` until it has faded), never as the window crosses 72rem, where the closed drawer
+  goes straight to `display: none`. The panel and the drawer lie over the page, so nothing under them moves (the
+  Products list inside the drawer pushes the drawer's own links down). Under reduced motion they open and close at once; without scripting the hover and
+  focus-within panel fades in the same way, and the drawer's links sit open.
+- `site.js` sets `aria-pressed` on the theme button the stored choice names. The pressed look follows `<html
+  data-theme>` instead (`[data-theme-set]` against it), which `theme-init.js` sets before the first frame, so a
+  page that dissolves in shows the right button before `site.js` has run. A single `<button data-theme-toggle>`
+  without `data-theme-set` children also works and toggles between light and dark.
 - Without JavaScript the drawer links sit open under the bar, the mega panel opens on hover or focus, and the theme
   control is hidden (`@media (scripting: none)`).
 - Below 30rem the brand wordmark stacks on two lines. Below 22.5rem only the mark shows; the link keeps its
@@ -514,6 +566,41 @@ Compact page (support, legal, workflows, downloads, contact, about):
   Every person<span data-product="agmessage">.</span> Every surface<span data-product="playmap">.</span></p>
 ```
 The eyebrow's marker is the four app bars on ecosystem pages and the product's bar inside `data-product`.
+
+#### The tagline's particles (`particles.js`, Ecosystem only)
+
+```html
+<p class="c-stops hub-stops" data-particles>               <!-- particles.js sets data-state="armed|run|done|off" -->
+  <span class="hub-stop" data-particles-line>Every pixel<span data-product="patterns">.</span></span> …one per line…</p>
+```
+- **What it does.** On the Ecosystem page the tagline gathers out of a cloud of particles, once, after the page and
+  its fonts have loaded and as soon as any of the paragraph is in view. The cloud is the four app bars: each line
+  gathers from its own app's colour and lands in the text colour, line after line, and its full stop keeps the bar.
+  Colours come from the computed styles, so both themes are right, and a theme change mid-flight recolours it. The
+  bars stay fills (4.3), so in the light theme the yellow and cyan particles are faint on the page; that is
+  accepted, because the cloud is decoration and the words it becomes are in the text colour.
+- **The words are the truth.** They stay in the page for every reader. They are hidden only while the canvas draws
+  over them (their fill, so the rules stay), and they fade back in as the canvas fades out (`--d-3`, `--e-cut`);
+  then the canvas is removed. The canvas sits absolutely over the paragraph and never takes the pointer, so
+  nothing moves and the tagline stays selectable and copyable. There is no pointer effect, for the same reason.
+- **`data-state`.** `armed` once the script has taken the paragraph (the words wait unseen), `run` while the canvas
+  draws, `done` when it has settled or ended early (the words fade back in), and `off` when the script never took
+  the paragraph (the words simply stay).
+- **Before and without the script.** Until the script takes the paragraph, the CSS holds the words unseen, so they
+  never show and then vanish. If the script never comes, or the page is too slow to start the gather before that
+  hold ends (two seconds after the paragraph is first styled), the words fade in with no effect. It does nothing
+  under reduced motion, Save-Data, reduced data or forced colours, or without scripting. Under Save-Data or reduced
+  data the words still wait for the script, at most the hold's two seconds: the page is cached the same for every
+  visitor, so the server cannot leave the hold out. Under forced colours the CSS hides nothing, even if they come
+  on mid-flight.
+- **Bounded.** It pauses off screen and in a hidden tab, ends at once on a resize or when reduced motion or forced
+  colours come on, and stops for good when settled. About 1,500 particles on a phone and 3,000 on a desktop, fewer
+  on a weak device or a large high-density canvas; about 6.4 KB gzipped.
+- **No pause control.** The gather moves for about 2.1s and the crossfade takes 320ms, about 2.4s in all (3.4 to
+  4.0s measured at twenty times CPU throttling, where a stalled frame slows it rather than skipping it). It is a
+  one-shot entrance that ends well within five seconds, so it needs no pause control (7, WCAG 2.2.2). It is the one
+  exception to the rule against animation for decoration (11), and the owner asked for it.
+- `design/kitchen-sink.html` shows the tagline in its static state, the no-script state, without these hooks.
 
 ### 8.11 Home hero mixer (`hero.js`)
 
@@ -1071,6 +1158,7 @@ size, so the bars stay crisp; only tile corners are smoothed.
 | `public/favicon.ico` | 16, 32, 48 | the same tile, laid out per size (the light segment is two bars wide) |
 | `brand/apple-touch-icon.png` | 180 | full bleed (iOS rounds it), mark at 62% |
 | `brand/icon-192.png`, `brand/icon-512.png` | 192, 512 | rounded tiles for the web manifest's "any" purpose |
+| `brand/icon-144.png` | 144 | the same rounded tile, the RSS feeds' channel image (`NewsController::FEED_IMAGE`) |
 | `brand/icon-maskable-512.png` | 512 | full bleed, the whole mark inside the 80% safe circle |
 | `brand/logo-512.png` | 512 | full bleed, for the Organization JSON-LD (`Schema.php`) |
 
@@ -1091,8 +1179,8 @@ followspot in its colour; PlayMap's card says "Early access".
 | `patterns`, `stagewatch`, `agmessage`, `playmap` | each product's overview, features and licensing | the product's drawn screen on a monitor with its UMD |
 | `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
 | `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
-| `news` | Industry Updates: the hub and its pages | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
-| `news-{key}` (one per category) | each category's hub and its pages, and every article of that primary category without a picture of its own | the category's headline (its title tag without " \| Industry Updates") beside its artwork from `news-art.svg`, drawn with doubled hairlines so it reads at a thumbnail, over its name |
+| `news` | Industry Updates: the hub and its pages, and the editorial standards page, which shares it | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
+| `news-{key}` (one per category) | each category's hub and its pages, and every article of that primary category without a picture of its own | the category's headline (its title tag without " \| Industry Updates") beside its artwork, the test card its pages print for its `Art::SHARE` id, painted by `pages/news.css`, over its name |
 
 Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines (four for the home card's
 long headline, so it stays large beside the multiview); hyphenated words never
@@ -1129,7 +1217,7 @@ the banner works as below.
 - **Reopening:** any `[data-consent-open]` reopens the card with focus on the current answer, and Escape closes a
   reopened card. The openers stay hidden without scripting, because the choice needs scripting, and so does the tag.
 
-### 8.36 Industry Updates (`pages/news.css`, `news.js`, `news-art.svg`)
+### 8.36 Industry Updates (`pages/news.css`, `pages/news-latest.css`, `news.js`, `Psc\News\Art`)
 
 **The name.** "Industry Updates" is a proper name, written in title case wherever it appears: the h1, the page
 titles, the footer link, the admin navigation and the byline ("Industry Updates desk"). The header bar is the one
@@ -1182,16 +1270,44 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   list (each a link with its date and read time), and a secondary button to the category's hub.
 - **Links out** are real (`rel="nofollow noopener" target="_blank"`, a hidden "opens in a new tab") and carry
   `data-news-link`, which `news.js` reports with a keepalive fetch; the browser follows the link as it would anyway.
+  The follow and share links below open in a new tab the same way but carry no `data-news-link` and are not counted.
 - **Pictures.** An article's images are uploaded by an administrator with the right to use them, re-encoded and
   served by the site (`/news/media/`), never hotlinked: `news-figure` with every width in `srcset`, its size, alt
   text, caption and credit. The AI desk never adds a picture.
-- **The artwork rule.** An article without a picture shows its primary category's artwork: one monochrome
-  `<symbol>` per category in `news-art.svg`, used with `<use>` and `aria-hidden`, drawn in `currentColor` on 1.5px
-  hairlines that keep their weight at any size. The tile (`news-art`) sets the colours through classes, the symbol
-  in `--text-3` on a hairline grid in `--line` over `--s2`, so it follows the theme. No SMPTE bars, no product
-  colours, no inline styles. The motifs: a monitor wall (Video), a waveform (Audio), beams (Lighting), a truss
-  (Staging), a cue stack (Production), a clock (Showcalling), a signal (Streaming), nodes (Automation), a grid
-  (Interactive), a spark (AI), a network (Technology), a person (Freelance), a shield (Legal), a lightbulb (Tips).
+- **The artwork rule.** An article without a picture shows its category's artwork (`news-art`): a test card drawn for
+  the category. `Psc\News\Art` prints it inline through `partials/news/art.php` from one generated table
+  (`app/src/News/art-data.php`, written by `tools/news-art/build.mjs`, never edited by hand), and only classes in
+  `pages/news.css` paint it. It is a screen, so it stays dark in both themes and in print (`color-scheme: dark` on
+  `--bg`), as `.c-screen` does.
+- **The one place colour is a picture.** This is the exception to principle 2: here colour is the picture the screen
+  shows, and that picture is the brand's, the seven bars together in their order. The bars appear in the motif, which
+  is made of the signal (a wall showing the SMPTE card, beams landing as the bars, a shield, spark or bulb cut from
+  them, a lanyard of them), and in the test card's edge. Everything structural is drawn in the screen's greys.
+  - Where the bars are the test signal itself (the SMPTE card, which only Video shows; a pass header; a clapper) they
+    keep SMPTE order. Elsewhere the article's id chooses which bar leads, so no category owns a colour and a category
+    is known by its motif alone.
+  - A lone element (a lamp, a pressed key, a node's header, a seven-segment display, a large panel) takes only the
+    calm bars, never green or red, and nothing in the art is amber, so no tile is one app's colour and none reads as a
+    state.
+- **The motifs**, four compositions each, in three takes that differ in arrangement: screens showing the SMPTE card
+  (Video), a waveform, meters, faders (Audio), beams landing as the bars (Lighting), truss, decks, risers and rigging
+  with LED walls in the palette (Staging), cue lists, timelines and cue cards (Production), clocks, countdowns and a
+  slate (Showcalling), masts, play buttons, a carrier, an uplink (Streaming), node graphs (Automation), keys, pads
+  and a touch surface (Interactive), sparks (AI), chips, a wafer and buses (Technology), a person with a lanyard and
+  a pass (Freelance), a shield, the scales and a seal (Legal), a bulb (Tips).
+- **Variety.** The id picks the composition, the take, the lead bar and the edge: any four articles in a row show four
+  compositions, so a card never repeats the one beside or above it, and nine in a row are nine pictures. The test
+  card's edge (the bars along the top, the side or the foot, or castellations, with a staircase or a multiburst in
+  the right-hand margin) is drawn in CSS on the tile; `tools/news-art/edges.mjs` measures which edges each take leaves
+  clear, so a figure never stands on a strip of bars.
+- **Quiet in a list.** Each tile is one motif on a dark field with hairline test card furniture, so the cards stay
+  quiet enough for the page's one bold thing (principle 4); on a news list the lead card is the bold thing.
+- **Sizes.** 16:9 on a card; the whole picture on the lead card's screen, never cropped; on the article page a band
+  of 16:5 from 40rem with a wide composition of its own, and the card's picture below 40rem. The share card
+  (`news-{key}`) shows the category's strongest picture (`Art::SHARE`).
+- **Decoration.** `aria-hidden="true"` and `focusable="false"` on every svg, no title, words, ids, links or script,
+  and `pointer-events: none`, so the card's link takes the click. It moves only on its card's hover or focus (a
+  `scale` of 1.035 over `--d-2`), once, and not at all under reduced motion.
 - **Comments** (`pages/news-comments.css`, `news-comments.js`, pushed by `partials/news/comments.php`) end the
   article in `news-comments`: a list of `news-comment` cards (the author, a `c-tag` "Patterns team" badge for staff,
   the time, the plain-text body, then `news-comment-actions`) and `news-comments-box`, the sign-in link, the form or
@@ -1199,6 +1315,36 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   dashed: standing by) or one a moderator hid (`news-comment--hidden`, dotted and dimmed), each beside a
   `news-comment-note` that says so, so colour is never the only cue. The comment page for readers without
   scripting (`news-comment-page`) uses the same classes.
+- **The follow row** (`news-follow`, `partials/news/follow.php`) sits in the hero of the hub and of each category's
+  hub, under the lede: a label (`news-follow-label`, "Follow"), then `news-follow-list`. The links are the page's own
+  RSS feed (icon `broadcast`), the same feed in Feedly and in Inoreader, and Google's preferred sources page for the
+  site. The last three open in a new tab: icon `external` after the word, a hidden "opens in a new tab", and
+  `rel="nofollow noopener"`. They are plain links: nothing is loaded from any of them, so the security policy and
+  the cached page stay the same for every visitor.
+- **The share row** (`news-share`, a `news-part` titled by `news-share-title`, `partials/news/share.php`) comes
+  after the AI note and is left out of the admin preview. LinkedIn, X, Bluesky and WhatsApp each open their own
+  share page in a new tab (icon `external`), with a hidden "Share on" before the name. Then a Copy link button (icon
+  `copy`, `site.js` `data-copy`; `is-copied` turns its border to the text colour) in `news-js-only`, which is hidden
+  under `@media (scripting: none)`, because only a script can copy. No network's script is loaded.
+- **One style for these links.** The follow row, the share row and the standards page's contents are 40px outlined
+  targets with their words: a `--field` border on `--s1`, the icon in `--text-2`, the border `--text-2` on hover.
+  Neutral, never a product colour: they are not the page's bold thing.
+- **Corrections** (`c-callout c-callout--info news-corrections`, `id="corrections"`, icon `edit`) open the story,
+  straight under the headline, when an article has any: "Correction" or "Corrections", each line in
+  `news-corrections-list` with its date first (in bold), then "How we correct articles", the way to
+  `/news/standards/#corrections`. It is info, not a warning: amber means standing by (principle 1). The AI note also
+  ends with a link to the standards page ("How Industry Updates is made").
+- **The standards page** (`/news/standards/`, `templates/news/standards.php`): a `c-hero--page news-hero`, then one
+  reading column (`news-story-wrap news-standards`). `news-standards-toc` lists the sections as the same 40px links
+  over a hairline; each section is a `news-part` with its id and a `c-prose` body; it ends with a secondary button to
+  every article (`news-standards-back`). It shares the `news` share card (8.34).
+- **The latest strip** (`news-latest`, `partials/news/latest.php`, `pages/news-latest.css`) is on the home page
+  before the FAQ and on each product overview before its FAQ, drawn from that product's categories. A
+  `c-section-head`, then up to three articles as a hairline row (`news-latest-list`, one column, three from 48rem),
+  each `news-latest-item` its headline (`news-latest-title`) and `news-latest-meta` (the category and the date),
+  then `news-latest-more`: links to the section and, on a product page, to the hubs it draws from. It reads
+  `news-latest.json` only, never the database, and draws nothing (and loads no stylesheet) when the file is empty.
+  A quiet row: never the page's bold thing, no product colour, no pictures.
 
 ## 9. Imagery: real screenshots
 
@@ -1226,7 +1372,9 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 - Colour is never the only cue (principle 2). Tables have captions and `scope`. Check and dash icons carry hidden
   "Included" or "Not included".
 - No character-key shortcuts. Escape closes the drawer, the mega-menu and the assistant.
-- Motion is opt-in (section 7), and anything that moves by itself has a pause control.
+- Motion is opt-in (section 7). Anything that moves or updates by itself for more than five seconds has a pause
+  control (WCAG 2.2.2). One-shot entrances that end sooner (the reveals, the dissolve, the tagline's gather) need
+  none.
 - Windows High Contrast (`forced-colors`): selected segments, tabs, pressed votes, chosen radio cards, the
   recommended tier and the STANDBY row get an outline; swatches, lamps and bars keep their colours.
 - The kitchen sink has no horizontal scroll at 320, 360, 390, 768, 1024, 1152, 1280, 1366, 1440 or 1920px, with or
@@ -1244,7 +1392,7 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 | Keep monitors dark in both themes (`.c-screen`) | Recolour a screenshot frame for the light theme |
 | Use JetBrains Mono for timecode, IDs, versions and table values | Use mono for labels, eyebrows or prose |
 | Write sentence case; capitals only for PGM, PVW, TAKE, GO, STANDBY, ON AIR | Use all-caps letter-spaced eyebrows |
-| Use one bold visual per page | Add glows, gradients or animation for decoration |
+| Use one bold visual per page | Add glows, gradients or animation for decoration (the one exception is the Ecosystem tagline's one-shot gather, 8.10, which the owner asked for) |
 | Use TAKE and GO keys only for a real take or GO | Use them as ordinary call-to-action buttons |
 | Give every stacked-table cell a `data-label` | Hide table headers without a replacement |
 | Show the AI behind the amber "A person approves" gate | Draw an AI wired straight to Show Bus or a screen |
@@ -1256,9 +1404,9 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 
 | Page | Components |
 |---|---|
-| Home | `c-hero` + mixer, `c-legend`, `c-multiview`, `c-flow`, `c-ladder` (one workflow), `c-faq`, the support band (`c-launcher`, `c-support-links`), `c-footer` |
-| Ecosystem, integrations, AI | `c-hero--page`, `c-stops` tagline, `c-flow`, `c-features`, `c-chips`, `c-callout--info`, `c-cue` (the approval steps) |
-| Product overview (×4) | `c-hero--product` (with `c-specs`, the product visual, `c-shots`, `c-subnav`), `c-bento`, `c-features`, `c-chips`, `c-ladder--static` (getting started), `c-faq` |
+| Home | `c-hero` + mixer, `c-legend`, `c-multiview`, `c-flow`, `c-ladder` (one workflow), `news-latest` (`pages/news-latest.css`, when the strip draws), `c-faq`, the support band (`c-launcher`, `c-support-links`), `c-footer` |
+| Ecosystem, integrations, AI | `c-hero--page`, `c-stops` tagline (on Ecosystem, `hub-stops` gathered by `particles.js`, 8.10), `c-flow`, `c-features`, `c-chips`, `c-callout--info`, `c-cue` (the approval steps) |
+| Product overview (×4) | `c-hero--product` (with `c-specs`, the product visual, `c-shots`, `c-subnav`), `c-bento`, `c-features`, `c-chips`, `c-ladder--static` (getting started), `news-latest` (when the strip draws), `c-faq` |
 | Product features (×4) | `c-hero--page` + `c-subnav`, `c-features` per feature group, `c-shot` |
 | Product licensing (×4) and Licensing hub | `c-tiers`, `c-compare`, `c-pass`, `c-specs--rows` (policies), `c-ladder--static` (how to buy), `c-faq`, `c-fineprint` |
 | Workflows hub and six workflows | `c-hero--page`, `c-card[data-product]` grid (hub), `c-ladder` with T-minus, `c-specs--rows` (you need), `c-callout--success` (outcome), `c-faq` |
@@ -1266,7 +1414,8 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 | Support hub and four product help pages | `c-hero--page`, inline assistant (`c-chat--inline`), `c-support-links`, `c-faq`, `c-prose` |
 | FAQ | `c-hero--page`, `c-tabs` (groups) or section heads, `c-faq` |
 | Contact | `c-hero--page`, `c-callout--info` (show in 48 hours), `c-form--panel`, `c-kv` |
-| Industry Updates: the hub, the category hubs, articles | `c-hero--page`, `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-more`; comments: `news-comments`, `news-comment`, `news-comments-box`, and `news-comment-page` without scripting (8.36) |
+| Industry Updates: the hub, the category hubs, articles | `c-hero--page` (with `news-follow` on the hubs), `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `news-corrections` (`c-callout--info`), `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-share`, `news-more`; comments: `news-comments`, `news-comment`, `news-comments-box`, and `news-comment-page` without scripting (8.36) |
+| Editorial standards (`/news/standards/`) | `c-hero--page`, `news-standards-toc`, `news-part` + `c-prose`, `news-standards-back` (8.36) |
 | About, legal | `c-hero--page`, `c-prose` |
 | Portal: dashboard, downloads, licences, tickets, ideas board, account | `pt-shell`, `pt-header`, `pt-stats`, `pt-grid` + `pt-card--link`, `pt-table`, `pt-badge`, `pt-vote`, `pt-thread`, `pt-files`, `pt-kv`, `pt-alert`, `pt-empty`, `pt-pager` |
 | Admin tables | `pt-table` (+ `c-table--zebra c-table--compact`, `aria-sort` + `c-sort`), `pt-search`, `pt-tabs`, `pt-badge`, `c-table--stack` with `data-label` for phones |
