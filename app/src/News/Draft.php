@@ -27,6 +27,10 @@ final class Draft
     public const STATUSES = ['draft', 'published'];
     public const VERDICTS = ['adopt', 'test', 'watch', 'skip', 'note'];
     public const KINDS = ['primary', 'press', 'report', 'standard', 'other'];
+    /** The kinds a confirmed item may cite without saying whose account it is: the source's own words. */
+    public const FIRST_HAND = ['primary', 'standard'];
+    /** The government's own hosts, subdomains included: a source on one is primary whatever the draft called it. */
+    public const OFFICIAL_HOSTS = ['gov.uk', 'parliament.uk', 'gov.scot', 'gov.wales', 'europa.eu'];
 
     /** The byline of every AI-written article unless content/news.php names another. */
     public const DESK_BYLINE = 'Industry Updates desk';
@@ -362,7 +366,10 @@ final class Draft
             if (isset($seen[$ref['url']])) {
                 return;
             }
-            $seen[$ref['url']] = true;
+            if ($kind !== 'standard' && Urls::onDomain($ref['url'], self::OFFICIAL_HOSTS)) {
+                $kind = 'primary';
+            }
+            $seen[$ref['url']] = ['publisher' => $publisher, 'kind' => $kind];
             $this->sources[] = ['url' => $ref['url'], 'title' => Prose::cut($ref['title'], 300), 'publisher' => $publisher, 'kind' => $kind];
         };
         foreach (is_array($data['sources'] ?? null) ? $data['sources'] : [] as $s) {
@@ -400,6 +407,16 @@ final class Draft
                 $addSource($r, '', 'other');
                 if ($list === 'confirmed' && $r['via'] !== 'fetch' && !$r['cited']) {
                     $this->notes[] = ['rule' => 'refs', 'detail' => 'Moved a confirmed item to speculation: ' . $ref . ' was neither fetched nor cited.'];
+                    $moved[] = ['text' => $text, 'url' => $r['url']];
+                    continue;
+                }
+                // A confirmed fact cites the source's own words, or says whose report it is: otherwise it is only
+                // that report's claim.
+                $source = $seen[$r['url']];
+                if ($list === 'confirmed' && !in_array($source['kind'], self::FIRST_HAND, true)
+                    && ($source['publisher'] === '' || Prose::mentions(Prose::plain($text), [$source['publisher']]) === [])) {
+                    $this->notes[] = ['rule' => 'refs', 'detail' => 'Moved a confirmed item to speculation: ' . $ref . ' is ' . $source['kind']
+                        . ($source['publisher'] !== '' ? ' (' . $source['publisher'] . ')' : '') . ', and the item neither cites a primary source nor names whose report it is.'];
                     $moved[] = ['text' => $text, 'url' => $r['url']];
                     continue;
                 }

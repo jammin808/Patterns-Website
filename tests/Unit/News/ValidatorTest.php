@@ -236,15 +236,15 @@ final class ValidatorTest extends TestCase
         $d = $r->draft;
         self::assertSame(['https://vendor.example/releases/7-2', 'https://forum.example/thread/9', 'https://press.example/story'], array_column($d->sources, 'url'), 'S9 dropped; the items\' references listed as sources');
         self::assertSame('Release notes 7.2', $d->sources[0]['title'], 'titles come from the research');
-        self::assertSame(['Version 7.2 adds frame remapping.', 'The trade press saw it working.'], array_column($d->confirmed, 'text'));
-        self::assertSame(['A price cut may follow.', 'Two outputs can share one wall.'], array_column($d->speculation, 'text'), 'an item resting on an unread, uncited page moves to speculation');
+        self::assertSame(['Version 7.2 adds frame remapping.'], array_column($d->confirmed, 'text'));
+        self::assertSame(['A price cut may follow.', 'Two outputs can share one wall.', 'The trade press saw it working.'], array_column($d->speculation, 'text'), 'an item resting on an unread, uncited page, or on coverage that names no publisher, moves to speculation');
         self::assertStringContainsString('[the notes](https://vendor.example/releases/7-2)', $d->body);
         self::assertStringContainsString(' a rumour,', $d->body, 'an unknown reference keeps only its text');
         self::assertStringContainsString(' an outside page and', $d->body, 'an address the research did not return is unlinked');
         self::assertStringContainsString('[our guide](/workflows/)', $d->body, 'links to this site stay');
         self::assertSame('Industry Updates desk', $d->byline);
         self::assertTrue($d->aiWritten);
-        self::assertCount(5, array_filter($r->warnings, static fn (string $w): bool => str_contains($w, 'Dropped') || str_contains($w, 'Moved') || str_contains($w, 'Unlinked')));
+        self::assertCount(6, array_filter($r->warnings, static fn (string $w): bool => str_contains($w, 'Dropped') || str_contains($w, 'Moved') || str_contains($w, 'Unlinked')));
     }
 
     public function testAnAiDraftWithNoValidSourceIsRejected(): void
@@ -435,6 +435,60 @@ final class ValidatorTest extends TestCase
         self::assertArrayHasKey('tags', $manual->errors);
     }
 
+    /**
+     * A confirmed fact cites the source's own words (a primary source or a standard), or names whose report it is;
+     * any other is only that report's claim and moves to speculation. The government's own hosts are primary
+     * whatever the draft called them. A story told only by the trade press is never refused for it.
+     */
+    public function testAConfirmedItemCitesThePrimarySourceOrSaysWhoseReportItIs(): void
+    {
+        $refs = [
+            'S1' => ['url' => 'https://www.legislation.gov.uk/uksi/2026/1/made', 'title' => 'The Principal Use Regulations 2026', 'via' => 'fetch', 'page_age' => '', 'cited' => false],
+            'S2' => ['url' => 'https://lawfirm.example/insights/principal-use', 'title' => 'Principal use rules explained', 'via' => 'fetch', 'page_age' => '', 'cited' => false],
+            'S3' => ['url' => 'https://press.example/story', 'title' => 'Venues brace for new duties', 'via' => 'search', 'page_age' => '', 'cited' => true],
+            'S4' => ['url' => 'https://www.gov.uk/government/publications/principal-use-guidance', 'title' => 'Principal use guidance', 'via' => 'search', 'page_age' => '', 'cited' => true],
+        ];
+        $draft = Draft::fromArray(self::aiArticle([
+            'sources' => [
+                ['ref' => 'S1', 'publisher' => 'legislation.gov.uk', 'kind' => 'other'],
+                ['ref' => 'S2', 'publisher' => 'National Law Review', 'kind' => 'press'],
+                ['ref' => 'S3', 'publisher' => 'TPi', 'kind' => 'press'],
+                ['ref' => 'S4', 'publisher' => 'GOV.UK', 'kind' => 'press'],
+            ],
+            'confirmed' => [
+                ['text' => 'The regulations came into force on 15 October 2026.', 'ref' => 'S1'],
+                ['text' => 'The test has two stages.', 'ref' => 'S2'],
+                ['text' => 'Ownership alone does not decide responsibility, as reported by the National Law Review.', 'ref' => 'S2'],
+                ['text' => "TPi's survey found venue packs changing.", 'ref' => 'S3'],
+                ['text' => 'The Home Office published guidance on 10 September 2026.', 'ref' => 'S4'],
+            ],
+            'speculation' => [],
+        ]), 'ai', $refs);
+        $r = $this->check($draft, 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($r->ok(), implode('; ', $r->reasons()));
+        $d = $r->draft;
+        self::assertSame(['primary', 'press', 'press', 'primary'], array_column($d->sources, 'kind'), 'the government\'s own hosts are primary whatever the draft said');
+        self::assertSame([
+            'The regulations came into force on 15 October 2026.',
+            'Ownership alone does not decide responsibility, as reported by the National Law Review.',
+            "TPi's survey found venue packs changing.",
+            'The Home Office published guidance on 10 September 2026.',
+        ], array_column($d->confirmed, 'text'));
+        self::assertSame([['text' => 'The test has two stages.', 'url' => 'https://lawfirm.example/insights/principal-use']], $d->speculation);
+        self::assertContains('Moved a confirmed item to speculation: S2 is press (National Law Review), and the item neither cites a primary source nor names whose report it is.', $r->warnings);
+
+        $tradeOnly = Draft::fromArray(self::aiArticle([
+            'sources' => [['ref' => 'S3', 'publisher' => 'TPi', 'kind' => 'press']],
+            'confirmed' => [['text' => 'The tour carried 40 tonnes of LED, TPi reports.', 'ref' => 'S3'], ['text' => 'The rig flew in four hours.', 'ref' => 'S3']],
+            'speculation' => [],
+            'body' => self::article()['body'],
+        ]), 'ai', $refs);
+        $trade = $this->check($tradeOnly, 'ai', 'publish', ['refs' => $refs]);
+        self::assertTrue($trade->ok(), 'a story told only by the trade press is published: ' . implode('; ', $trade->reasons()));
+        self::assertSame(['The tour carried 40 tonnes of LED, TPi reports.'], array_column($trade->draft->confirmed, 'text'));
+        self::assertSame(['The rig flew in four hours.'], array_column($trade->draft->speculation, 'text'));
+    }
+
     /** Fourteen sources keep twelve: every one an item cites, then the first of the rest. */
     public function testAnAiDraftKeepsTwelveSourcesThoseItsItemsCiteFirst(): void
     {
@@ -444,7 +498,7 @@ final class ValidatorTest extends TestCase
         }
         $draft = Draft::fromArray(self::aiArticle([
             'sources' => array_map(static fn (int $n): array => ['ref' => 'S' . $n, 'publisher' => 'Site ' . $n, 'kind' => 'press'], range(1, 14)),
-            'confirmed' => [['text' => 'The fourteenth site has the fact.', 'ref' => 'S14']],
+            'confirmed' => [['text' => 'Site 14 has the fact.', 'ref' => 'S14']],
             'speculation' => [],
             'body' => self::article()['body'],
         ]), 'ai', $refs);
@@ -452,7 +506,7 @@ final class ValidatorTest extends TestCase
         self::assertTrue($r->ok(), implode('; ', $r->reasons()));
         $kept = array_map(static fn (int $n): string => 'https://site' . $n . '.example/story', [...range(1, 11), 14]);
         self::assertSame($kept, array_column($r->draft->sources, 'url'));
-        self::assertSame(['The fourteenth site has the fact.'], array_column($r->draft->confirmed, 'text'), 'its item keeps its source');
+        self::assertSame(['Site 14 has the fact.'], array_column($r->draft->confirmed, 'text'), 'its item keeps its source');
         self::assertContains('Kept 12 of the 14 sources, those the items cite first.', $r->warnings);
     }
 

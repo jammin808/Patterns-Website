@@ -498,7 +498,8 @@ final class Pipeline
                 if ($hold !== []) {
                     $held[] = $id;
                 }
-                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($hold !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason, 'rules' => []];
+                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($hold !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason,
+                    'rules' => array_values(array_filter($d->notes, static fn (array $n): bool => $n['rule'] === 'refs'))];
             }
             return [$published, $drafts, $held, $outcomes];
         });

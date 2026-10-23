@@ -97,7 +97,7 @@ These are the owner's words, kept because the defaults and fences come from them
    - a **repair** call, at most once per article, for the phrases to avoid and for the lengths only a rewrite can fix;
    - a **check** call on Claude Haiku 5.5 for every article, for banned topics and for allegation risk.
 6. **Fences, not hopes.** Each of these is code with a test.
-   - An AI article can cite only a numbered reference (`S1`, `S2` …) that the research actually returned, in its sources, its items and its links alike. The server writes the URL, so a URL can never be mistyped or invented. A confirmed item that cites neither a page the desk fetched nor a search citation moves to speculation.
+   - An AI article can cite only a numbered reference (`S1`, `S2` …) that the research actually returned, in its sources, its items and its links alike. The server writes the URL, so a URL can never be mistyped or invented. A confirmed item that cites neither a page the desk fetched nor a search citation moves to speculation. So does one that cites coverage (anything but a `primary` or `standard` source; a page on gov.uk, parliament.uk, gov.scot, gov.wales or europa.eu is `primary` whatever the draft called it) without naming that source's publisher in its text ("as reported by TPi"): the research reads each candidate's primary source first and lists it (`Primary:` in the brief), compose cites it where it states the fact, and a story told only by the trade press still publishes, its facts attributed. What the rule moved in a published article is kept on the run (its outcome's `rules`), so the desk's run page shows it.
    - Banned domains are blocked in the tools, and dropped from (AI) or refused in (manual and import) sources, items, links and image credit links.
    - Banned topics are refused in AI and import articles; a manual article that mentions one gets a warning.
    - Duplicates are refused unless they are declared follow-ups, and a follow-up must bring at least one new source. The desk follows up only live articles.
@@ -1120,7 +1120,7 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 - The happy path, with staggered times, and each call sent what this design says (models, effort, tools, cache markers, the untrusted-data rules).
 - The check reads every part of the article, its tags too, and no marker inside it survives; a nested link never reaches the page; references told apart by their addresses.
 - Slow news skipped; the 7 and 14-day windows.
-- Refs: an unknown ref dropped, no valid source rejected, an unfetched confirmed item moved to speculation.
+- Refs: an unknown ref dropped, no valid source rejected, an unfetched confirmed item moved to speculation, a confirmed item citing coverage without naming whose report it is moved too (a government host counted primary; a trade-press-only story still published), and what was moved kept on the run.
 - A banned domain and a banned topic.
 - A duplicate refused, a follow-up with new sources allowed, a follow-up without new sources refused, only live articles followed up or linked, one following up an article not live held, two candidates on one story writing one article.
 - The repair path (phrases, and a length only a rewrite can fix) and the hold path.
