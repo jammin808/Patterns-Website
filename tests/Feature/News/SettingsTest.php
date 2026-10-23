@@ -23,7 +23,8 @@ final class SettingsTest extends TestCase
             'enabled', 'max_per_session', 'min_importance', 'slots', 'date_overrides', 'auto_publish', 'research_model',
             'compose_model', 'max_searches', 'max_fetches', 'monthly_budget_usd', 'watch_urls', 'banned_domains',
             'banned_topics', 'avoid_phrases', 'ai_note', 'comments',
-        ], array_keys($all), 'docs/NEWS.md §8, in its order');
+            'digest_enabled', 'digest_weekday', 'digest_time', 'digest_per_tick', 'digest_per_hour', 'digest_per_day',
+        ], array_keys($all), 'docs/NEWS.md §8 in its order, then the weekly digest\'s (§14.2)');
         self::assertSame([['time' => '06:00', 'days' => [1, 2, 3, 4, 5, 6, 7]], ['time' => '14:30', 'days' => [1, 2, 3, 4, 5, 6, 7]]], $all['slots']);
         self::assertSame(['claude-sonnet-5-5', 'claude-opus-5-5', 12, 6, 100, 'open', true, true, 3, 3], [
             $all['research_model'], $all['compose_model'], $all['max_searches'], $all['max_fetches'], $all['monthly_budget_usd'],
@@ -99,6 +100,32 @@ final class SettingsTest extends TestCase
         self::assertSame([], $result['changed']);
         self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_settings'));
         self::assertSame('Keep the list to 30 lines.', $this->settings()->save(['watch_urls' => implode("\n", array_map(static fn (int $i): string => 'https://site' . $i . '.example/', range(1, 31)))], null)['errors']['watch_urls']);
+    }
+
+    public function testTheDigestsSettingsHaveTheirDefaultsAndBounds(): void
+    {
+        $s = $this->settings();
+        self::assertSame([true, 5, '09:00', 25, 100, 500], [$s->get('digest_enabled'), $s->get('digest_weekday'), $s->get('digest_time'), $s->get('digest_per_tick'), $s->get('digest_per_hour'), $s->get('digest_per_day')]);
+        self::assertSame(['digest_weekday' => [1, 7], 'digest_per_tick' => [1, 50], 'digest_per_hour' => [1, 200], 'digest_per_day' => [1, 900]], array_intersect_key(Settings::BOUNDS, array_flip(['digest_weekday', 'digest_per_tick', 'digest_per_hour', 'digest_per_day'])));
+
+        $refused = $s->save(['digest_weekday' => '8', 'digest_time' => '24:00', 'digest_per_tick' => '0', 'digest_per_hour' => '201', 'digest_per_day' => '901', 'digest_enabled' => 'sometimes'], null);
+        self::assertSame([
+            'digest_weekday' => 'Choose the day the digest goes out.',
+            'digest_time' => 'Enter the digest\'s time as HH:MM, from 00:00 to 23:59.',
+            'digest_per_tick' => 'Enter a number of digests per tick from 1 to 50.',
+            'digest_per_hour' => 'Enter a number of digests per hour from 1 to 200.',
+            'digest_per_day' => 'Enter a number of digests per 24 hours from 1 to 900.',
+            'digest_enabled' => 'Choose yes or no.',
+        ], $refused['errors']);
+        foreach (['9:00', '09:60', '', ' ', '0900'] as $time) {
+            self::assertArrayHasKey('digest_time', $s->save(['digest_time' => $time], null)['errors'], $time);
+        }
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM news_settings'));
+
+        $saved = $s->save(['digest_weekday' => '1', 'digest_time' => ' 23:59 ', 'digest_per_tick' => '50', 'digest_per_hour' => '1', 'digest_per_day' => '900', 'digest_enabled' => '0'], null);
+        self::assertSame([], $saved['errors']);
+        $s = $this->settings();
+        self::assertSame([false, 1, '23:59', 50, 1, 900], [$s->get('digest_enabled'), $s->get('digest_weekday'), $s->get('digest_time'), $s->get('digest_per_tick'), $s->get('digest_per_hour'), $s->get('digest_per_day')]);
     }
 
     public function testSessionsAreRowsOfATimeAndItsDays(): void

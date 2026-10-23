@@ -813,9 +813,10 @@ final class NewsPagesTest extends TestCase
         self::assertSame(1, preg_match('/^## Industry Updates\n\n(.*?)(?:\n\n|\z)/ms', $llms, $m));
         $lines = explode("\n", trim($m[1]));
         self::assertSame('- [Industry Updates](' . self::BASE . '/news/): ' . \Psc\Content\Content::page('/news/')['description'], $lines[0]);
-        self::assertCount(12, $lines, 'the section, its editorial standards and its ten newest articles');
+        self::assertCount(13, $lines, 'the section, its editorial standards, the weekly digest and its ten newest articles');
         self::assertSame('- [Editorial standards](' . self::BASE . '/news/standards/): ' . \Psc\Content\Content::page('/news/standards/')['description'], $lines[1]);
-        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[2]);
+        self::assertSame('- [Weekly digest](' . self::BASE . '/digest/): ' . \Psc\Content\Content::page('/digest/')['description'], $lines[2]);
+        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[3]);
         self::assertStringNotContainsString('llms-story-11', $llms);
         self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
         self::assertStringNotContainsString('llms-draft', $llms);

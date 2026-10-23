@@ -77,5 +77,67 @@ if ($article === null || (int) $article['first_live_at'] !== $now - 60 || (int) 
 }
 $db->exec('DELETE FROM chat_conversations WHERE id = ?', [$cid]);
 $limiter->clear('ci:x');
+
+// The weekly digest's statements that differ between the engines (docs/NEWS.md §14), through its own classes: an
+// unsubscribed row asked again by an unproven registration moves its generation on (assigned before state, which
+// MySQL would otherwise read as already pending) and keeps its record in the prior_ columns (copied before the
+// columns it copies are overwritten), a claim given back and claimed again, the retry CASE at the third attempt,
+// countDue()'s NOT EXISTS, countWaiting()'s EXISTS inside it, page()'s CASE in its select list and prune()'s subquery.
+$storage = sys_get_temp_dir() . '/psc-mysql-check-storage-' . getmypid();
+$app = Psc\App::boot(Psc\Config::fromArray(PSC_ROOT, [
+    'app' => ['url' => 'https://patternsshowcontrol.test', 'env' => 'testing', 'debug' => false, 'secret' => str_repeat('cd', 32), 'force_https' => false],
+    'storage' => ['path' => $storage],
+    'mail' => ['driver' => 'log', 'unsubscribe_to' => 'unsubscribe@example.test'],
+    'db' => ['auto_migrate' => false],
+    'chat' => ['api_key' => ''],
+]));
+$app->useDatabase($db);
+$tokens = Psc\News\Digest\Tokens::fromApp($app);
+$addresses = ['ci-digest-back@example.test', 'ci-digest-send@example.test'];
+$clean = static function () use ($db, $tokens, $addresses): void {
+    $db->exec("DELETE FROM news_digests WHERE week = '1999-w01'");
+    foreach ($addresses as $address) {
+        $db->exec('DELETE FROM news_digest_subscribers WHERE email_hash = ?', [$tokens->emailHash($address)]);
+        $db->exec('DELETE FROM users WHERE email = ?', [$address]);
+    }
+};
+$clean();
+$subscribers = new Psc\News\Digest\Subscribers($app);
+$back = $subscribers->request($addresses[0], 'c', 'p', $now - 60)['subscriber'];
+$subscribers->confirm((string) $back['selector'], 0, $now - 60);
+$subscribers->unsubscribe((string) $back['selector'], 'page', $now - 30);
+$pending = $db->insert('users', ['email' => $addresses[0], 'name' => 'CI', 'password_hash' => 'x', 'role' => 'client', 'status' => 'pending', 'created_at' => $now, 'updated_at' => $now]);
+$answer = $subscribers->subscribeAccount((array) $db->one('SELECT * FROM users WHERE id = ?', [$pending]), 'registration', 'c', 'p', $now);
+$row = $subscribers->find((int) $back['id']);
+if ($answer !== 'pending' || $row === null || [$row['state'], $row['source'], $row['generation'], $row['user_id'], $row['prior_source'], $row['prior_requested_at']] !== ['pending', 'registration', 1, $pending, 'page', $now - 60]) {
+    $clean();
+    fwrite(STDERR, "digest generation update failed\n");
+    exit(1);
+}
+$old = $now - 400 * 86400;
+$reader = $subscribers->request($addresses[1], 'c', 'p', $old - 60)['subscriber'];
+$subscribers->confirm((string) $reader['selector'], 0, $old - 60);
+$digestId = $db->insert('news_digests', ['week' => '1999-w01', 'send_at' => $old, 'window_start' => $old - 604800, 'window_end' => $old, 'articles' => '[]', 'left_out' => 0, 'state' => 'sending', 'recipients' => 1, 'composed_at' => $old]);
+$digest = (array) (new Psc\News\Digest\Digests($app))->find($digestId);
+$sends = new Psc\News\Digest\Sends($app);
+$states = [$sends->countDue($digest)];
+$sendId = (int) $sends->claim($digestId, (int) $reader['id'], $now);
+$states[] = $sends->release($sendId, 'connect') ? (int) $db->value('SELECT attempts FROM news_digest_sends WHERE id = ?', [$sendId]) : -1;
+for ($i = 0; $i < 3; $i++) {
+    $states[] = $sends->claim($digestId, (int) $reader['id'], $now) === $sendId ? $sends->retry($sendId, 'rcpt 451 4.7.1') : 'unclaimed';
+    $states[] = $sends->countWaiting($digest);
+}
+$states[] = $sends->countDue($digest);
+$states[] = $sends->page($digest, 1, 10)['items'][0]['due'] ?? null;
+$pruned = (new Psc\News\Digest\Digests($app))->prune($now - 365 * 86400);
+$left = (int) $db->value('SELECT COUNT(*) FROM news_digest_sends WHERE id = ?', [$sendId]);
+$clean();
+@array_map('unlink', glob($storage . '/*/*') ?: []);
+@array_map('rmdir', glob($storage . '/*') ?: []);
+@rmdir($storage);
+if ($states !== [1, 0, 'retry', 1, 'retry', 1, 'failed', 0, 0, true] || $pruned['sends'] < 1 || $pruned['digests'] < 1 || $left !== 0) {
+    fwrite(STDERR, 'digest sends failed: ' . json_encode([$states, $pruned, $left]) . "\n");
+    exit(1);
+}
 echo "mysql ok\n";
 @unlink($marker);

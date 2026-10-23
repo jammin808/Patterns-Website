@@ -1,9 +1,10 @@
 <?php
 /**
- * The follow row on the hub and on each category's hub (docs/DESIGN.md 8.36): the page's own RSS feed, the same feed
- * in Feedly and in Inoreader (each reader's subscribe page for it), and Google's preferred-sources page for the site.
- * Plain links: nothing is loaded from any of them, so the page keeps its security policy and stays the same for
- * every visitor. The readers' and Google's open in a new tab.
+ * The follow row on the hub and on each category's hub (docs/DESIGN.md 8.36): the weekly digest's signup page first
+ * (docs/NEWS.md §14.11), then the page's own RSS feed, the same feed in Feedly and in Inoreader (each reader's
+ * subscribe page for it), and Google's preferred-sources page for the site. Plain links: nothing is loaded from any of
+ * them, so the page keeps its security policy, sets no cookie and stays the same for every visitor. The digest's and
+ * the feed's open in the same tab; the readers' and Google's in a new one.
  *
  * @var array<string, mixed> $copy  content/news.php
  * @var string $feed  the feed's path (Paths::feed())
@@ -25,6 +26,7 @@ $links = [
 <div class="news-follow">
     <p class="news-follow-label" id="news-follow-label"><?= e($follow['label'] ?? 'Follow') ?></p>
     <ul class="news-follow-list" role="list" aria-labelledby="news-follow-label">
+        <li><a href="<?= e(\Psc\News\Digest\Links::SIGNUP) ?>"><?= icon('mail', 'c-icon--sm') ?><?= e($copy['digest']['follow'] ?? 'Weekly digest by email') ?></a></li>
         <li><a href="<?= e($feed) ?>" type="application/rss+xml"><?= icon('broadcast', 'c-icon--sm') ?><span class="u-visually-hidden"><?= e($rssHint) ?></span><?= e($rss) ?></a></li>
         <?php foreach ($links as $l): ?>
             <li><a href="<?= e($l['href']) ?>" target="_blank" rel="nofollow noopener"><span class="u-visually-hidden"><?= e($l['hint']) ?></span><?= e($l['label']) ?><?= icon('external', 'c-icon--sm') ?><?= $newTab ?></a></li>

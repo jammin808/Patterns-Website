@@ -153,6 +153,7 @@ final class AuthController extends Controller
             'company' => Auth::cleanLine($request->input('company')),
             'password' => $request->input('password'),
             'marketing' => $request->input('marketing') === '1',
+            'digest' => $request->input('digest') === '1',
         ];
         $errors = $this->app->auth()->validateRegistration($input);
         if ($request->input('terms') !== '1') {
@@ -170,7 +171,7 @@ final class AuthController extends Controller
             return $this->backWithErrors('/portal/register/', $request, [], 'Several accounts have been created from here recently. Please wait an hour, then try again.');
         }
         // Counted before the password is hashed, so a flood at one address costs neither mail nor work.
-        if (!$limiter->hit('register-addr:' . Auth::normaliseEmail($input['email']), self::REGISTER_PER_ADDRESS_PER_HOUR, 3600)) {
+        if (!$limiter->hit('register-addr:' . Auth::mailboxKey($input['email']), self::REGISTER_PER_ADDRESS_PER_HOUR, 3600)) {
             return $this->checkYourEmail($input['email']);
         }
         $result = $this->app->auth()->register($input);
@@ -188,16 +189,40 @@ final class AuthController extends Controller
         return Response::redirect('/portal/register/', 303);
     }
 
+    /**
+     * GET /portal/verify/?token=: the email check's link opens a page with one button, and only its POST confirms
+     * the address. Link scanners open every link in an email before a person does, so opening it changes nothing:
+     * a proven address is a person's act, which the account page's digest tick relies on.
+     */
+    public function verifyPage(Request $request): Response
+    {
+        $token = $request->queryString('token');
+        if ($token === '' || !$this->app->auth()->peekToken($token, 'verify')) {
+            return $this->verifyResult('invalid');
+        }
+        return $this->portal('portal/auth/verify', [
+            'state' => 'ask',
+            'signedIn' => $this->app->auth()->user() !== null,
+            'action' => '/portal/verify/?token=' . rawurlencode($token),
+        ], 'Confirm your email');
+    }
+
+    /** POST /portal/verify/?token=: the button. The token is spent and the account moves on. */
     public function verify(Request $request): Response
     {
         $token = $request->queryString('token');
         $row = $token !== '' ? $this->app->auth()->verifyEmail($token) : null;
-        $state = match ($row['status'] ?? null) {
+        return $this->verifyResult(match ($row['status'] ?? null) {
             null => 'invalid',
             'active' => 'confirmed',
             'approval' => 'approval',
             default => 'disabled',
-        };
+        });
+    }
+
+    /** The email check's result page in one of its states. */
+    private function verifyResult(string $state): Response
+    {
         $titles = [
             'invalid' => 'This link no longer works',
             'confirmed' => 'Email address confirmed',
@@ -266,7 +291,7 @@ final class AuthController extends Controller
         }
         $limiter = $this->app->limiter();
         if ($limiter->hit('verify-resend-ip:' . $this->app->clientIp(), 10, 3600)
-            && $limiter->hit('verify-resend:' . $email, 3, 3600)) {
+            && $limiter->hit('verify-resend:' . Auth::mailboxKey($email), 3, 3600)) {
             $row = $this->app->auth()->findByEmail($email);
             if ($row !== null && $row['status'] === 'pending') {
                 $this->app->auth()->sendVerification((int) $row['id']);

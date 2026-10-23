@@ -263,12 +263,13 @@ final class FormsTest extends TestCase
             $this->app->limiter()->hits('account-password:' . $id, 3600);
         }
         $r = $this->post('/portal/account/password/', ['form' => 'password', 'current_password' => self::PASSWORD, 'new_password' => 'lantern quay rehearsal', 'new_password_confirm' => 'lantern quay rehearsal']);
-        self::assertRedirect($r, '/portal/account/#password');
+        self::assertRedirect($r, '/portal/account/#password-errors');
         $page = $this->request('GET', '/portal/account/')->body;
         self::assertSame(1, substr_count($page, 'data-error-summary'));
         $password = self::form($page, '/portal/account/password/');
         self::assertStringContainsString('Your password was not changed', $password);
         self::assertStringContainsString('Too many password changes in a short time.', $password);
+        self::assertStringContainsString('id="password-errors"', $password, 'the redirect lands on the summary itself, which takes focus');
         self::assertStringNotContainsString('data-error-summary', self::form($page, '/portal/account/profile/'));
 
         $this->post('/portal/account/delete/', ['form' => 'delete', 'delete_password' => 'wrong', 'delete_confirm' => 'delete']);

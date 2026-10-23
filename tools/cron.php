@@ -9,7 +9,10 @@ declare(strict_types=1);
  * spent and expired one-time tokens, assistant conversations past their retention, contact messages after two
  * years, download records and the audit log after about thirteen months, accounts never confirmed, ended session
  * files and old log files, and for Industry Updates: link click counts after about thirteen months, the desk's run
- * records after six months, and images left without an article. Safe to run at any time and any number of times.
+ * records after six months, and images left without an article. For its weekly digest: sign-ups never confirmed after
+ * seven days (one asking to come back returns to its suppression record), the suppression records of those who
+ * unsubscribed kept for as long as the digest runs, and each digest with its record of sends after a year. Safe to run
+ * at any time and any number of times.
  */
 
 if (PHP_SAPI !== 'cli') {
