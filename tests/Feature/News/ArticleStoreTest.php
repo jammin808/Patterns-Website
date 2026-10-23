@@ -178,8 +178,10 @@ final class ArticleStoreTest extends TestCase
         self::assertSame($ahead + 2, (int) $store->find($id)['updated_at']);
         self::assertNull($store->update($id, self::draft(['title' => 'A stale form']), null, $ahead + 1));
         $this->db->update('news_articles', ['updated_at' => time() - 600], ['id' => $id]);
+        $before = time();
         self::assertTrue($store->publish($id));
-        self::assertSame(time(), (int) $store->find($id)['updated_at'], 'now, when that is later');
+        $stamped = (int) $store->find($id)['updated_at'];
+        self::assertTrue($stamped >= $before && $stamped <= time(), 'now, when that is later');
 
         $row = $store->find($id);
         $wentLive = (int) $row['first_live_at'];

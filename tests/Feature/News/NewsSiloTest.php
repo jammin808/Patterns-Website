@@ -485,11 +485,13 @@ final class NewsSiloTest extends TestCase
     /** The news sitemap lists what went live in the last 48 hours, with the publication, language, time and headline. */
     public function testTheNewsSitemapHoldsTheLastTwoDays(): void
     {
-        $this->makeArticle(['slug' => 'hour-old-story', 'title' => 'Consoles & comms: an hour ago', 'categories' => ['audio'], 'published_at' => time() - 3600]);
-        $this->makeArticle(['slug' => 'almost-two-days', 'published_at' => time() - 47 * 3600]);
-        $this->makeArticle(['slug' => 'just-too-old', 'published_at' => time() - 49 * 3600]);
+        // One clock reading for the stored times and the expected ones, so a second ticking over mid-test changes nothing.
+        $now = time();
+        $this->makeArticle(['slug' => 'hour-old-story', 'title' => 'Consoles & comms: an hour ago', 'categories' => ['audio'], 'published_at' => $now - 3600]);
+        $this->makeArticle(['slug' => 'almost-two-days', 'published_at' => $now - 47 * 3600]);
+        $this->makeArticle(['slug' => 'just-too-old', 'published_at' => $now - 49 * 3600]);
         $this->makeArticle(['slug' => 'recent-draft', 'status' => 'draft']);
-        $this->makeArticle(['slug' => 'scheduled-soon', 'published_at' => time() + 600]);
+        $this->makeArticle(['slug' => 'scheduled-soon', 'published_at' => $now + 600]);
 
         $r = $this->request('GET', '/news/sitemap-news.xml');
         self::assertSame(SeoController::NEWS_SITEMAP_CACHE, $r->getHeader('Cache-Control'));
@@ -505,8 +507,8 @@ final class NewsSiloTest extends TestCase
             ];
         }
         self::assertSame([
-            self::BASE . '/news/audio/hour-old-story/' => ['Patterns Show Control', 'en', gmdate('Y-m-d\TH:i:s\Z', time() - 3600), 'Consoles & comms: an hour ago'],
-            self::BASE . '/news/video/almost-two-days/' => ['Patterns Show Control', 'en', gmdate('Y-m-d\TH:i:s\Z', time() - 47 * 3600), 'Sample story number 2 from the test suite'],
+            self::BASE . '/news/audio/hour-old-story/' => ['Patterns Show Control', 'en', gmdate('Y-m-d\TH:i:s\Z', $now - 3600), 'Consoles & comms: an hour ago'],
+            self::BASE . '/news/video/almost-two-days/' => ['Patterns Show Control', 'en', gmdate('Y-m-d\TH:i:s\Z', $now - 47 * 3600), 'Sample story number 2 from the test suite'],
         ], $items);
         self::assertStringContainsString('<news:title>Consoles &amp; comms: an hour ago</news:title>', $r->body, 'escaped');
     }
