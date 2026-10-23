@@ -389,6 +389,30 @@ final class AdminTest extends TestCase
         self::assertMatchesRegularExpression('#<div class="pt-alert pt-alert--warning" role="status">A settings file was uploaded as <code>public_html/config/local.php</code>#', $r->body);
     }
 
+    /**
+     * The overview's Server card reads PHP itself, so it shows what is in force: the version and server interface,
+     * and each hardening setting with whether it is as the site wants it (docs/DEPLOY.md, PHP).
+     */
+    public function testTheOverviewShowsThePhpItRanOn(): void
+    {
+        $facts = AdminController::serverFacts();
+        $byLabel = array_column($facts, null, 'label');
+        self::assertSame(['PHP', 'Upload progress', 'Arguments in error traces', 'PHP version in responses', 'Largest request', 'Password hashing'], array_keys($byLabel));
+        self::assertSame(PHP_VERSION . ' (' . PHP_SAPI . ')', $byLabel['PHP']['value']);
+        self::assertSame(PHP_VERSION_ID >= 80400, $byLabel['PHP']['ok']);
+        // App::boot hides arguments in traces for every SAPI, the test runner's included.
+        self::assertSame('1', ini_get('zend.exception_ignore_args'));
+        self::assertSame(['value' => 'Hidden', 'ok' => true], array_intersect_key($byLabel['Arguments in error traces'], ['value' => 0, 'ok' => 0]));
+        $progress = filter_var(ini_get('session.upload_progress.enabled'), FILTER_VALIDATE_BOOLEAN);
+        self::assertSame(['value' => $progress ? 'On' : 'Off', 'ok' => !$progress], array_intersect_key($byLabel['Upload progress'], ['value' => 0, 'ok' => 0]));
+
+        $this->signInAsAdmin();
+        $body = $this->request('GET', '/portal/admin/')->body;
+        self::assertStringContainsString('<h2 class="pt-h2" id="ov-server">Server</h2>', $body);
+        self::assertStringContainsString('<th scope="row">PHP</th>', $body);
+        self::assertStringContainsString('<td>' . e(PHP_VERSION . ' (' . PHP_SAPI . ')') . '</td>', $body);
+    }
+
     // ------------------------------------------------------------ account actions
 
     public function testAnAdministratorApprovesAWaitingAccount(): void

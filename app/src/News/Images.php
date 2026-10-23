@@ -362,7 +362,8 @@ final class Images
         // The largest copy is drawn from the original; the smaller ones and the share card from it.
         [$rw, $rh] = $orientation >= 5 ? [$largestHeight, $largest] : [$largest, $largestHeight];
         $big = self::resized($src, $rw, $rh);
-        imagedestroy($src);
+        // Each picture is freed as soon as nothing needs it (GD images are freed with their last reference).
+        unset($src);
         $big = self::oriented($big, $orientation);
 
         $base = bin2hex(random_bytes(16));
@@ -374,7 +375,7 @@ final class Images
             if ($target < $largest) {
                 $copy = self::resized($big, $target, max(1, (int) round($largestHeight * $target / $largest)));
                 $ok = $ok && @imagewebp($copy, $file, self::WEBP_QUALITY);
-                imagedestroy($copy);
+                unset($copy);
                 $widths[] = $target;
                 continue;
             }
@@ -383,10 +384,10 @@ final class Images
             break;
         }
         $card = self::card($big);
-        imagedestroy($big);
+        unset($big);
         imageinterlace($card, true);
         $ok = $ok && @imagejpeg($card, $dir . '/' . $base . '-og.jpg', self::JPEG_QUALITY);
-        imagedestroy($card);
+        unset($card);
         if (!$ok) {
             $this->removeFiles($base);
             return ['error' => 'The image could not be stored. Please try again.'];
@@ -436,7 +437,6 @@ final class Images
         if ($turn !== 0) {
             $turned = imagerotate($img, $turn, 0);
             if ($turned instanceof \GdImage) {
-                imagedestroy($img);
                 $img = $turned;
                 imagealphablending($img, false);
                 imagesavealpha($img, true);

@@ -147,7 +147,7 @@ final class Auth
      * @return array{ok: bool, reason: string, user?: array<string, mixed>}
      *   reason: ok | invalid | throttled | unverified | approval | disabled
      */
-    public function attempt(string $email, string $password, bool $remember = false): array
+    public function attempt(string $email, #[\SensitiveParameter] string $password, bool $remember = false): array
     {
         $email = self::normaliseEmail($email);
         $ip = $this->app->clientIp();
@@ -289,7 +289,7 @@ final class Auth
     }
 
     /** @return array<string, mixed>|null the account, now active or waiting for approval */
-    public function verifyEmail(string $token): ?array
+    public function verifyEmail(#[\SensitiveParameter] string $token): ?array
     {
         $row = $this->consume($token, 'verify');
         if ($row === null) {
@@ -345,7 +345,7 @@ final class Auth
      *
      * @return array{ok: bool, errors: array<string, string>}
      */
-    public function resetPassword(string $token, string $password, string $purpose = 'reset'): array
+    public function resetPassword(#[\SensitiveParameter] string $token, #[\SensitiveParameter] string $password, string $purpose = 'reset'): array
     {
         $row = $this->lookup($token, $purpose);
         if ($row === null) {
@@ -390,7 +390,7 @@ final class Auth
      *
      * @return array{ok: bool, errors: array<string, string>}
      */
-    public function changePassword(string $current, string $new): array
+    public function changePassword(#[\SensitiveParameter] string $current, #[\SensitiveParameter] string $new): array
     {
         $row = $this->user();
         if ($row === null) {
@@ -486,7 +486,7 @@ final class Auth
         return $errors;
     }
 
-    public function passwordError(string $password, string $email = ''): ?string
+    public function passwordError(#[\SensitiveParameter] string $password, string $email = ''): ?string
     {
         $min = $this->app->config->int('security.password_min_length', 10);
         if (mb_strlen($password) < $min) {
@@ -545,7 +545,7 @@ final class Auth
         $limiter->clear(self::accountBucket($email, $this->app->clientIp()));
     }
 
-    public static function hash(string $password): string
+    public static function hash(#[\SensitiveParameter] string $password): string
     {
         return password_hash($password, self::algorithm());
     }

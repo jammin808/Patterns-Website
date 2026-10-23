@@ -38,7 +38,6 @@ final class NewsMediaTest extends TestCase
             'gif' => imagegif($im),
             default => imagepng($im),
         };
-        imagedestroy($im);
         return (string) ob_get_clean();
     }
 

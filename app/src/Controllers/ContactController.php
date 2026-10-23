@@ -259,7 +259,7 @@ final class ContactController extends Controller
             CURLOPT_TIMEOUT => 8,
         ]);
         $raw = curl_exec($ch);
-        curl_close($ch);
+        unset($ch);
         if (!is_string($raw)) {
             $this->app->log->warning('turnstile unreachable');
             return true;
