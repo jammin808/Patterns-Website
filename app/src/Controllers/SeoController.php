@@ -9,6 +9,7 @@ use Psc\Chat\AnthropicGateway;
 use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\Announcer;
 use Psc\News\ArticleStore;
 use Psc\News\Images;
 use Psc\News\Paths;
@@ -173,11 +174,34 @@ final class SeoController extends Controller
         return Response::text(implode("\n", $xml) . "\n", 200, 'application/xml')->header('Cache-Control', self::NEWS_SITEMAP_CACHE);
     }
 
+    /**
+     * The robots tokens of crawlers that gather pages to train models, not to answer anyone: OpenAI's, Anthropic's,
+     * Google's and Apple's training tokens (Google-Extended and Applebot-Extended are tokens only, never crawlers, and
+     * leave Google Search and Apple's search alone, though Google-Extended also covers grounding in Gemini's apps),
+     * Common Crawl's, Meta's and ByteDance's. content/site.php 'block_training' asks them to stay away.
+     */
+    public const TRAINING_AGENTS = ['GPTBot', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'CCBot', 'meta-externalagent', 'Bytespider'];
+
+    /**
+     * The robots tokens of AI search and answer engines: the crawlers that index pages for ChatGPT search, Claude's
+     * search, Perplexity and Meta AI's citations, and the fetchers that read a page because a person asked about it.
+     * Welcome unless content/site.php 'ai_search' is false.
+     */
+    public const AI_SEARCH_AGENTS = ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User', 'meta-webindexer', 'meta-externalfetcher'];
+
+    /**
+     * robots.txt. Everyone is welcome but on the API and the tracked links (a crawler that matches a group of its own
+     * reads only that group, so no other group is written while every crawler reads the same rules). Two of the
+     * owner's switches in content/site.php each add a group that keeps its crawlers off the whole site:
+     * 'block_training' for the model-training crawlers (false when the key is missing; the site ships it true, the
+     * owner's choice), and 'ai_search' (true by default: welcome) for the AI search and answer engines. Search engines
+     * are never in either.
+     */
     public function robots(Request $request): Response
     {
         $base = $this->app->baseUrl();
-        // The portal is not disallowed: crawlers must be able to fetch it to read its noindex. Search and answer
-        // engines are welcome; model-training crawlers are the owner's call (content/site.php 'block_training').
+        $site = Content::get('site');
+        // The portal is not disallowed: crawlers must be able to fetch it to read its noindex.
         $lines = [
             'User-agent: *',
             'Allow: /',
@@ -186,8 +210,15 @@ final class SeoController extends Controller
             'Disallow: /news/go/',
             '',
         ];
-        if (!empty(Content::get('site')['block_training'])) {
-            foreach (['GPTBot', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'CCBot'] as $bot) {
+        $blocked = [];
+        if (!empty($site['block_training'])) {
+            $blocked = self::TRAINING_AGENTS;
+        }
+        if (array_key_exists('ai_search', $site) && !$site['ai_search']) {
+            $blocked = [...$blocked, ...self::AI_SEARCH_AGENTS];
+        }
+        if ($blocked !== []) {
+            foreach ($blocked as $bot) {
                 $lines[] = 'User-agent: ' . $bot;
             }
             $lines[] = 'Disallow: /';
@@ -196,6 +227,28 @@ final class SeoController extends Controller
         $lines[] = 'Sitemap: ' . $base . '/sitemap.xml';
         $lines[] = 'Sitemap: ' . $base . Paths::sitemap();
         return Response::text(implode("\n", $lines) . "\n")->header('Cache-Control', 'public, max-age=3600');
+    }
+
+    /**
+     * /{key}.txt, the IndexNow key file (docs/NEWS.md §5): the key alone, as UTF-8 text, for the key the tick's pings
+     * carry (Settings::indexNowKey()), so an engine can check they come from this site. Any other name, or none made
+     * yet, or IndexNow switched off, is a 404; the key is never made here. It is public by design: it proves only that
+     * a ping came from whoever controls the site.
+     */
+    public function indexNowKey(Request $request): Response
+    {
+        try {
+            $key = Announcer::indexNowOn($this->app) ? (new Settings($this->app))->indexNowKey(false) : null;
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'indexnow key');
+            return Response::text("The key cannot be read just now.\n", 503)
+                ->header('Retry-After', (string) NewsController::RETRY_AFTER)
+                ->header('Cache-Control', 'private, no-store');
+        }
+        if ($key === null || !hash_equals($key, $request->attr('key'))) {
+            return $this->notFound();
+        }
+        return Response::text($key)->header('Cache-Control', 'public, max-age=3600')->header('X-Robots-Tag', 'noindex');
     }
 
     /** llms.txt: a plain map of the site for AI assistants and answer engines (llmstxt.org format). */
@@ -242,6 +295,10 @@ final class SeoController extends Controller
             $out[] = '## ' . (string) (Content::get('news')['name'] ?? 'Industry Updates');
             $out[] = '';
             $out[] = '- [' . ($news['crumb'] ?? $news['title']) . '](' . $base . Paths::index() . '): ' . $news['description'];
+            $standards = Content::page(Paths::standards());
+            if ($standards !== null) {
+                $out[] = '- [' . ($standards['crumb'] ?? $standards['title']) . '](' . $base . Paths::standards() . '): ' . $standards['description'];
+            }
             try {
                 foreach ((new ArticleStore($this->app))->live(null, null, 1, self::LLMS_ARTICLES)['items'] as $a) {
                     $out[] = '- [' . self::oneLine((string) $a['title']) . '](' . $base . Paths::article($a) . '): ' . self::oneLine((string) ($a['summary'] ?: $a['dek']));

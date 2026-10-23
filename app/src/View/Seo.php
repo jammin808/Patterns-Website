@@ -25,6 +25,15 @@ final class Seo
     /** The headline share cards show (og:title, twitter:title) when it differs from the <title>; null: the title. */
     public ?string $ogTitle = null;
 
+    /**
+     * Site ownership tokens by meta name (google-site-verification, msvalidate.01), from the seo.* settings: written
+     * on the home page only, where Search Console and Bing Webmaster Tools look for them. A value pasted as the whole
+     * tag gives its content; one that is not a token is left out.
+     *
+     * @var array<string, string>
+     */
+    public array $verification = [];
+
     public function __construct(
         public string $title,
         public string $description,
@@ -92,6 +101,17 @@ final class Seo
         $out[] = '<title>' . $e($this->title) . '</title>';
         $out[] = '<meta name="description" content="' . $e($this->description) . '">';
         $out[] = '<meta name="robots" content="' . $e($this->robots) . '">';
+        if ($this->path === '/') {
+            foreach ($this->verification as $name => $token) {
+                $token = trim($token);
+                if (preg_match('/content\s*=\s*["\']([^"\']*)["\']/i', $token, $m) === 1) {
+                    $token = trim($m[1]);
+                }
+                if (preg_match('/^[A-Za-z0-9_-]{8,128}$/', $token) === 1 && preg_match('/^[a-z0-9.-]{1,40}$/', $name) === 1) {
+                    $out[] = '<meta name="' . $e($name) . '" content="' . $e($token) . '">';
+                }
+            }
+        }
         if ($this->isIndexable()) {
             $out[] = '<link rel="canonical" href="' . $e($this->canonical()) . '">';
             $out[] = '<link rel="alternate" hreflang="en-GB" href="' . $e($this->canonical()) . '">';

@@ -358,7 +358,70 @@ final class Settings
         return $db->exec('UPDATE news_settings SET updated_at = ?, value = ? WHERE name = ? AND updated_at <= ?', [$now, self::encode($now), $name, $now - $every]) === 1;
     }
 
+    /**
+     * The site's IndexNow key (docs/NEWS.md §5): 32 lower-case hex characters, which both readings of the protocol's
+     * key rules allow, made the first time the announcer needs it and kept from then on, so the key file at
+     * /{key}.txt always answers for the pings already sent. Null when none has been made and $create is false (the
+     * key file's route never makes one).
+     */
+    public function indexNowKey(bool $create = true): ?string
+    {
+        $value = $this->internal(self::INDEXNOW_KEY);
+        if (is_string($value) && preg_match('/^[a-f0-9]{32}$/', $value) === 1) {
+            return $value;
+        }
+        if (!$create) {
+            return null;
+        }
+        $db = $this->db();
+        $key = bin2hex(random_bytes(16));
+        try {
+            if ($db->value('SELECT 1 FROM news_settings WHERE name = ?', [self::INDEXNOW_KEY]) === null) {
+                $db->insert('news_settings', ['name' => self::INDEXNOW_KEY, 'value' => self::encode($key), 'updated_by' => null, 'updated_at' => time()]);
+                return $key;
+            }
+            // A row that holds no usable key (never written by this code) is given one.
+            $db->update('news_settings', ['value' => self::encode($key), 'updated_at' => time()], ['name' => self::INDEXNOW_KEY]);
+            return $key;
+        } catch (\PDOException $e) {
+            if (!ArticleStore::isDuplicate($e)) {
+                throw $e;
+            }
+        }
+        // Another process made it first: its key is the one.
+        $value = $this->internal(self::INDEXNOW_KEY);
+        return is_string($value) ? $value : null;
+    }
+
+    /** The row that holds the IndexNow key. */
+    public const INDEXNOW_KEY = 'indexnow_key';
+
+    /**
+     * An internal row's value, decoded (the announcer's key and each channel's state), or null before it is first
+     * written. Never a setting: get() refuses every name that is not in DEFAULTS, and these names never are.
+     */
+    public function internal(string $name): mixed
+    {
+        self::internalName($name);
+        $value = $this->db()->value('SELECT value FROM news_settings WHERE name = ?', [$name]);
+        return is_string($value) ? json_decode($value, true) : null;
+    }
+
+    /** Writes an internal row (see internal()). */
+    public function putInternal(string $name, mixed $value): void
+    {
+        self::internalName($name);
+        $this->db()->transaction(fn (Database $db) => $this->put($db, $name, self::encode($value), null, time()));
+    }
+
     // ------------------------------------------------------------------------------------------- internals
+
+    private static function internalName(string $name): void
+    {
+        if (preg_match('/^[a-z0-9_]{1,64}$/', $name) !== 1 || array_key_exists($name, self::DEFAULTS)) {
+            throw new \InvalidArgumentException('Not an internal row: ' . $name);
+        }
+    }
 
     private function db(): Database
     {

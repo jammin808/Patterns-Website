@@ -276,7 +276,13 @@ final class App
     /** A Seo object for a path with the site defaults applied. */
     public function seo(string $title, string $description, string $path): Seo
     {
-        return new Seo($title, $description, $path, $this->baseUrl(), $this->name());
+        $seo = new Seo($title, $description, $path, $this->baseUrl(), $this->name());
+        // Search Console's and Bing Webmaster Tools' ownership tokens (seo.*), which the home page carries.
+        $seo->verification = [
+            'google-site-verification' => $this->config->string('seo.google_site_verification'),
+            'msvalidate.01' => $this->config->string('seo.bing_site_verification'),
+        ];
+        return $seo;
     }
 
     public function handle(Request $request): Response

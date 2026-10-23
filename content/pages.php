@@ -403,6 +403,20 @@ return [
         // The page's own last change; the sitemap gives the newest live article's time when that is later.
         'updated' => '2026-10-22',
     ],
+    // How the section is made and corrected (its words are content/news.php 'standards'); routed beside the section's
+    // own pages, before an article's /news/{slug}/ could take it.
+    '/news/standards/' => [
+        'template' => 'news/standards',
+        'title' => 'Editorial standards | Industry Updates',
+        'description' => 'How Industry Updates is made: an AI desk that drafts from the original sources, an editor who answers for it, and how mistakes are put right.',
+        'crumb' => 'Editorial standards',
+        'parent' => '/news/',
+        'section' => 'news',
+        'type' => 'page',
+        'og' => '/assets/img/og/news.png',
+        'og_alt' => 'Industry Updates, AV and live event news. In every article: what\'s confirmed, what\'s still speculation, what it means for your shows and whether it is worth testing.',
+        'updated' => '2026-10-23',
+    ],
     '/contact/' => [
         'template' => 'pages/contact',
         'title' => 'Contact Patterns Show Control',

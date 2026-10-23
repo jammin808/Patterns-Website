@@ -11,9 +11,10 @@ use Psc\Db\Database;
  * The AI desk's tick and session (docs/NEWS.md §6).
  *
  * A tick (tools/news.php, every 15 minutes) writes the heartbeat, reaps runs whose process died (a failed run, so
- * the admin is told), imports the repository's article files, runs the session that is queued or due, and writes the
- * heartbeat again, each step on its own so one failing never stops the others; a session the tick runs refreshes the
- * heartbeat before its model calls, so a long one never reads as a stopped cron. A due slot is claimed once, and an
+ * the admin is told), imports the repository's article files, runs the session that is queued or due, refreshes the
+ * latest-articles file the other pages read (Latest), tells the search engines and the feed hub what changed
+ * (Announcer), and writes the heartbeat again, each step on its own so one failing never stops the others; a session
+ * the tick runs refreshes the heartbeat before its model calls, so a long one never reads as a stopped cron. A due slot is claimed once, and an
  * older slot due beside it lapses (claimed and skipped), so it never runs late after it; when the desk is paused, has
  * no key or SDK, or the session could take the month past its cap, the claimed run is recorded as skipped with the
  * reason and nothing is spent.
@@ -169,6 +170,19 @@ final class Pipeline
             }
         } catch (\Throwable $e) {
             $this->tickFailed($report, 'session', $e);
+        }
+        // The other pages' strips of the newest articles, then the search engines and the feed hub, told what went
+        // live, changed or went since the last tick (a scheduled article included, once its time has passed).
+        try {
+            $this->app->dbAlive();
+            $report['latest'] = Latest::refresh($this->app);
+        } catch (\Throwable $e) {
+            $this->tickFailed($report, 'latest', $e);
+        }
+        try {
+            $report['announced'] = (new Announcer($this->app))->run();
+        } catch (\Throwable $e) {
+            $this->tickFailed($report, 'announce', $e);
         }
         $this->beat($report, ['run' => $report['run'], 'status' => $report['status']]);
         $this->app->log->info('news tick', $report);
@@ -484,7 +498,8 @@ final class Pipeline
                 if ($hold !== []) {
                     $held[] = $id;
                 }
-                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($hold !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason, 'rules' => []];
+                $outcomes[$i] = ['status' => $d->status === 'published' ? 'published' : ($hold !== [] ? 'held' : 'draft'), 'article' => $id, 'at' => $d->publishAt, 'note' => (string) $d->reviewReason,
+                    'rules' => array_values(array_filter($d->notes, static fn (array $n): bool => $n['rule'] === 'refs'))];
             }
             return [$published, $drafts, $held, $outcomes];
         });
@@ -1071,7 +1086,7 @@ final class Pipeline
             't' => gmdate('c'), 'reaped' => 0, 'imported' => 0, 'import_failed' => 0, 'run' => null, 'slot' => null,
             'status' => 'idle', 'reason' => null, 'summary' => '', 'candidates' => 0, 'articles' => 0, 'held' => 0,
             'usage_in' => 0, 'usage_out' => 0, 'cache_write' => 0, 'cache_read' => 0, 'searches' => 0, 'fetches' => 0,
-            'cost_usd' => 0.0, 'errors' => [],
+            'cost_usd' => 0.0, 'latest' => false, 'announced' => [], 'errors' => [],
         ];
     }
 

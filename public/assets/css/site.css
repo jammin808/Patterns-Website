@@ -174,8 +174,22 @@
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   ::selection { background: color-mix(in srgb, var(--lamp-standby) 40%, transparent); }
   ::placeholder { color: var(--text-3); opacity: 1; }
-  /* No view transitions: a theme change and a page load paint the live page at once, so what is on screen is
-     always the page's own state, never a snapshot of it. */
+  /* Page changes dissolve: a cross-document view transition cross-fades the page in 240ms while the header holds
+     still. Only between pages, never for a theme change (site.js sets data-theme at once). It cannot show the
+     other theme: theme-init.js applies the stored theme at every reveal, before the first frame (a fresh load and
+     a page restored from the back/forward cache alike), and cuts instead of dissolving when the two pages' colour
+     schemes differ or the theme changes while it runs. The header is the only named element (one per page). The
+     new header is drawn over the old one without blending, so it stays put; the old one fades from under it,
+     taking an open menu, the scroll line's old length and the scrolled shadow with it. */
+  @media (prefers-reduced-motion: no-preference) {
+    @view-transition { navigation: auto; }
+    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+      animation-duration: calc(var(--d-2) * 1.2); animation-timing-function: var(--e-std);
+    }
+    ::view-transition-old(site-header) { animation: psc-fade-out calc(var(--d-2) * 1.2) var(--e-std) both; }
+    ::view-transition-new(site-header) { animation: none; }
+  }
+  @keyframes psc-fade-out { to { opacity: 0; } }
   @keyframes psc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes psc-blink { 50% { opacity: 0.25; } }
   @keyframes psc-rise { from { opacity: 0; translate: 0 12px; } }
@@ -382,11 +396,14 @@
   /* ===== Site header, navigation, Products mega-menu, mobile drawer ===== */
   .c-header {
     --accent: var(--text); --accent-ink: var(--text); --accent-line: var(--text-2); --accent-on: var(--bg);
+    --menu-out: calc(var(--d-2) * 0.75);
     position: sticky; top: 0; z-index: 50;
     background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(14px) saturate(1.2);
     border-bottom: 1px solid var(--line); transition: box-shadow var(--d-2) var(--e-std);
     &.is-scrolled { box-shadow: var(--shadow-2); }
   }
+  /* The layout's own header (a child of body, so exactly one per page) holds still through a page dissolve. */
+  .l-page > .c-header { view-transition-name: site-header; }
   .c-header-bar { display: flex; align-items: center; gap: var(--sp-3); height: var(--header-h); }
   .c-brand { display: inline-flex; align-items: center; gap: 12px; flex: none; margin-right: auto; text-decoration: none; color: var(--text); }
   .c-brand-mark {
@@ -405,8 +422,11 @@
   .c-theme { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
     & button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--r-1); color: var(--text-2); }
     & button:hover { color: var(--text); }
-    & button[aria-pressed="true"] { background: var(--s3); color: var(--text); box-shadow: inset 0 -2px 0 var(--text-2); }
     & .c-icon { width: 18px; height: 18px; } }
+  /* The pressed look follows <html data-theme>, which theme-init.js sets before the first frame, so the control is
+     right from that frame (a dissolve shows the new header live, before site.js has set aria-pressed to match). */
+  :root:not([data-theme]) .c-theme [data-theme-set="system"], :root[data-theme="light"] .c-theme [data-theme-set="light"],
+  :root[data-theme="dark"] .c-theme [data-theme-set="dark"] { background: var(--s3); color: var(--text); box-shadow: inset 0 -2px 0 var(--text-2); }
   .c-menu-btn[aria-expanded="true"] .c-icon-open, .c-menu-btn:not([aria-expanded="true"]) .c-icon-close { display: none; }
   .c-scroll-line { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; transform-origin: 0 50%; transform: scaleX(0); background: var(--bars); display: none; }
   @supports (animation-timeline: scroll()) {
@@ -419,6 +439,17 @@
     padding: 4px var(--gutter-x) 24px; background: var(--bg); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-3);
   }
   .c-header.is-nav-open .c-nav { display: block; }
+  /* The drawer (scripted, below 72rem) moves as the Products panel does (see .c-mega-panel). The closed drawer has no
+     transition of its own: only a close made from the drawer (site.js sets .is-nav-closing until it has faded) fades
+     it out, so narrowing the window across 72rem takes the inline bar straight to display: none. */
+  @media (scripting: enabled) and (width < 72rem) {
+    .c-nav { opacity: 0; translate: 0 -8px; pointer-events: none; }
+    .c-header.is-nav-closing .c-nav {
+      transition: opacity var(--menu-out) var(--e-std), translate var(--menu-out) var(--e-std), display var(--menu-out) allow-discrete; }
+    .c-header.is-nav-open .c-nav { opacity: 1; translate: none; pointer-events: auto;
+      transition: opacity var(--d-2) var(--e-cut), translate var(--d-2) var(--e-cut), display var(--d-2) allow-discrete;
+      @starting-style { opacity: 0; translate: 0 -8px; } }
+  }
   .c-nav-list { list-style: none; padding: 0; display: grid; }
   .c-nav-link {
     display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 14px 4px; border-bottom: 1px solid var(--line);
@@ -428,8 +459,22 @@
     &[aria-expanded="true"] .c-icon { rotate: 180deg; }
   }
   .c-mega-mark { width: 16px; height: 8px; flex: none; background: var(--apps); margin-right: auto; margin-left: 2px; }
-  .c-mega-panel { display: none; padding: 16px 0 20px; border-bottom: 1px solid var(--line); }
-  [aria-expanded="true"] + .c-mega-panel { display: block; }
+  /* The Products panel and the drawer open by fading in from 8px above over --d-2 and close a quarter quicker.
+     display, set by aria-expanded and .is-nav-open, stays the source of truth: allow-discrete only holds a closing
+     panel on screen until it has faded, and it takes no pointer while it does. Focus never waits for the motion. */
+  .c-mega-panel { display: none; padding: 16px 0 20px; border-bottom: 1px solid var(--line);
+    opacity: 0; translate: 0 -8px; pointer-events: none;
+    transition: opacity var(--menu-out) var(--e-std), translate var(--menu-out) var(--e-std), display var(--menu-out) allow-discrete; }
+  [aria-expanded="true"] + .c-mega-panel { display: block; opacity: 1; translate: none; pointer-events: auto;
+    transition-duration: var(--d-2); transition-timing-function: var(--e-cut);
+    @starting-style { opacity: 0; translate: 0 -8px; } }
+  /* The four products follow 20ms apart. */
+  [aria-expanded="true"] + .c-mega-panel .c-mega-product {
+    transition: opacity var(--d-2) var(--e-cut) var(--mega-delay, 0s), translate var(--d-2) var(--e-cut) var(--mega-delay, 0s);
+    @starting-style { opacity: 0; translate: 0 -4px; } }
+  .c-mega-product:nth-child(2) { --mega-delay: calc(var(--d-1) / 6); }
+  .c-mega-product:nth-child(3) { --mega-delay: calc(var(--d-1) / 3); }
+  .c-mega-product:nth-child(n + 4) { --mega-delay: calc(var(--d-1) / 2); }
   .c-mega-grid { list-style: none; padding: 0; display: grid; gap: 20px 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
   .c-mega-product { padding-top: 12px; border-top: 3px solid var(--accent); }
   .c-mega-title { display: flex; align-items: center; gap: 10px; font: 680 1.125rem/1.2 var(--font-display); font-stretch: 112%; text-decoration: none; color: var(--text);
@@ -469,7 +514,9 @@
   /* Without JavaScript: the drawer's links sit open under the bar, and the Products panel opens on hover or focus. */
   @media (scripting: none) {
     .c-menu-btn, .c-theme { display: none; }
-    .c-mega:is(:hover, :focus-within) .c-mega-panel { display: block; }
+    .c-mega:is(:hover, :focus-within) .c-mega-panel { display: block; opacity: 1; translate: none; pointer-events: auto;
+      transition-duration: var(--d-2); transition-timing-function: var(--e-cut);
+      @starting-style { opacity: 0; translate: 0 -8px; } }
   }
   @media (scripting: none) and (width < 72rem) {
     .c-header { position: static; }
@@ -1152,6 +1199,9 @@
      stands in for it, so at most one launcher is on screen. The tuck itself is not scoped to scripting, so a browser
      that cannot evaluate the scripting query still tucks with scripting and still hides the stand-in's twin without. */
   .c-chat-fab.is-tucked { translate: 0 calc(100% + 28px); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, var(--d-3); }
+  /* While a page dissolves in, the launcher takes its place without sliding, so the old page's launcher fading out
+     and the new one rising never show as two. */
+  :root:active-view-transition .c-chat-fab { transition: none; }
   @media (scripting: none) { .c-chat-fab.is-tucked { display: none; } }
   @media (width < 40rem) { .c-chat-fab { right: 16px; bottom: 16px; padding: 0 16px 0 14px; } .c-chat-fab-long { display: none; } }
   .c-launcher { display: flex; align-items: center; gap: 14px; width: 100%; max-width: 520px; padding: 14px 16px 14px 14px; text-align: left; text-decoration: none;
@@ -1386,7 +1436,8 @@
   /* Windows High Contrast: fills that carry meaning become outlines; product and lamp colours stay. */
   @media (forced-colors: active) {
     .c-swatch, .c-lamp, .c-bars, .c-brand-mark, .c-badge::before, .pt-badge::before, .c-tally, .c-role, .c-flag, .c-umd-bar, .c-legend-list li::before, .c-mega-mark, .c-eyebrow::before, .pt-eyebrow::before { forced-color-adjust: none; }
-    .c-seg :is(input:checked + span, button[aria-pressed="true"]), .c-theme button[aria-pressed="true"], .c-radio-card input:checked + span,
+    .c-seg :is(input:checked + span, button[aria-pressed="true"]), :root:not([data-theme]) .c-theme [data-theme-set="system"],
+    :root[data-theme="light"] .c-theme [data-theme-set="light"], :root[data-theme="dark"] .c-theme [data-theme-set="dark"], .c-radio-card input:checked + span,
     .c-vote[aria-pressed="true"], .pt-vote[aria-pressed="true"], .c-tabs > [aria-current], .c-tabs > [aria-selected="true"], .pt-tabs > [aria-current], .c-pager [aria-current="page"], .pt-pager [aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
     .c-btn, .pt-btn, .c-chat-fab, .c-chat-send, .c-go, .c-take { border: 1px solid ButtonText; }
     :is(.pt-actions > a.pt-btn--ghost, .pt-card-footer > a.pt-btn--ghost:only-child) { border-color: transparent; }

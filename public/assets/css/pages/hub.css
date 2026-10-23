@@ -67,6 +67,31 @@
       color: transparent; background: var(--accent); box-shadow: inset 0 0 0 1px var(--swatch-edge); } }
   @media (width >= 64rem) { .hub-stops { font-size: var(--fs-6); & > .hub-stop { padding-block: 14px; } } }
 
+  /* The tagline gathers out of a cloud of particles (particles.js sets data-state). The words stay in the page for
+     every reader: only while the canvas draws over them are they hidden (their fill, so their colour can still be
+     read and the rules stay), and they fade back in as it fades out. Until the script has taken the paragraph they
+     wait unseen, so they never show and then vanish; if it never comes they fade in on their own after two seconds.
+     The canvas sits absolutely over the paragraph, so nothing moves, and never takes the pointer, so the words stay
+     selectable. Under forced colours nothing is hidden and the canvas never shows, even if they come on mid-flight.
+     The fades run on colour and opacity: a text fill does not interpolate. */
+  .hub-stops[data-particles] { position: relative; }
+  .hub-stops-canvas { position: absolute; left: 0; width: 100%; pointer-events: none; opacity: 0; transition: opacity var(--d-3) var(--e-cut); }
+  @media screen and (forced-colors: none) {
+    .hub-stops[data-state="run"] > .hub-stops-canvas { opacity: 1; }
+    .hub-stops:is([data-state="armed"], [data-state="run"]) > .hub-stop { -webkit-text-fill-color: transparent; & > [data-product] { opacity: 0; } }
+  }
+  @media screen { .hub-stops[data-state="done"] > .hub-stop > [data-product] { transition: opacity var(--d-3) var(--e-cut); } }
+  @media screen and (prefers-reduced-motion: no-preference) {
+    .hub-stops[data-state="done"] > .hub-stop { animation: hub-stops-in var(--d-3) var(--e-cut); }
+    @media (scripting: enabled) and (forced-colors: none) {
+      .hub-stops[data-particles]:not([data-state]) > .hub-stop { animation: hub-stops-in var(--d-3) var(--e-cut) 2s backwards;
+        & > [data-product] { animation: hub-stops-mark-in var(--d-3) var(--e-cut) 2s backwards; } }
+    }
+  }
+  @keyframes hub-stops-in { from { color: transparent; } }
+  @keyframes hub-stops-mark-in { from { opacity: 0; } }
+  @media print { .hub-stops-canvas { display: none; } }
+
   /* Connections grouped by the apps they join: a group title with the apps' bars, then the cards. */
   .hub-pair + .hub-pair { margin-top: clamp(40px, 5vw, 64px); }
   .hub-pair-title { display: flex; align-items: center; gap: 12px; margin-bottom: var(--sp-5); font-size: var(--fs-4); }

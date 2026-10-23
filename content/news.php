@@ -79,6 +79,103 @@ return [
         'category_title' => ':title: :category',
         'category_label' => ':category: Industry Updates RSS feed',
     ],
+    // The follow row on the hub and on each category's hub: the page's own feed, two feed readers that follow it in
+    // one step, and Google's preferred-sources page for the site (each a plain link; nothing is loaded from them).
+    'follow' => [
+        'label' => 'Follow',
+        'rss' => 'RSS feed',
+        'feedly' => 'Feedly',
+        'inoreader' => 'Inoreader',
+        'google' => 'Google preferred source',
+        'google_hint' => 'Add Patterns Show Control as a',
+    ],
+    // The share row at the end of an article: plain links that open each network's own share page, and a copy button.
+    'share' => [
+        'title' => 'Share this article',
+        'on' => 'Share on',
+        'copy' => 'Copy link',
+    ],
+    // The dated corrections an article shows under its headline (docs/NEWS.md §10), and the way to the policy.
+    'corrections' => [
+        'one' => 'Correction',
+        'many' => 'Corrections',
+        'policy' => 'How we correct articles',
+    ],
+    // The note's way to the standards page, after the AI note on every AI-written article.
+    'standards_link' => 'How Industry Updates is made',
+    // The newest articles on the home page and the product pages (Psc\News\Latest): their words, and each product's
+    // categories, the areas its users work in.
+    'latest' => [
+        'eyebrow' => 'Industry Updates',
+        'home_title' => 'Latest from the news desk',
+        'home_lede' => 'The newest from Industry Updates: what changed in AV, live events and streaming, and whether it is worth testing.',
+        'product_title' => 'From Industry Updates',
+        'product_lede' => 'The newest on :categories, the areas :product works in.',
+        'all' => 'All Industry Updates',
+        'more' => ':category news',
+    ],
+    'products' => [
+        'patterns' => ['video', 'streaming', 'automation'],
+        'stagewatch' => ['showcalling', 'production', 'automation'],
+        'agmessage' => ['production', 'legal', 'ai'],
+        'playmap' => ['interactive', 'video', 'lighting'],
+    ],
+
+    // /news/standards/: how the section is made, who answers for it and how it is corrected (Markdown; :editor is
+    // the site's publisher, content/site.php publisher.name; :publishing is one of 'publishing' below). Every claim
+    // here is one the code keeps (docs/NEWS.md §2, §6, §7).
+    'standards' => [
+        'eyebrow' => 'Industry Updates',
+        'title' => 'Editorial standards',
+        'lede' => 'How Industry Updates is made, who answers for it, and how to tell us when we get something wrong.',
+        'sections' => [
+            [
+                'id' => 'how',
+                'title' => 'How Industry Updates is made',
+                'body' => "Most articles here are researched and written by our AI desk. Usually twice a day it looks for what changed in AV, live events and streaming, reads the original sources (manufacturers' release notes, standards bodies, regulators and the trade press) and writes up the developments that matter, with what each one means for freelance crew and corporate event teams. We use it because it lets a small, independent show-software maker follow fourteen corners of the industry every day, straight from the sources.\n\n"
+                    . "- Every article lists its sources, and each fact under **What's confirmed** and **Still speculation** links to the page it rests on. The desk can only cite pages its research actually found, so it cannot invent a link.\n"
+                    . "- Verified facts are kept apart from speculation: anything not yet confirmed is marked unconfirmed, with whose claim it is.\n"
+                    . "- A fact under **What's confirmed** cites the original document where there is one (the law, the official guidance, the regulator's notice, the maker's own release). A fact the desk has only from a report says whose report it is; one that does not is listed as unconfirmed.\n"
+                    . "- Its rules forbid made-up quotes: it may quote only words it found in a source.\n"
+                    . "- It never copies pictures. A picture on an article was added by the editor, with the right to use it.\n"
+                    . "- Every article the AI desk wrote, or helped write, carries a note saying so.\n\n"
+                    . 'Before an article from the desk goes live, a second, separate check reads all of it. Anything that names a private person or may allege wrongdoing is held back for the editor, and anything on a topic we do not cover is dropped. :publishing',
+            ],
+            [
+                'id' => 'editor',
+                'title' => 'What the editor does',
+                'body' => "Industry Updates is edited by :editor, who answers for everything published here.\n\n"
+                    . "- Reviews every article the checks hold back, and decides whether it is published, changed or dropped.\n"
+                    . "- Takes down any article that should not be here, at once.\n"
+                    . "- Corrects articles when something is wrong, and says so on the article.\n"
+                    . '- Decides what the desk looks into, which websites it may not use and which topics it leaves alone.',
+            ],
+            [
+                'id' => 'errors',
+                'title' => 'Spotted a mistake?',
+                'body' => 'If something in an article is wrong, out of date or unfair, please [tell us through the contact form](/contact/?topic=other). Name the article (its address helps) and what is wrong, with a source if you have one. Every message reaches the editor, and mistakes get put right.',
+            ],
+            [
+                'id' => 'corrections',
+                'title' => 'Corrections',
+                'body' => "When a correction changes what an article says, the article shows a dated **Correction** note under its headline saying what changed, and its updated time moves with it. Small fixes that change no facts, such as a typo or a broken link, are made without a note.\n\n"
+                    . 'An article we remove for good leaves its address saying that it has gone, so nothing else ever appears there.',
+            ],
+            [
+                'id' => 'publisher',
+                'title' => 'Who publishes it',
+                'body' => 'Industry Updates is published by Patterns Show Control, which makes show software: [Patterns](/patterns/), [StageWatch](/stagewatch/), [AGMessage](/agmessage/) and [PlayMap](/playmap/). Patterns Show Control is run by :editor in the United Kingdom. The desk names our own products only where they are directly relevant, once and plainly. More about us is on the [about page](/about/).',
+            ],
+        ],
+        // The last words of 'how' (:publishing): as the desk's "Publish articles automatically" setting stands
+        // (auto_publish), and, when the settings cannot be read, the words that are true either way.
+        'publishing' => [
+            'auto' => 'Articles that pass every check are published automatically.',
+            'editor' => 'Articles that pass every check then wait for the editor to publish them.',
+            'unknown' => 'Articles that pass every check are published automatically, unless the editor has chosen to publish each one by hand.',
+        ],
+    ],
+
     // The way across the section, at the foot of the hub and of each category's hub.
     'silo' => [
         'index' => 'Browse by category',

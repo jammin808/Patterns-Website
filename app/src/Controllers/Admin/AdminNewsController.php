@@ -14,6 +14,7 @@ use Psc\News\ArticleStore;
 use Psc\News\Categories;
 use Psc\News\Draft;
 use Psc\News\Images;
+use Psc\News\Latest;
 use Psc\News\Paths;
 use Psc\News\Result;
 use Psc\News\Settings;
@@ -152,7 +153,7 @@ final class AdminNewsController extends Controller
             return $this->redirect($back, 'danger', self::UNKNOWN_ACTION);
         }
         $values = self::formValues($request);
-        [$draft, $result, $at] = $this->check($values, $action, null);
+        [$draft, $result, $at] = $this->check($values, $action, null, time());
         if (!$result->ok() || $at === false) {
             return $this->keep($back, null, $values, $draft, $result);
         }
@@ -176,6 +177,7 @@ final class AdminNewsController extends Controller
         };
         $this->app->session()->flash('success', $message);
         $this->flashWarnings($result);
+        $this->refreshLatest();
         return Response::redirect('/portal/admin/news/' . $id . '/', 303);
     }
 
@@ -254,7 +256,14 @@ final class AdminNewsController extends Controller
 
         $values = self::formValues($request);
         $values['loaded_at'] = $loaded !== null ? (string) $loaded : '';
-        [$draft, $result, $at] = $this->check($values, $action, $article);
+        // One clock reading for the whole save: a new correction's date, a schedule's "now" and the updated_at the
+        // store writes (always past the one the form was made from), so the article's last change and its newest
+        // correction are the same second.
+        $now = $loaded !== null ? max(time(), $loaded + 1) : time();
+        [$draft, $result, $at] = $this->check($values, $action, $article, $now);
+        if ($unpublished) {
+            $this->refreshLatest();
+        }
         if ($stale || !$result->ok() || $at === false) {
             $response = $stale ? $this->conflict($path, $id, $values, $draft) : $this->keep($path, $id, $values, $draft, $result);
             if ($unpublished) {
@@ -271,7 +280,7 @@ final class AdminNewsController extends Controller
         } elseif ($clean->slug === null && $store->slugFor($clean->slugBase(), $id) !== (string) $article['slug']) {
             $clean->slug = $clean->slugBase();
         }
-        $changed = $store->update($id, $clean, (int) $admin['id'], $loaded);
+        $changed = $store->update($id, $clean, (int) $admin['id'], $loaded, $now);
         if ($changed === null) {
             $response = $this->conflict($path, $id, $values, $draft);
             if ($unpublished) {
@@ -308,6 +317,7 @@ final class AdminNewsController extends Controller
             $session->flash($changed !== [] ? 'success' : 'info', $saved . 'The article was already a draft.');
         }
         $this->flashWarnings($result);
+        $this->refreshLatest();
         return Response::redirect($path, 303);
     }
 
@@ -484,6 +494,9 @@ final class AdminNewsController extends Controller
         $values['confirmed'] = $rows($request->post['confirmed'] ?? null, ['text', 'url']);
         $values['speculation'] = $rows($request->post['speculation'] ?? null, ['text', 'url']);
         $values['sources'] = $rows($request->post['sources'] ?? null, ['url', 'title', 'publisher', 'kind']);
+        // The earlier corrections' lines by position (their dates are the stored ones), and a new one.
+        $values['corrections'] = $rows($request->post['corrections'] ?? null, ['text']);
+        $values['correction_new'] = $text('correction_new');
         $values['categories'] = array_slice(array_values(array_unique($strings($request->post['categories'] ?? null))), 0, count(Categories::KEYS));
         $values['follow_up_of'] = array_slice(array_values(array_unique(array_map('intval', array_filter($strings($request->post['follow_up_of'] ?? null), 'ctype_digit')))), 0, self::FOLLOW_UP_CHOICES);
         $values['comments_open'] = $request->input('comments_open') === '1';
@@ -500,8 +513,8 @@ final class AdminNewsController extends Controller
      */
     private static function withDefaults(array $values): array
     {
-        $defaults = array_fill_keys(['title', 'seo_title', 'slug', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time', 'loaded_at'], '')
-            + array_fill_keys(['confirmed', 'speculation', 'sources', 'categories', 'follow_up_of'], [])
+        $defaults = array_fill_keys(['title', 'seo_title', 'slug', 'summary', 'dek', 'body', 'impact', 'verdict', 'verdict_note', 'tags', 'byline', 'publish_date', 'publish_time', 'loaded_at', 'correction_new'], '')
+            + array_fill_keys(['confirmed', 'speculation', 'sources', 'categories', 'follow_up_of', 'corrections'], [])
             + ['comments_open' => true, 'ai_written' => false];
         $out = [];
         foreach ($defaults as $k => $default) {
@@ -552,20 +565,23 @@ final class AdminNewsController extends Controller
             'ai_written' => $d->aiWritten,
             'publish_date' => $at?->format('Y-m-d') ?? '',
             'publish_time' => $at?->format('H:i') ?? '',
+            'corrections' => array_map(static fn (array $c): array => ['text' => $c['text']], $d->corrections),
         ]);
     }
 
     /**
      * The form as a draft, checked by the rules for $action: a draft's for saving one, the full rules for
      * publishing, scheduling, and saving an article that is published or scheduled. The third value is the schedule
-     * time (null when not scheduling, false when it was refused, with its error on the result).
+     * time (null when not scheduling, false when it was refused, with its error on the result). $now is the request's
+     * one clock reading, which dates a new correction and is the "now" a schedule must be after.
      *
      * @param array<string, mixed> $values
      * @param array<string, mixed>|null $article
      * @return array{0: Draft, 1: Result, 2: int|false|null}
      */
-    private function check(array $values, string $action, ?array $article): array
+    private function check(array $values, string $action, ?array $article, int $now): array
     {
+        [$corrections, $origins] = self::corrections($values, $article, $now);
         $draft = Draft::fromArray([
             'title' => $values['title'],
             'seo_title' => $values['seo_title'],
@@ -585,6 +601,7 @@ final class AdminNewsController extends Controller
             'byline' => $values['byline'],
             'comments_open' => $values['comments_open'],
             'ai_written' => $values['ai_written'],
+            'corrections' => $corrections,
             'status' => 'draft',
         ], 'manual');
         if ($article !== null) {
@@ -596,7 +613,7 @@ final class AdminNewsController extends Controller
         $result = (new Validator(new ArticleStore($this->app)))->check($draft, $settings->context('manual', $full ? 'publish' : 'draft', $article !== null ? (int) $article['id'] : null));
         $at = null;
         if ($action === 'schedule') {
-            [$at, $error] = self::scheduleTime((string) $values['publish_date'], (string) $values['publish_time'], time());
+            [$at, $error] = self::scheduleTime((string) $values['publish_date'], (string) $values['publish_time'], $now);
             if ($error !== null) {
                 $result->error('publish_at', $error);
                 $at = false;
@@ -605,7 +622,48 @@ final class AdminNewsController extends Controller
         foreach ($result->rejections as $rejection) {
             $result->error('article', $rejection['detail']);
         }
+        // A correction's error names the field it was typed in: an earlier line's own, or the new one.
+        foreach ($result->errors as $field => $message) {
+            if (preg_match('/^corrections\.(\d+)$/', (string) $field, $m) === 1 && isset($origins[(int) $m[1]])) {
+                unset($result->errors[$field]);
+                $result->errors[$origins[(int) $m[1]] === 'new' ? 'correction_new' : 'corrections.' . $origins[(int) $m[1]]] = $message;
+            } elseif ($field === 'corrections') {
+                unset($result->errors[$field]);
+                $result->errors['correction_new'] = $message;
+            }
+        }
         return [$draft, $result, $at];
+    }
+
+    /**
+     * The article's corrections as the form leaves them: each stored one with its own date and the line the form
+     * posted for it (an emptied line removes it; one the form did not post stays as it was), then the new line, dated
+     * $now (the save's clock reading), on an article that has been live. Also where each came from (a stored position, or 'new'), so an error can
+     * name its field.
+     *
+     * @param array<string, mixed> $values
+     * @param array<string, mixed>|null $article
+     * @return array{0: list<array{at: int, text: string}>, 1: list<int|string>}
+     */
+    private static function corrections(array $values, ?array $article, int $now): array
+    {
+        $out = [];
+        $origins = [];
+        $stored = $article !== null && is_array($article['corrections'] ?? null) ? $article['corrections'] : [];
+        foreach ($stored as $i => $c) {
+            $posted = is_array($values['corrections'][$i] ?? null) ? (string) ($values['corrections'][$i]['text'] ?? '') : null;
+            $text = $posted ?? (string) $c['text'];
+            if (trim($text) !== '') {
+                $out[] = ['at' => (int) $c['at'], 'text' => $text];
+                $origins[] = $i;
+            }
+        }
+        $new = trim((string) ($values['correction_new'] ?? ''));
+        if ($new !== '' && $article !== null && ArticleStore::hasBeenLive($article)) {
+            $out[] = ['at' => max($now, $out !== [] ? (int) end($out)['at'] + 1 : 0), 'text' => $new];
+            $origins[] = 'new';
+        }
+        return [$out, $origins];
     }
 
     /**
@@ -768,6 +826,7 @@ final class AdminNewsController extends Controller
             return $this->redirect('/portal/admin/news/', 'info', 'That article was already deleted.');
         }
         $this->app->session()->forget(self::draftKey($id));
+        $this->refreshLatest();
         // The row is gone, so the audit keeps enough to say what it was.
         Audit::log($this->app, $adminId, 'news.deleted', (string) $id, [
             'title' => (string) $row['title'],
@@ -778,6 +837,19 @@ final class AdminNewsController extends Controller
             'comments' => (int) $row['comment_count'],
         ]);
         return $this->redirect('/portal/admin/news/', 'success', '“' . $row['title'] . '” is deleted.' . ($state === 'live' ? ' ' . AdminNewsCommentController::TAKEDOWN : ''));
+    }
+
+    /**
+     * The other pages' strips of the newest articles follow an administrator's change at once (Psc\News\Latest), so
+     * a takedown leaves them with the article itself. A failure is logged: the next tick writes the file again.
+     */
+    private function refreshLatest(): void
+    {
+        try {
+            Latest::refresh($this->app);
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'news latest');
+        }
     }
 
     /** @return array<string, mixed> the signed-in administrator (the middleware guarantees one) */

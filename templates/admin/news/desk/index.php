@@ -19,6 +19,7 @@
  * @var list<array<string, mixed>> $runs
  * @var int $perWeek
  * @var bool $hasOverrides
+ * @var array<string, array{label: string, text: string, failing: bool}> $announce what the tick last told the search engines and the feed hub
  */
 use Psc\News\Pricing;
 use Psc\News\Schedule;
@@ -75,6 +76,10 @@ $cron = '*/15 * * * * /usr/bin/php /home/<user>/domains/<domain>/public_html/too
     <dl class="pt-kv">
         <dt>Last tick</dt>
         <dd><?= $tick !== null ? $at($tick['t']) . ' <span class="pt-muted">(' . e(ago((int) $tick['t'])) . ')</span>' : '<span class="pt-muted">None yet</span>' ?></dd>
+        <?php foreach ($announce as $a): ?>
+            <dt><?= e($a['label']) ?></dt>
+            <dd><?= $a['failing'] ? '<span class="pt-badge pt-badge--declined">Failing</span> ' : '' ?><?= e($a['text']) ?></dd>
+        <?php endforeach; ?>
     </dl>
     <?php if ($tickStale): ?>
         <div class="pt-alert pt-alert--warning" role="status">

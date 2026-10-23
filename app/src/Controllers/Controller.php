@@ -48,13 +48,15 @@ abstract class Controller
     }
 
     /**
-     * The default graph every public page carries: the organisation, its founder and the website. The organisation's
-     * contact point is the contact page, never an email address, so crawlers find no address to collect.
+     * The default graph every public page carries: the organisation (with its profiles elsewhere, content/site.php
+     * 'same_as'), its founder and the website. The organisation's contact point is the contact page, never an email
+     * address, so crawlers find no address to collect.
      */
     protected function baseGraph(Seo $seo): Seo
     {
         $base = $this->app->baseUrl();
-        $seo->add(Schema::organization($base, $this->app->name()));
+        $sameAs = \Psc\Content\Content::get('site')['same_as'] ?? [];
+        $seo->add(Schema::organization($base, $this->app->name(), is_array($sameAs) ? array_values($sameAs) : []));
         $seo->add(Schema::person($base, $this->app->config->string('app.publisher')));
         $seo->add(Schema::website($base, $this->app->name(), 'Show control software for live events: Patterns, StageWatch, AGMessage and PlayMap.'));
         return $seo;

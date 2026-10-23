@@ -9,8 +9,10 @@
  * Public pages are identical for every visitor (they are cached), so nothing a visitor chooses is rendered by the
  * server. The theme choice (`psc-theme`) and dismissed announcements (`psc-dismissed`) live in this browser's
  * localStorage only and are never sent to the server; theme-init.js, a classic script in <head>, applies them
- * before the first paint, and this module keeps them in step afterwards. No stored theme means the CSS follows
- * prefers-color-scheme. When storage is blocked the page simply follows the system and shows every announcement.
+ * before the first paint (and again whenever a page is revealed), and this module keeps them in step afterwards. No
+ * stored theme means the CSS follows prefers-color-scheme. When storage is blocked the page simply follows the
+ * system and shows every announcement. Pages dissolve into each other (site.css); theme-init.js keeps each dissolve
+ * to one theme, and nothing here ever starts a view transition.
  */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -19,10 +21,23 @@ const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const store = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  /* Whether the write reached storage: only a stored choice is one the site's other pages can read. */
   set(key, value) {
-    try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* storage blocked: the choice holds on this page only */ }
+    try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); return true; } catch { /* storage blocked: the choice holds on this page only */ return false; }
   },
+  /* Whether storage can be read at all (blocked site data throws): when it cannot, nothing is stored to follow. */
+  readable() { try { return localStorage !== null; } catch { return false; } },
 };
+/*
+ * A channel between this site's pages in this browser, told when a stored choice (the theme, a dismissed notice)
+ * changes, or the system's scheme does while no theme is stored. Only a page whose storage works speaks on it. A page
+ * open in another tab follows at once. A page held in the back/forward cache cannot run, and its frozen frame would
+ * show the old choice on Back before any script could fix it: a message dropped on it evicts it (Chrome), so Back
+ * loads it afresh and theme-init.js applies the choice before its first frame.
+ */
+const prefs = (() => { try { return new BroadcastChannel('psc-prefs'); } catch { return null; } })();
+const tellOtherPages = (what) => { try { prefs?.postMessage(what); } catch { /* the other pages catch up on their next load */ } };
+
 /* Reads a cookie the server set; the only one read here is the portal's psc_li hint. */
 const readCookie = (name) => {
   const hit = document.cookie.split('; ').find((c) => c.startsWith(`${name}=`));
@@ -76,14 +91,19 @@ function initTheme() {
     if (meta) meta.setAttribute('content', effective() === 'dark' ? '#090C10' : '#F3F4F6');
   };
 
-  /* The page shows exactly the stored choice: the attribute is set at once, never inside a transition. */
+  /*
+   * The page shows exactly the stored choice: the attribute is set at once, never inside a view transition (a page
+   * dissolve that is running is cut short by theme-init.js). Whoever sets it (a click here, theme-init.js on a
+   * reveal, another tab), the controls and theme-color follow, before the next frame.
+   */
   const show = (value) => {
-    if (valid(value)) root.dataset.theme = value; else delete root.dataset.theme;
-    sync();
+    if (valid(value)) { if (root.dataset.theme !== value) root.dataset.theme = value; } else if ('theme' in root.dataset) delete root.dataset.theme;
   };
+  new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
   const apply = (value) => {
-    store.set(KEY, valid(value) ? value : null);
+    const saved = store.set(KEY, valid(value) ? value : null);
     show(value);
+    if (saved) tellOtherPages('theme');
     announce(valid(value) ? `${value[0].toUpperCase()}${value.slice(1)} theme` : 'Theme follows your system');
   };
 
@@ -94,11 +114,18 @@ function initTheme() {
       if (!$('[data-theme-set]', control)) apply(effective() === 'dark' ? 'light' : 'dark');
     });
   }
-  system.addEventListener('change', sync);
-  // A page restored from the back/forward cache, or one open in another tab, shows the choice made since.
-  window.addEventListener('pageshow', (e) => { if (e.persisted) show(store.get(KEY)); });
-  window.addEventListener('storage', (e) => { if (e.key === KEY || e.key === null) show(store.get(KEY)); });
+  // The system's scheme changed. A page that follows it repaints by itself, but one held in the back/forward cache
+  // keeps a frozen frame in the old scheme: telling the other pages evicts it, as a theme click does. With storage
+  // blocked nothing is sent, so no page loses a choice made on it alone.
+  system.addEventListener('change', () => { sync(); if (!valid(root.dataset.theme) && store.readable()) tellOtherPages('theme'); });
+  // A page restored from the back/forward cache (theme-init.js has already applied it), or one open in another tab,
+  // shows the choice stored since. With storage blocked there is none, and the choice made on this page holds.
+  const follow = () => { if (store.readable()) show(store.get(KEY)); };
+  window.addEventListener('pageshow', (e) => { if (e.persisted) follow(); });
+  window.addEventListener('storage', (e) => { if (e.key === KEY || e.key === null) follow(); });
+  prefs?.addEventListener('message', (e) => { if (e.data === 'theme') follow(); });
   show(store.get(KEY));
+  sync();
 }
 
 /* ---------------------------------------------------------------------------------- mobile drawer */
@@ -111,6 +138,9 @@ function initNav() {
   const desktop = matchMedia('(width >= 72rem)');
 
   const set = (open, focusBack = false) => {
+    // Only a close made from the open drawer fades it out (site.css): a close as the window widens, or under reduced
+    // motion, has nothing to fade, and the closed drawer itself has no transition.
+    header.classList.toggle('is-nav-closing', !open && header.classList.contains('is-nav-open') && !desktop.matches && motionOK());
     toggle.setAttribute('aria-expanded', String(open));
     header.classList.toggle('is-nav-open', open);
     const label = $('[data-nav-label]', toggle);
@@ -126,6 +156,10 @@ function initNav() {
     if (header.classList.contains('is-nav-open') && !header.contains(e.target)) set(false);
   });
   desktop.addEventListener('change', () => set(false));
+  // The fade has ended, or was cut short: the closed drawer is back to having no transition.
+  const settle = (e) => { if (e.target === nav) header.classList.remove('is-nav-closing'); };
+  nav.addEventListener('transitionend', settle);
+  nav.addEventListener('transitioncancel', settle);
 }
 
 /* -------------------------------------------------------------------------------- the mega-menu */
@@ -150,8 +184,9 @@ function initMega() {
     const focusLink = (i) => { const l = links(); if (l.length) l[(i + l.length) % l.length].focus(); };
 
     button.addEventListener('click', () => set(!isOpen()));
+    // The panel is displayed the moment aria-expanded is set (its fade-in is only paint), so focus moves at once.
     button.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); set(true); requestAnimationFrame(() => focusLink(0)); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); set(true); focusLink(0); }
       if (e.key === 'Escape' && isOpen()) { e.preventDefault(); e.stopPropagation(); set(false); }
     });
     panel.addEventListener('keydown', (e) => {
@@ -165,6 +200,12 @@ function initMega() {
     });
     mega.addEventListener('focusout', (e) => {
       if (isOpen() && e.relatedTarget && !mega.contains(e.relatedTarget)) set(false);
+    });
+    // Following one of its links closes the panel, as the drawer does: it fades while the next page loads (and goes
+    // with the old header in the dissolve), and Back never restores the page with it hanging open.
+    panel.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.target.closest('a[href]')) set(false);
     });
     document.addEventListener('click', (e) => { if (isOpen() && !mega.contains(e.target)) set(false); });
   }
@@ -283,14 +324,15 @@ function initCopy() {
       area.remove();
     }
     const label = $('[data-copy-label]', button);
-    const before = label ? label.textContent : '';
+    // The idle words are read once, before the first press, so a press while "Copied" shows still restores them.
+    if (label) label.dataset.copyIdle ??= label.textContent;
     button.classList.toggle('is-copied', ok);
     if (label) label.textContent = ok ? 'Copied' : 'Press Ctrl+C';
     announce(ok ? 'Copied to the clipboard' : 'Copy failed; select the text and press Ctrl+C');
     clearTimeout(Number(button.dataset.copyTimer || 0));
     button.dataset.copyTimer = String(setTimeout(() => {
       button.classList.remove('is-copied');
-      if (label) label.textContent = before;
+      if (label) label.textContent = label.dataset.copyIdle;
     }, 2000));
   });
 }
@@ -330,8 +372,14 @@ function initDismiss() {
     box.hidden = true;
     const id = box.dataset.dismissible;
     if (id) {
-      store.set('psc-dismissed', [...new Set([...read(), id])].slice(-12).join(','));
+      if (store.set('psc-dismissed', [...new Set([...read(), id])].slice(-12).join(','))) tellOtherPages('dismissed');
     }
+  });
+  // A notice dismissed in another tab goes from this one too.
+  prefs?.addEventListener('message', (e) => {
+    if (e.data !== 'dismissed') return;
+    const now = read();
+    for (const box of $$('[data-dismissible]')) if (now.includes(box.dataset.dismissible)) box.hidden = true;
   });
 }
 
