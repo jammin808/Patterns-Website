@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Psc\Auth;
 
 use Psc\App;
+use Psc\Content\Content;
 use Psc\Controllers\DigestController;
 use Psc\News\Digest\DigestMail;
 use Psc\News\Digest\Subscribers;
@@ -46,6 +47,8 @@ final class Auth
 
     /** The per-account ceiling on failed sign-ins from all addresses together, as a multiple of the per-address limit. */
     private const ACCOUNT_CEILING_FACTOR = 10;
+
+    public const COUNTRY_ERROR = 'Choose a country from the list.';
 
     /** @var array<string, mixed>|null|false false = not looked up yet */
     private array|null|false $user = false;
@@ -187,6 +190,15 @@ final class Auth
     }
 
     /**
+     * An account's country as sent: none (''), or an ISO 3166-1 alpha-2 code from the contact form's list
+     * (content/countries.php). Anything else is refused, never guessed at.
+     */
+    public static function isCountry(string $code): bool
+    {
+        return $code === '' || array_key_exists($code, Content::countries());
+    }
+
+    /**
      * A one-line text field (a name, a company) as stored: valid UTF-8 only (anything else is empty), control
      * characters and runs of whitespace as one space, trimmed. Line breaks never reach an email or a page.
      */
@@ -316,7 +328,7 @@ final class Auth
      * Creates an account and sends the email check. An email that already has an account gets a notice instead,
      * and the caller is told "ok" either way, so the form never reveals who has an account.
      *
-     * @param array{name: string, email: string, company?: string, password: string, marketing?: bool, digest?: bool} $input
+     * @param array{name: string, email: string, company?: string, country?: string, password: string, marketing?: bool, digest?: bool} $input
      * @return array{ok: bool, errors: array<string, string>}
      */
     public function register(array $input): array
@@ -341,6 +353,7 @@ final class Auth
             'email' => $email,
             'name' => self::cleanLine($input['name']),
             'company' => self::cleanLine($input['company'] ?? '') ?: null,
+            'country' => ($input['country'] ?? '') !== '' ? $input['country'] : null,
             'password_hash' => $hash,
             'role' => $this->isAdminEmail($email) ? 'admin' : 'client',
             'status' => 'pending',
@@ -616,6 +629,9 @@ final class Auth
         }
         if (mb_strlen(self::cleanLine((string) ($input['company'] ?? ''))) > 160) {
             $errors['company'] = 'Keep the company name under 160 characters.';
+        }
+        if (!self::isCountry((string) ($input['country'] ?? ''))) {
+            $errors['country'] = self::COUNTRY_ERROR;
         }
         $pw = $this->passwordError((string) ($input['password'] ?? ''), $email);
         if ($pw !== null) {

@@ -15,7 +15,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 
 ## Creating an account
 
-- Choose Create an account (in the footer it reads Create a free account). Enter your name, your email address, an optional company and a password, and accept the terms of use. You can also choose to get emails about new releases and features, and turn that off later on the Account page.
+- Choose Create an account (in the footer it reads Create a free account). Enter your name, your email address, an optional company and country, and a password, and accept the terms of use. You can also choose to get emails about new releases and features, and turn that off later on the Account page.
 - The site then shows Check your email. Open the link in that email and press Confirm my email address on the page it opens; the link works for 48 hours. If the address already has an account, the email says so and explains how to sign in instead.
 - Nothing arrived? Emails can take a little while. Check the spam or junk folder and that the address was typed correctly. If the link has expired, sign in with the email address and password: the sign-in page explains that the address is not confirmed yet and offers to send a new link.
 - How sign-ups work can change. At times new accounts are checked by a person before they can sign in: the Create an account page says so, and an email follows when the account is ready. At times accounts are by invitation: the Create an account page says so and offers the contact form. An invited person gets an email with a link to set their password.
@@ -73,7 +73,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 
 ## Your account and your data
 
-- Account lets a signed-in client change their name, company and email preferences and their password, download a copy of their data, and delete their account.
+- Account lets a signed-in client change their name, company, country and email preferences and their password, download a copy of their data, and delete their account.
 - Licence records are kept after an account is deleted, for as long as the licence may be used and for the period accounting law requires. Tickets remain under "Deleted user". Industry Updates comments are deleted with the account. Deleting the account also ends any digest subscription and deletes the address from it. Unsubscribing from the digest deletes the address from it straight away.
 - The privacy policy explains what is collected and for how long; the cookies page lists the Google Analytics cookies the pages use (and how to block them) and the essential ones the contact form, the digest sign-up page, the portal, the assistant and commenting on Industry Updates use.
 

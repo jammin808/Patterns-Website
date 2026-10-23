@@ -45,7 +45,7 @@ $digestWords = content('news')['digest']['account'] ?? [];
             <?= form_guard('register', $old) ?>
             <?= $this->partial('error-summary', [
                 'errors' => $errors,
-                'fields' => ['name' => 'register-name', 'email' => 'register-email', 'company' => 'register-company', 'password' => 'register-password', 'terms' => 'register-terms'],
+                'fields' => ['name' => 'register-name', 'email' => 'register-email', 'company' => 'register-company', 'country' => 'register-country', 'password' => 'register-password', 'terms' => 'register-terms'],
                 'flashes' => $flashes ?? [],
                 'action' => 'before creating your account',
                 'failed' => $quick ? 'Your account is not created yet' : 'Your account was not created',
@@ -81,6 +81,11 @@ $digestWords = content('news')['digest']['account'] ?? [];
                 'autocomplete' => 'organization',
                 'maxlength' => 160,
                 'error' => $errors['company'] ?? null,
+            ]) ?>
+            <?= $this->render('portal/_country', [
+                'id' => 'register-country',
+                'value' => $old['country'] ?? '',
+                'error' => $errors['country'] ?? null,
             ]) ?>
             <?= $this->render('portal/auth/_field', [
                 'id' => 'register-password',

@@ -43,6 +43,7 @@ $summary = fn (string $form, array $fields, string $action, string $failed): str
 $fromProfile = array_key_exists('name', $old);
 $name = $fromProfile ? $old['name'] : (string) $account['name'];
 $company = $fromProfile ? ($old['company'] ?? '') : (string) ($account['company'] ?? '');
+$country = $fromProfile ? ($old['country'] ?? '') : (string) ($account['country'] ?? '');
 $marketing = $fromProfile ? ($old['marketing'] ?? '') === '1' : (int) $account['marketing_opt_in'] === 1;
 $digestTicked = $fromProfile ? ($old['digest'] ?? '') === '1' : $digest === true;
 $digestShown = $fromProfile
@@ -77,7 +78,7 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
     <form method="post" action="/portal/account/profile/" class="pt-form" novalidate>
         <?= csrf_field() ?>
         <input type="hidden" name="form" value="profile">
-        <?= $summary('profile', ['name' => 'profile-name', 'company' => 'profile-company'], 'before saving', 'Your details were not saved') ?>
+        <?= $summary('profile', ['name' => 'profile-name', 'company' => 'profile-company', 'country' => 'profile-country'], 'before saving', 'Your details were not saved') ?>
         <?= $this->render('portal/auth/_field', [
             'id' => 'profile-name',
             'name' => 'name',
@@ -96,6 +97,11 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
             'autocomplete' => 'organization',
             'maxlength' => 160,
             'error' => $errors['company'] ?? null,
+        ]) ?>
+        <?= $this->render('portal/_country', [
+            'id' => 'profile-country',
+            'value' => $country,
+            'error' => $errors['country'] ?? null,
         ]) ?>
         <div class="pt-field pt-field--inline">
             <input id="profile-marketing" name="marketing" type="checkbox" value="1"<?= $marketing ? ' checked' : '' ?> aria-describedby="profile-marketing-help">
@@ -196,7 +202,7 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
     <div class="pt-alert pt-alert--warning" role="status">
         <p><strong>This cannot be undone.</strong> You will be signed out and will not be able to sign in again with this account.</p>
     </div>
-    <p>We remove your name, email address, company and password straight away. Some records stay because they are business records:</p>
+    <p>We remove your name, email address, company, country and password straight away. Some records stay because they are business records:</p>
     <ul>
         <li>Licences stay on record<?php if ($kept['licences'] > 0): ?> (you have <?= e($licenceCount) ?>)<?php endif; ?>. Download any licence files you need first.</li>
         <li>Tickets and their comments stay<?php if ($kept['tickets'] > 0): ?> (you have <?= e($ticketCount) ?>)<?php endif; ?>, so conversations still make sense. They show &ldquo;Deleted user&rdquo; as the author.</li>

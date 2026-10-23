@@ -22,8 +22,8 @@ use Psc\Support\Uploads;
  * comment page, where it can be deleted, also on an article that is no longer live), a copy of their data, and
  * deleting the account. Every handler acts on the session's account only; nothing posted can name another one.
  *
- * Deleting anonymises rather than removes the row: tickets, ticket comments and licences are business records and
- * stay, shown as "Deleted user"; the name, email, company, password and every sign-in token go. Comments on Industry
+ * Deleting anonymises rather than removes the row: tickets, ticket comments and licences are business records and stay,
+ * shown as "Deleted user"; the name, email, company, country, password and every sign-in token go. Comments on Industry
  * Updates articles are public and no business record, so they go for good, with the reports the person made: the
  * anonymising UPDATE never fires the foreign keys' CASCADE, so they are deleted here, and the counts they touched
  * (an article's visible comments, a comment's reports) are counted again.
@@ -44,7 +44,7 @@ final class AccountController extends Controller
     public const NEWS_COMMENTS_SHOWN = 50;
 
     /** The profile columns a copy of the data carries (never the password hash or the sign-in counters). */
-    private const PROFILE_COLUMNS = ['id', 'email', 'name', 'company', 'role', 'status', 'marketing_opt_in', 'email_verified_at', 'last_login_at', 'created_at', 'updated_at'];
+    private const PROFILE_COLUMNS = ['id', 'email', 'name', 'company', 'country', 'role', 'status', 'marketing_opt_in', 'email_verified_at', 'last_login_at', 'created_at', 'updated_at'];
 
     private const LICENCE_COLUMNS = ['id', 'product', 'tier', 'status', 'quantity', 'nonprofit', 'hardware_ids', 'customer_note', 'reference', 'issued_at', 'updates_until', 'expires_at', 'created_at', 'updated_at'];
 
@@ -76,6 +76,7 @@ final class AccountController extends Controller
         $user = $this->user();
         $name = Auth::cleanLine($request->input('name'));
         $company = Auth::cleanLine($request->input('company'));
+        $country = $request->input('country');
         $marketing = $request->input('marketing') === '1' ? 1 : 0;
         $digest = $request->input('digest') === '1';
         $errors = [];
@@ -85,11 +86,14 @@ final class AccountController extends Controller
         if (mb_strlen($company) > 160) {
             $errors['company'] = 'Keep the company name under 160 characters.';
         }
+        if (!Auth::isCountry($country)) {
+            $errors['country'] = Auth::COUNTRY_ERROR;
+        }
         if ($errors !== []) {
             // To the form's error summary, which takes focus (a fragment on the section would leave it on the page).
             return $this->backWithErrors('/portal/account/#profile-errors', $request, $errors);
         }
-        $set = ['name' => $name, 'company' => $company !== '' ? $company : null, 'marketing_opt_in' => $marketing];
+        $set = ['name' => $name, 'company' => $company !== '' ? $company : null, 'country' => $country !== '' ? $country : null, 'marketing_opt_in' => $marketing];
         $changed = [];
         foreach ($set as $column => $value) {
             if ((string) ($user[$column] ?? '') !== (string) ($value ?? '')) {
@@ -221,6 +225,7 @@ final class AccountController extends Controller
                 'email' => self::anonymisedEmail($db, $id),
                 'name' => 'Deleted user',
                 'company' => null,
+                'country' => null,
                 'password_hash' => Auth::hash(bin2hex(random_bytes(32))),
                 'marketing_opt_in' => 0,
                 'failed_logins' => 0,

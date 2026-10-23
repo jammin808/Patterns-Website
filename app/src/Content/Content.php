@@ -59,7 +59,7 @@ final class Content
         return is_array($all) ? $all : [];
     }
 
-    /** @return list<string> the codes the contact form lists first */
+    /** @return list<string> the codes the contact and account forms list first */
     public static function topCountries(): array
     {
         $top = self::get('countries')['top'] ?? [];

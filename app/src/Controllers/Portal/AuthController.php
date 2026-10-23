@@ -151,6 +151,7 @@ final class AuthController extends Controller
             'name' => Auth::cleanLine($request->input('name')),
             'email' => trim($request->input('email')),
             'company' => Auth::cleanLine($request->input('company')),
+            'country' => $request->input('country'),
             'password' => $request->input('password'),
             'marketing' => $request->input('marketing') === '1',
             'digest' => $request->input('digest') === '1',

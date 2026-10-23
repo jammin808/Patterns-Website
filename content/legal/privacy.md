@@ -6,7 +6,7 @@ Patterns Show Control is run by Ben Rohleder in the United Kingdom, who is the c
 
 ## What we collect and why
 
-- **Your account** (name, email address, optional company, a hashed password, whether you want product news): to run the client portal. Lawful basis: our contract with you.
+- **Your account** (name, email address, optional company and country, a hashed password, whether you want product news): to run the client portal. Lawful basis: our contract with you.
 - **Licence requests and licences** (product, plan, hardware IDs you send, nonprofit organisation name, notes, the licence files we issue): to issue and support your licences and keep business records. Lawful basis: contract, and legal obligation for accounting records.
 - **Bug reports, questions, feature requests, their comments, votes and attachments**: to support the software and plan improvements. Feature requests and their comments are visible to other signed-in clients; bug reports and questions are private to you and us unless we agree otherwise. Lawful basis: contract and our legitimate interest in improving the products.
 - **Comments on Industry Updates articles** (what you write, when, and the reports you make about other people's comments): to publish the discussion under each article and keep it civil. Comments are public: anyone can read them, signed in or not, with your first name and the initial of your last name, never your full name or email address. Reports are seen only by us. Lawful basis: our legitimate interest in running the news section; whether to post is your choice.

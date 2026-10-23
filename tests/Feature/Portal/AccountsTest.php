@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Tests\Feature\Portal;
 
+use Psc\Auth\Auth;
 use Psc\Controllers\Controller;
 use Psc\Http\Response;
 use Psc\Tests\TestCase;
@@ -695,7 +696,7 @@ final class AccountsTest extends TestCase
     public function testDeletingAnonymisesTheAccountKeepsBusinessRecordsAndBlocksSignIn(): void
     {
         $id = $this->makeUser();
-        $this->db->update('users', ['company' => 'Front of House Ltd', 'marketing_opt_in' => 1], ['id' => $id]);
+        $this->db->update('users', ['company' => 'Front of House Ltd', 'country' => 'GB', 'marketing_opt_in' => 1], ['id' => $id]);
         $ticket = $this->db->insert('tickets', ['user_id' => $id, 'type' => 'bug', 'product' => 'stagewatch', 'title' => 'Clock drifts', 'body' => 'It drifts.', 'last_activity_at' => time(), 'created_at' => time(), 'updated_at' => time()]);
         $licence = $this->db->insert('licences', ['user_id' => $id, 'product' => 'stagewatch', 'tier' => 'pro', 'status' => 'issued', 'reference' => 'SW-TEST-1', 'created_at' => time(), 'updated_at' => time()]);
         $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'remember' => '1']);
@@ -717,6 +718,7 @@ final class AccountsTest extends TestCase
         self::assertSame('deleted-' . $id . '@deleted.invalid', $row['email']);
         self::assertSame('Deleted user', $row['name']);
         self::assertNull($row['company']);
+        self::assertNull($row['country']);
         self::assertSame(0, (int) $row['marketing_opt_in']);
         self::assertFalse(password_verify(self::PASSWORD, (string) $row['password_hash']));
         self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM user_tokens WHERE user_id = ?', [$id]));
@@ -1296,5 +1298,91 @@ final class AccountsTest extends TestCase
         self::assertSame('/news/old-story/comment/', $_SESSION[\Psc\Controllers\Portal\AuthController::RETURN_KEY]);
         $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'next' => '/news/old-story/comment/']);
         self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION);
+    }
+
+    // ------------------------------------------------------------ country
+
+    public function testSigningUpTakesAnOptionalCountryFromTheList(): void
+    {
+        $form = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<select id="register-country" name="country" autocomplete="country">', $form);
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $form, 'none is chosen until the person chooses');
+        self::assertStringContainsString('<optgroup label="Most common">', $form);
+        self::assertStringContainsString('<option value="IE">Ireland</option>', $form);
+
+        $this->register('none@example.test');
+        $none = $this->db->one('SELECT id, country FROM users WHERE email = ?', ['none@example.test']);
+        self::assertNotNull($none);
+        self::assertNull($none['country'], 'no choice is stored as none');
+        self::assertStringContainsString('Check your email', $this->request('GET', '/portal/register/')->body);
+
+        $r = $this->register('bogus@example.test', ['country' => 'XX']);
+        self::assertRedirect($r, '/portal/register/');
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM users WHERE email = ?', ['bogus@example.test']), 'a code not on the list is refused, never stored');
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<a href="#register-country">' . Auth::COUNTRY_ERROR . '</a>', $page);
+        self::assertStringContainsString('<select id="register-country" name="country" autocomplete="country" aria-invalid="true" aria-describedby="register-country-error">', $page);
+
+        $this->register('kept@example.test', ['country' => 'IE', 'terms' => '']);
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertSame(1, substr_count($page, '<option value="IE" selected>'), 'the choice comes back with the rest of the form');
+        self::assertStringContainsString('<option value="">Choose a country</option>', $page);
+
+        $this->register('gb@example.test', ['country' => 'GB']);
+        self::assertSame('GB', $this->db->value('SELECT country FROM users WHERE email = ?', ['gb@example.test']));
+        self::assertStringContainsString('Check your email', $this->request('GET', '/portal/register/')->body);
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $page, 'a sign-up that went through leaves nothing chosen');
+
+        $this->register('gb-again@example.test', ['country' => 'GB', 'terms' => '']);
+        self::assertSame(1, substr_count($this->request('GET', '/portal/register/')->body, '<option value="GB" selected>'), 'a country in both groups is selected once, in the first');
+
+        $this->signInAdmin();
+        $id = (int) $this->db->value('SELECT id FROM users WHERE email = ?', ['gb@example.test']);
+        $admin = $this->request('GET', '/portal/admin/users/' . $id . '/')->body;
+        self::assertStringContainsString("<dt>Country</dt>\n        <dd>United Kingdom</dd>", $admin);
+        $admin = $this->request('GET', '/portal/admin/users/' . (int) $none['id'] . '/')->body;
+        self::assertStringContainsString("<dt>Country</dt>\n        <dd><span class=\"pt-muted\">Not given</span></dd>", $admin);
+    }
+
+    public function testTheApprovalEmailNamesTheCountry(): void
+    {
+        $this->bootApp(['security' => ['registration' => 'approval']]);
+        $this->register('nina@example.test', ['country' => 'IE']);
+        $url = $this->mailUrl('nina@example.test', 'verify-email');
+        $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $admin = $this->lastMailTo('owner@example.test');
+        self::assertNotNull($admin);
+        self::assertSame('admin-approval', $admin['template']);
+        self::assertStringContainsString('>Country</td><td>Ireland</td>', $admin['html']);
+    }
+
+    public function testTheAccountPageSetsChangesAndClearsTheCountry(): void
+    {
+        $me = $this->makeUser();
+        $this->signIn();
+        $page = $this->request('GET', '/portal/account/')->body;
+        self::assertStringContainsString('<select id="profile-country" name="country" autocomplete="country">', $page);
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $page);
+
+        $r = $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => 'US']);
+        self::assertRedirect($r, '/portal/account/');
+        self::assertSame('US', $this->db->value('SELECT country FROM users WHERE id = ?', [$me]));
+        self::assertSame(1, substr_count($this->request('GET', '/portal/account/')->body, '<option value="US" selected>'));
+        $audit = json_decode((string) $this->db->value("SELECT meta FROM audit_log WHERE action = 'account.profile_updated' AND user_id = ? ORDER BY id DESC LIMIT 1", [$me]), true);
+        self::assertSame(['country'], $audit['fields'] ?? null, 'only what changed is recorded');
+
+        $r = $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => 'Narnia']);
+        self::assertRedirect($r, '/portal/account/#profile-errors');
+        self::assertSame('US', $this->db->value('SELECT country FROM users WHERE id = ?', [$me]), 'a refused change keeps the saved one');
+        $page = $this->request('GET', '/portal/account/')->body;
+        self::assertStringContainsString('<a href="#profile-country">' . Auth::COUNTRY_ERROR . '</a>', $page);
+        self::assertStringContainsString('aria-describedby="profile-country-error"', $page);
+
+        $data = json_decode($this->request('GET', '/portal/account/export/')->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('US', $data['profile']['country'], 'the copy of their data holds it');
+
+        $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => '']);
+        self::assertNull($this->db->value('SELECT country FROM users WHERE id = ?', [$me]), 'choosing none clears it');
     }
 }
