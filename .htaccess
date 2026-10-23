@@ -6,6 +6,14 @@ Options -Indexes -MultiViews
 DirectoryIndex index.php
 ServerSignature Off
 
+# PHP settings that must hold before PHP reads a request, so they cannot be set from the application. LiteSpeed
+# (Hostinger) applies them per request; other servers skip the block. Upload progress stays off: the site never uses
+# it, and it is the confirmed path of CVE-2026-109619 (php.net's advisory of 21 October 2026). The admin overview's
+# Server card shows the value PHP actually runs with.
+<IfModule LiteSpeed>
+    php_flag session.upload_progress.enabled off
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 

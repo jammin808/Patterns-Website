@@ -71,6 +71,9 @@ final class App
     {
         $root = defined('PSC_ROOT') ? (string) PSC_ROOT : dirname(__DIR__, 2);
         $config ??= Config::load($root);
+        // A stack trace never carries an argument's value (a password, a key, a typed sign-in), in any SAPI; the
+        // functions that take secrets also mark them #[\SensitiveParameter] for code that reads the trace itself.
+        ini_set('zend.exception_ignore_args', '1');
         self::$instance = new self($config, $root);
         self::$instance->installErrorHandlers();
         return self::$instance;
@@ -481,6 +484,14 @@ final class App
             }
             $this->log->warning('php', ['severity' => $severity, 'message' => $message, 'file' => $file . ':' . $line]);
             return true;
+        });
+        // A fatal error (memory, a time limit, a parse error) never reaches the handler above: it is written to the
+        // site log as the request ends, so the owner sees it there too.
+        register_shutdown_function(function (): void {
+            $e = error_get_last();
+            if ($e !== null && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+                $this->log->error('php fatal', ['severity' => $e['type'], 'message' => $e['message'], 'file' => $e['file'] . ':' . $e['line']]);
+            }
         });
     }
 }

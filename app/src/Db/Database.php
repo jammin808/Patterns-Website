@@ -25,11 +25,12 @@ final class Database
         }
     }
 
-    public static function connect(string $dsn, string $user = '', string $password = ''): self
+    public static function connect(string $dsn, string $user = '', #[\SensitiveParameter] string $password = ''): self
     {
         $options = [PDO::ATTR_TIMEOUT => 5];
         if (str_starts_with($dsn, 'mysql:')) {
-            $options[PDO::MYSQL_ATTR_INIT_COMMAND] = "SET NAMES utf8mb4, time_zone = '+00:00', sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION'";
+            // The driver's own class holds the key from PHP 8.4 (PDO's copy is deprecated from 8.5); both are 1002.
+            $options[\PHP_VERSION_ID >= 80400 ? \Pdo\Mysql::ATTR_INIT_COMMAND : PDO::MYSQL_ATTR_INIT_COMMAND] = "SET NAMES utf8mb4, time_zone = '+00:00', sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION'";
         }
         return new self(new PDO($dsn, $user !== '' ? $user : null, $password !== '' ? $password : null, $options));
     }

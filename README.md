@@ -19,7 +19,7 @@ The marketing, support and client-portal website for the Patterns Show Control e
 
 ## Stack
 
-PHP 8.2+ with no framework, MySQL (SQLite for development and tests), plain modern CSS and small vanilla
+PHP 8.4+ with no framework, MySQL (SQLite for development and tests), plain modern CSS and small vanilla
 JavaScript modules. The only Composer packages are the official Anthropic PHP SDK and Guzzle, used by the assistant
 and the Industry Updates desk. Hosted on Hostinger (LiteSpeed): see [docs/DEPLOY.md](docs/DEPLOY.md).
 

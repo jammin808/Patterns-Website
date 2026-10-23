@@ -199,7 +199,7 @@ final class Mailer
      * @param resource $fp
      * @param int|list<int> $code
      */
-    private function command($fp, string $line, int|array $code, bool $secret = false): string
+    private function command($fp, #[\SensitiveParameter] string $line, int|array $code, bool $secret = false): string
     {
         fwrite($fp, $line . "\r\n");
         try {

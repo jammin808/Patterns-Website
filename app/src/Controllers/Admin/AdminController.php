@@ -119,7 +119,28 @@ final class AdminController extends Controller
             'products' => DownloadController::productNames(),
             'topics' => ContactController::TOPICS,
             'configShadowed' => $this->app->config->shadowed(),
+            'server' => self::serverFacts(),
         ], 'Admin overview');
+    }
+
+    /**
+     * The PHP this request ran on, read from PHP itself rather than from the hosting panel, so the overview shows
+     * what is in force: the version and its server interface, and the settings the site's hardening depends on
+     * (docs/DEPLOY.md, PHP). Each fact says whether it is as the site wants it; none is a secret.
+     *
+     * @return list<array{label: string, value: string, ok: bool}>
+     */
+    public static function serverFacts(): array
+    {
+        $on = static fn (string $ini): bool => filter_var(ini_get($ini), FILTER_VALIDATE_BOOLEAN);
+        return [
+            ['label' => 'PHP', 'value' => PHP_VERSION . ' (' . PHP_SAPI . ')', 'ok' => PHP_VERSION_ID >= 80400],
+            ['label' => 'Upload progress', 'value' => $on('session.upload_progress.enabled') ? 'On' : 'Off', 'ok' => !$on('session.upload_progress.enabled')],
+            ['label' => 'Arguments in error traces', 'value' => $on('zend.exception_ignore_args') ? 'Hidden' : 'Shown', 'ok' => $on('zend.exception_ignore_args')],
+            ['label' => 'PHP version in responses', 'value' => $on('expose_php') ? 'Sent' : 'Not sent', 'ok' => !$on('expose_php')],
+            ['label' => 'Largest request', 'value' => (string) ini_get('post_max_size') . ', files up to ' . (string) ini_get('upload_max_filesize'), 'ok' => true],
+            ['label' => 'Password hashing', 'value' => defined('PASSWORD_ARGON2ID') ? 'Argon2id' : 'bcrypt', 'ok' => true],
+        ];
     }
 
     /**
