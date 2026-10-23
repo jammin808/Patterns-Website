@@ -26,9 +26,11 @@ return [
         ['label' => 'News', 'href' => '/news/'],             // Industry Updates; the bar fits a short label only
         ['label' => 'Support', 'href' => '/support/'],
     ],
-    'footer' => [ ['title' => 'Products', 'links' => [['label' => …, 'href' => …], …]], … ], // Company lists Industry Updates
+    'footer' => [ ['title' => 'Products', 'links' => [['label' => …, 'href' => …], …]], … ], // Company lists Industry Updates and its editorial standards
     'trademarks' => '…NDI® is a registered trademark of Vizrt NDI AB. … belong to their owners…',
-    'block_training' => false, // robots.txt: true asks model-training crawlers to stay away
+    'block_training' => true,  // robots.txt: true asks the model-training crawlers to stay away (the owner's choice)
+    'ai_search' => true,       // robots.txt: false would ask the AI search and answer engines to stay away too
+    'same_as' => [],           // the organisation's own profiles, full https addresses: the Organization's sameAs
 ];
 ```
 
@@ -122,3 +124,11 @@ source rules of docs/NEWS.md §7 keep it true instead. The launch articles in `c
 imported into the database once, and the same applies to them. The articles' voice is `content/news/voice.md` (and
 the research brief `content/news/brief.md`): the AI desk's defaults, which an administrator edits on the desk's
 prompt page. No em dash in any of them; the site's dash fence reads all of `content/`.
+
+`content/news.php` also holds the words of the section's reader features (docs/NEWS.md §10): `follow` (the follow
+row on the hubs: the RSS feed, Feedly, Inoreader and Google preferred source), `share` (the share row and Copy link
+on an article), `corrections` (the dated note under a corrected article's headline), `standards_link` (the AI note's
+way to the standards page), `latest` (the newest articles on the home and product pages), `products` (each
+product's categories for its strip) and `standards` (the editorial standards page, `/news/standards/`, in Markdown;
+`:editor` is the site's publisher). Every claim on the standards page is one the code keeps: change the page when
+the desk's checks or the corrections change.

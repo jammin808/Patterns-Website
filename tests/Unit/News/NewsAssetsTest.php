@@ -35,6 +35,16 @@ final class NewsAssetsTest extends TestCase
         'public/assets/js/news.js',
         'public/assets/img/news-art.svg',
         'content/news.php',
+        'templates/partials/news/follow.php',
+        'templates/partials/news/share.php',
+        'templates/partials/news/latest.php',
+        'templates/news/standards.php',
+        'public/assets/css/pages/news-latest.css',
+        'app/src/News/Announcer.php',
+        'app/src/News/Latest.php',
+        'app/src/News/HttpPingTransport.php',
+        'database/migrations/mysql/0006_news_exposure.sql',
+        'database/migrations/sqlite/0006_news_exposure.sql',
     ];
 
     public function testTheArtworkIsOneMonochromeSymbolPerCategory(): void
@@ -67,7 +77,25 @@ final class NewsAssetsTest extends TestCase
 
     public function testTheStylesheetUsesTokensUnderItsOwnPrefix(): void
     {
-        $css = (string) file_get_contents(PSC_ROOT . '/public/assets/css/pages/news.css');
+        self::assertGreaterThan(20, count(self::assertTokensUnderPrefix('public/assets/css/pages/news.css', '.news-')));
+    }
+
+    /** The strips of the newest articles on the home and product pages: a stylesheet of their own, by the same rules. */
+    public function testTheLatestStripsStylesheetUsesTokensUnderItsOwnPrefix(): void
+    {
+        self::assertGreaterThan(4, count(self::assertTokensUnderPrefix('public/assets/css/pages/news-latest.css', '.news-latest')));
+        self::assertStringContainsString("asset('/assets/css/pages/news-latest.css')", (string) file_get_contents(PSC_ROOT . '/templates/partials/news/latest.php'), 'pushed by the strip itself');
+    }
+
+    /**
+     * Asserts that the stylesheet sits in the components layer, uses no raw colour, and names $prefix in each selector
+     * of every rule not nested in another; returns those rules' selectors.
+     *
+     * @return list<string>
+     */
+    private static function assertTokensUnderPrefix(string $file, string $prefix): array
+    {
+        $css = (string) file_get_contents(PSC_ROOT . '/' . $file);
         $code = (string) preg_replace('#/\*.*?\*/#s', '', $css);
         self::assertStringStartsWith('@layer components {', trim($code));
         self::assertSame(0, preg_match('/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/i', $code), 'tokens only, no raw colours');
@@ -92,12 +120,12 @@ final class NewsAssetsTest extends TestCase
                 $prelude .= $ch;
             }
         }
-        self::assertGreaterThan(20, count($outer));
         foreach ($outer as $selectors) {
             foreach (explode(',', $selectors) as $selector) {
-                self::assertStringContainsString('.news-', $selector, $selectors);
+                self::assertStringContainsString($prefix, $selector, $selectors);
             }
         }
+        return $outer;
     }
 
     public function testTheScriptReportsClicksTheWayTheEndpointAccepts(): void

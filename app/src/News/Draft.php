@@ -71,6 +71,13 @@ final class Draft
     public string $importKey = '';
     /** Why an AI article was held as a draft. */
     public ?string $reviewReason = null;
+    /**
+     * Each correction made after the article went live, the oldest first: when it was made and what it says
+     * (docs/NEWS.md §11, the corrections policy on /news/standards/). Never written by the desk.
+     *
+     * @var list<array{at: int, text: string}>
+     */
+    public array $corrections = [];
     /** @var array<string, string> field => what could not be read (Validator reports them as errors) */
     public array $problems = [];
     /** @var list<array{rule: string, detail: string}> what fromArray() changed in an AI draft (Validator warns) */
@@ -155,6 +162,9 @@ final class Draft
             default => $byline,
         };
 
+        if ($origin !== 'ai') {
+            $d->corrections = self::correctionRows($data['corrections'] ?? []);
+        }
         if ($origin === 'ai') {
             $d->readReferenced($data, self::refMap($refs));
         } else {
@@ -198,6 +208,7 @@ final class Draft
             'slug' => $this->slug,
             'key' => $this->importKey,
             'review_reason' => $this->reviewReason,
+            'corrections' => $this->corrections,
         ];
     }
 
@@ -221,6 +232,7 @@ final class Draft
             'kind' => $s['kind'],
         ], $d->sources);
         $d->tags = array_values(array_unique(array_filter(array_map(static fn (string $t): string => trim(mb_strtolower(Prose::undash($t)), " \t,"), $d->tags), static fn (string $t): bool => $t !== '')));
+        $d->corrections = array_map(static fn (array $c): array => ['at' => $c['at'], 'text' => trim(Prose::undash($c['text']))], $d->corrections);
         return $d;
     }
 
@@ -287,7 +299,22 @@ final class Draft
             $out['sources.' . $i . '.title'] = $s['title'];
             $out['sources.' . $i . '.publisher'] = $s['publisher'];
         }
+        foreach ($this->corrections as $i => $c) {
+            $out['corrections.' . $i] = $c['text'];
+        }
         return $out;
+    }
+
+    /**
+     * Corrections as stored (a JSON list) or as given (a list): each {at, text} with a time and words, the oldest
+     * first; anything else is left out.
+     *
+     * @return list<array{at: int, text: string}>
+     */
+    public static function corrections(mixed $value): array
+    {
+        $list = is_string($value) && $value !== '' ? json_decode($value, true) : $value;
+        return self::correctionRows(is_array($list) ? $list : []);
     }
 
     /** How many em and en dashes the text fields hold (Prose::undash() replaces them on save). */
@@ -526,6 +553,26 @@ final class Draft
             return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $default;
         }
         return $default;
+    }
+
+    /**
+     * @return list<array{at: int, text: string}> the rows that have a time and words, the oldest first
+     */
+    private static function correctionRows(mixed $rows): array
+    {
+        $out = [];
+        foreach (is_array($rows) ? array_slice(array_values($rows), 0, 100) : [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $at = self::time($row['at'] ?? null);
+            $text = self::line($row['text'] ?? '');
+            if ($at !== null && $text !== '') {
+                $out[] = ['at' => $at, 'text' => $text];
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => $a['at'] <=> $b['at']);
+        return $out;
     }
 
     /** Unix seconds from an int, digits, or a date and time (ISO 8601; without an offset, in the site's time zone). */

@@ -5,6 +5,7 @@
  *
  * Every fact comes from content/products/<key>.php ($product) and content/licensing/<key>.php ($licensing).
  * The FAQ carries the product's FAQPage schema (on this page only); the controller adds the SoftwareApplication.
+ * Before the FAQ, the newest Industry Updates articles in the product's areas (partials/news/latest), when there are any.
  *
  * @var string $productKey
  * @var array<string, mixed> $product
@@ -298,6 +299,31 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
         <?php endif; ?>
     </div>
 </section>
+
+<?php
+// The newest Industry Updates articles in the areas this product works in (content/news.php 'products'), from the
+// latest-articles file: no database is read, and with no file nothing is drawn. The strip links only the hubs with a
+// live article in the file, never an empty, noindexed one; the lede names every area, each in running text (a name
+// in capitals, AI, keeps them).
+$newsKeys = \Psc\News\Latest::productCategories($key);
+$newsLists = \Psc\News\Latest::read(\Psc\App::get()) ?? [];
+$newsHubs = array_values(array_filter($newsKeys, static fn (string $k): bool => ($newsLists[$k] ?? []) !== []));
+$newsCopy = content('news')['latest'] ?? [];
+$newsNames = array_map(static function (string $k): string {
+    $n = \Psc\News\Categories::name($k);
+    return $n === mb_strtoupper($n) ? $n : mb_strtolower($n);
+}, $newsKeys);
+$newsList = count($newsNames) > 1 ? implode(', ', array_slice($newsNames, 0, -1)) . ' and ' . end($newsNames) : implode('', $newsNames);
+?>
+<?php if ($newsKeys !== []): ?>
+<?= $this->partial('news/latest', [
+    'items' => \Psc\News\Latest::forCategories(\Psc\App::get(), $newsKeys),
+    'hubs' => $newsHubs,
+    'title' => (string) ($newsCopy['product_title'] ?? 'From Industry Updates'),
+    'lede' => strtr((string) ($newsCopy['product_lede'] ?? ''), [':categories' => $newsList, ':product' => $name]),
+    'id' => 'news-latest-title',
+]) ?>
+<?php endif; ?>
 
 <?php if (!empty($product['faqs'])): ?>
 <section class="l-section" aria-labelledby="faq-title">

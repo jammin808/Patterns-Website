@@ -8,6 +8,7 @@ use Psc\App;
 use Psc\Controllers\Controller;
 use Psc\Http\Request;
 use Psc\Http\Response;
+use Psc\News\Announcer;
 use Psc\News\AnthropicNewsModel;
 use Psc\News\Pipeline;
 use Psc\News\Pricing;
@@ -110,7 +111,42 @@ final class AdminNewsDeskController extends Controller
             'runs' => $runs->recent(20),
             'perWeek' => Schedule::perWeek($settings),
             'hasOverrides' => $settings->get('date_overrides') !== [],
+            'announce' => $this->announceState(),
         ], 'The AI desk');
+    }
+
+    /**
+     * What the tick last told the search engines (IndexNow) and the feed hub (WebSub), as the desk page says it: off
+     * (and why), nothing yet, told (when, how many addresses), or failing (the status, and when it tries again).
+     *
+     * @return array<string, array{label: string, text: string, failing: bool}>
+     */
+    private function announceState(): array
+    {
+        $announcer = new Announcer($this->app);
+        $on = ['indexnow' => Announcer::indexNowOn($this->app) && Announcer::endpoint($this->app) !== '', 'websub' => Announcer::hub($this->app) !== ''];
+        // An off channel names its own cause: the switch, an empty setting, or an address that is not https.
+        $config = $this->app->config;
+        $hub = trim($config->string('news.websub_hub', Announcer::WEBSUB_HUB));
+        $off = [
+            'indexnow' => !Announcer::indexNowOn($this->app) ? 'Off (news.indexnow is false).' : 'Off (news.indexnow_endpoint is not an https address).',
+            'websub' => $hub === '' ? 'Off (news.websub_hub is empty).' : 'Off (news.websub_hub is not an https address).',
+        ];
+        $labels = ['indexnow' => 'Search engines (IndexNow)', 'websub' => 'Feed readers (WebSub hub)'];
+        $out = [];
+        foreach (Announcer::CHANNELS as $channel) {
+            $state = $announcer->state($channel);
+            $when = static fn (int $ts): string => date('j M Y, H:i', $ts);
+            $text = match (true) {
+                !$on[$channel] => $off[$channel],
+                $state['last_status'] === 'failed' => 'Not answering (' . ($state['last_http'] > 0 ? 'HTTP ' . $state['last_http'] : 'no answer') . ' at ' . $when($state['last_at'])
+                    . '). Tries again from ' . $when($state['retry_at']) . '.' . ($state['sent_at'] > 0 ? ' Last told ' . $when($state['sent_at']) . '.' : ''),
+                $state['sent_at'] > 0 => 'Last told ' . $when($state['sent_at']) . ' (' . $state['last_urls'] . ' ' . ($state['last_urls'] === 1 ? 'address' : 'addresses') . ').',
+                default => 'Nothing told yet.' . ($this->app->config->isProduction() ? ' The next tick tells it what is live.' : ' Only the live site tells it anything.'),
+            };
+            $out[$channel] = ['label' => $labels[$channel], 'text' => $text, 'failing' => $on[$channel] && $state['last_status'] === 'failed'];
+        }
+        return $out;
     }
 
     public function control(Request $request): Response

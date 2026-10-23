@@ -2,12 +2,13 @@
 /**
  * /news/{category}/{slug}/: one article, in the order docs/NEWS.md §10 sets. The hero holds the breadcrumbs (put
  * there by the layout), the category tags (each its hub's link), the headline, the standfirst and the meta line; then
- * the follow-up banner, the lead image or the category's artwork, the body, what is confirmed and what is still
- * speculation (each fact with its badge and its source), what it means, the verdict, the other images, the numbered
- * sources, the later updates, the note on AI-written articles, the newest of its category (More in) and the
- * comments. Every source link is real (rel nofollow, a new tab) and carries data-news-link, which news.js counts.
- * Every link to another article is that article's own address. The page is the same for every visitor; the
- * administrators' preview adds a banner and leaves out the counting and the comments.
+ * the corrections (dated, when it has any), the follow-up banner, the lead image or the category's artwork, the
+ * body, what is confirmed and what is still speculation (each fact with its badge and its source), what it means, the
+ * verdict, the other images, the numbered sources, the later updates, the note on AI-written articles (with the way
+ * to the editorial standards), the share row, the newest of its category (More in) and the comments. Every source
+ * link is real (rel nofollow, a new tab) and carries data-news-link, which news.js counts. Every link to another
+ * article is that article's own address. The page is the same for every visitor; the administrators' preview adds a
+ * banner and leaves out the counting, the share row and the comments.
  *
  * @var array<string, mixed> $copy  content/news.php
  * @var array<string, mixed> $article  ArticleStore::findBySlug() or find()
@@ -18,8 +19,8 @@
  * @var array<string, array{name: string}> $categories
  * @var string $byline
  * @var int|null $published
- * @var int|null $updated  set when the article changed after it went live
- * @var int $modified  its last change that counts: $updated, else the time it went live
+ * @var int|null $updated  set when the article changed after it went live, or has a correction: $modified
+ * @var int $modified  its last change that counts (ArticleStore::lastChange()), else the time it went live
  * @var int $readMinutes
  * @var string $body  rendered Markdown
  * @var string $impact  rendered Markdown, its headings one level down
@@ -31,6 +32,7 @@
  * @var array<string, mixed>|null $lead  NewsController::picture()
  * @var list<array<string, mixed>> $images  the other pictures
  * @var string $aiNote
+ * @var list<array{at: int, text: string}> $corrections  the dated corrections, the oldest first
  * @var list<array<string, mixed>> $comments
  * @var list<array{0: string, 1: string}> $feeds  the RSS feeds the page names: address, title
  * @var \Psc\View\Seo $seo
@@ -64,8 +66,8 @@ $when = static fn (int $ts): string => '<time datetime="' . e(date(DATE_ATOM, $t
 $verdict = $copy['verdicts'][(string) ($article['verdict'] ?? '')] ?? null;
 // A source link names its source; the source list's links name their pages.
 $out = static fn (string $url, ?int $id, string $label): string => '<a href="' . e($url) . '" rel="nofollow noopener" target="_blank"' . ($id !== null ? ' data-news-link="' . $id . '"' : '') . '>' . e($label) . $newTab . '</a>';
-// Tell us (in the editable note) is the way to the contact page.
-$note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>', e($aiNote), 1);
+// Tell us (in the editable note) is the way to the contact page, with the topic a correction comes under chosen.
+$note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/?topic=other">Tell us</a>', e($aiNote), 1);
 ?>
 <section class="c-hero c-hero--page news-story-hero" aria-labelledby="story-title">
     <div class="l-wrap l-wrap--prose">
@@ -102,6 +104,19 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
 
 <div class="l-section l-section--flush news-story">
     <div class="l-wrap l-wrap--prose news-story-wrap">
+        <?php if ($corrections !== []): $fix = is_array($copy['corrections'] ?? null) ? $copy['corrections'] : []; ?>
+            <div class="c-callout c-callout--info news-corrections" id="corrections" role="note">
+                <?= icon('edit') ?>
+                <strong class="c-callout-title"><?= e(count($corrections) === 1 ? ($fix['one'] ?? 'Correction') : ($fix['many'] ?? 'Corrections')) ?></strong>
+                <ul class="news-corrections-list" role="list">
+                    <?php foreach ($corrections as $c): ?>
+                        <li><time datetime="<?= e(date(DATE_ATOM, (int) $c['at'])) ?>"><?= e(date('j F Y', (int) $c['at'])) ?></time>: <?= e($c['text']) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                <p><a href="<?= e(Paths::standards()) ?>#corrections"><?= e($fix['policy'] ?? 'How we correct articles') ?></a></p>
+            </div>
+        <?php endif; ?>
+
         <?php if ($related['earlier'] !== []): ?>
             <div class="c-callout c-callout--info news-followup" role="note">
                 <?= icon('link') ?>
@@ -208,7 +223,12 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/">Tell us</a>'
             <div class="c-callout news-ainote" role="note">
                 <?= icon('sparkles') ?>
                 <p><?= $note ?></p>
+                <p><a href="<?= e(Paths::standards()) ?>"><?= e($copy['standards_link'] ?? 'How Industry Updates is made') ?></a></p>
             </div>
+        <?php endif; ?>
+
+        <?php if (!$preview): ?>
+            <?= $this->partial('news/share', ['copy' => $copy, 'url' => $seo->canonical(), 'title' => (string) $article['title']]) ?>
         <?php endif; ?>
 
         <?php if ($primary !== null): ?>

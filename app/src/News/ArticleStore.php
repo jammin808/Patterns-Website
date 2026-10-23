@@ -40,7 +40,7 @@ final class ArticleStore
     private const PRIMARY = '(SELECT c.category FROM news_article_categories c WHERE c.article_id = a.id ORDER BY c.position, c.category LIMIT 1)';
 
     private const LIST_COLUMNS = 'a.id, a.slug, a.title, a.seo_title, a.dek, a.summary, a.verdict, a.tags, a.byline, a.status,'
-        . ' a.published_at, a.origin, a.ai_written, a.story_key, a.comments_open, a.comment_count, a.word_count, a.created_at, a.updated_at';
+        . ' a.published_at, a.origin, a.ai_written, a.story_key, a.comments_open, a.comment_count, a.word_count, a.created_at, a.updated_at, a.corrected_at';
 
     public function __construct(private readonly App $app)
     {
@@ -96,11 +96,12 @@ final class ArticleStore
      * article has been saved, published or unpublished since, nothing is written and the answer is null, so a stale
      * form never overwrites someone else's change; the check and the write are one statement. A save it allows
      * always moves updated_at past the expected one, so a form made from the row before a save is stale after it,
-     * even within the same second.
+     * even within the same second. $now is the save's own clock reading (the time the editor dated a new correction
+     * with, so its date and updated_at are one reading); without it the store reads the clock.
      *
      * @return list<string>|null null: the article changed since $expectedUpdatedAt
      */
-    public function update(int $id, Draft $draft, ?int $userId, ?int $expectedUpdatedAt = null): ?array
+    public function update(int $id, Draft $draft, ?int $userId, ?int $expectedUpdatedAt = null, ?int $now = null): ?array
     {
         $db = $this->db();
         $old = $db->one('SELECT * FROM news_articles WHERE id = ?', [$id]);
@@ -120,7 +121,7 @@ final class ArticleStore
         }
         $changed = [];
         foreach ($cols as $k => $v) {
-            if ($k !== 'word_count' && (string) ($old[$k] ?? '') !== (string) ($v ?? '')) {
+            if ($k !== 'word_count' && $k !== 'corrected_at' && (string) ($old[$k] ?? '') !== (string) ($v ?? '')) {
                 $changed[] = $k;
             }
         }
@@ -147,7 +148,8 @@ final class ArticleStore
         if ($changed === []) {
             return [];
         }
-        $now = $expectedUpdatedAt !== null ? max(time(), $expectedUpdatedAt + 1) : time();
+        $now ??= time();
+        $now = $expectedUpdatedAt !== null ? max($now, $expectedUpdatedAt + 1) : $now;
         $where = ['id' => $id] + ($expectedUpdatedAt !== null ? ['updated_at' => $expectedUpdatedAt] : []);
         $written = $db->transaction(function (Database $db) use ($id, $cols, $slug, $d, $categories, $followUps, $now, $where, $expectedUpdatedAt): bool {
             // The article's row is written first: when a save since has moved updated_at, it matches no row and
@@ -495,14 +497,16 @@ final class ArticleStore
     }
 
     /**
-     * The article's last change that counts: updatedAfterLive(), else the time it went live (else its last save). What
-     * the page's dateModified, the feeds and the sitemaps all give.
+     * The article's last change that counts: updatedAfterLive(), else the time it went live (else its last save), or
+     * its newest correction when that is later (a correction always counts, however soon after going live). What the
+     * page's dateModified, the feeds, the sitemaps and the announcer's versions all give.
      *
      * @param array<string, mixed> $row
      */
     public static function lastChange(array $row): int
     {
-        return self::updatedAfterLive($row) ?? (($row['published_at'] ?? null) !== null ? (int) $row['published_at'] : (int) $row['updated_at']);
+        $change = self::updatedAfterLive($row) ?? (($row['published_at'] ?? null) !== null ? (int) $row['published_at'] : (int) $row['updated_at']);
+        return max($change, (int) ($row['corrected_at'] ?? 0));
     }
 
     /**
@@ -535,7 +539,7 @@ final class ArticleStore
     {
         $times = [];
         foreach ($this->db()->all(
-            'SELECT c.category, a.published_at, a.updated_at, a.created_at FROM news_article_categories c JOIN news_articles a ON a.id = c.article_id'
+            'SELECT c.category, a.published_at, a.updated_at, a.created_at, a.corrected_at FROM news_article_categories c JOIN news_articles a ON a.id = c.article_id'
             . " WHERE a.status = 'published' AND a.published_at <= ?",
             [time()]
         ) as $row) {
@@ -561,7 +565,7 @@ final class ArticleStore
     {
         $zone = new \DateTimeZone(Schedule::ZONE);
         $out = [];
-        foreach ($this->db()->all("SELECT a.published_at, a.updated_at, a.created_at FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ?", [time()]) as $row) {
+        foreach ($this->db()->all("SELECT a.published_at, a.updated_at, a.created_at, a.corrected_at FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ?", [time()]) as $row) {
             $month = (new \DateTimeImmutable('@' . (int) $row['published_at']))->setTimezone($zone)->format('Y-m');
             $out[$month] = max($out[$month] ?? 0, self::lastChange($row));
         }
@@ -593,6 +597,53 @@ final class ArticleStore
     public function liveSince(int $since): array
     {
         return $this->liveBetween($since, PHP_INT_MAX);
+    }
+
+    /**
+     * Every live article as the announcer reads it (docs/NEWS.md §6.1): its id, its own address (Paths::article()),
+     * its version (lastChange(), so a change that counts announces it again) and its categories, the primary first.
+     *
+     * @return list<array{id: int, path: string, version: int, categories: list<string>}>
+     */
+    public function liveAddresses(): array
+    {
+        $rows = $this->db()->all(
+            "SELECT a.id, a.slug, a.published_at, a.updated_at, a.created_at, a.corrected_at FROM news_articles a WHERE a.status = 'published' AND a.published_at <= ? ORDER BY a.published_at, a.id",
+            [time()]
+        );
+        $out = [];
+        foreach ($this->hydrateList($rows, false) as $row) {
+            $out[] = ['id' => (int) $row['id'], 'path' => Paths::article($row), 'version' => self::lastChange($row), 'categories' => $row['categories']];
+        }
+        return $out;
+    }
+
+    /**
+     * Up to $limit of the newest live articles, in one category or in all: id, slug, title, published_at and category
+     * (the primary). What the latest-articles file is written from (Latest::refresh()).
+     *
+     * @return list<array{id: int, slug: string, title: string, published_at: int, category: string}>
+     */
+    public function newest(?string $category, int $limit): array
+    {
+        if ($limit <= 0 || ($category !== null && !Categories::has($category))) {
+            return [];
+        }
+        $where = "a.status = 'published' AND a.published_at <= ?";
+        $params = [time()];
+        if ($category !== null) {
+            $where .= ' AND EXISTS (SELECT 1 FROM news_article_categories c WHERE c.article_id = a.id AND c.category = ?)';
+            $params[] = $category;
+        }
+        $rows = $this->db()->all('SELECT a.id, a.slug, a.title, a.published_at, ' . self::PRIMARY . ' AS category FROM news_articles a WHERE ' . $where
+            . ' ORDER BY a.published_at DESC, a.id DESC LIMIT ' . $limit, $params);
+        return array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'slug' => (string) $r['slug'],
+            'title' => (string) $r['title'],
+            'published_at' => (int) $r['published_at'],
+            'category' => (string) ($r['category'] ?? ''),
+        ], $rows);
     }
 
     /**
@@ -633,6 +684,7 @@ final class ArticleStore
         $d->aiWritten = (int) $row['ai_written'] === 1;
         $d->slug = (string) $row['slug'];
         $d->reviewReason = $row['review_reason'] !== null ? (string) $row['review_reason'] : null;
+        $d->corrections = $row['corrections'];
         return $d;
     }
 
@@ -720,6 +772,8 @@ final class ArticleStore
             'review_reason' => $d->reviewReason,
             'story_key' => $d->storyKey !== '' ? $d->storyKey : null,
             'comments_open' => $d->commentsOpen ? 1 : 0,
+            'corrections' => $json($d->corrections),
+            'corrected_at' => $d->corrections !== [] ? max(array_column($d->corrections, 'at')) : null,
             'word_count' => Prose::words(implode("\n\n", array_merge(
                 [$d->dek, $d->body, $d->impact],
                 array_column($d->confirmed, 'text'),
@@ -919,6 +973,9 @@ final class ArticleStore
                 if (array_key_exists($list, $r)) {
                     $rows[$i][$list] = self::items($r[$list]);
                 }
+            }
+            if (array_key_exists('corrections', $r)) {
+                $rows[$i]['corrections'] = Draft::corrections($r['corrections']);
             }
             if ($images) {
                 $rows[$i]['image'] = $leads[$id] ?? null;

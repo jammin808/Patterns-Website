@@ -8,6 +8,8 @@
   @media (width >= 64rem) {
     .news-hero .c-hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap) clamp(40px, 5vw, 80px); align-items: end; }
     .news-hero .c-hero-lede { margin-top: 0; }
+    /* The follow row goes under the lede, in its column, so the title keeps its place beside the lede. */
+    .news-hero .news-follow { grid-column: 2; margin-top: 0; }
   }
   .news-list { padding-block: clamp(24px, 3vw, 40px) var(--section-y); }
 
@@ -134,4 +136,31 @@
     & a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
       font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; transition: border-color var(--d-1) var(--e-cut); }
     & a:hover { border-color: var(--text-2); } }
+
+  /* ===== Follow and share: plain links to the page's feed, two readers and Google (the hub's hero), as quiet text
+     links with their icons, so they never read as the category bar's filters just below; and to each network's share
+     page (the article's end), as 40px outlined targets with their words. The copy button is one of them and shows
+     only with scripting, which works it (site.js data-copy) ===== */
+  .news-follow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; margin-top: var(--sp-5); }
+  .news-follow-label { margin: 0; font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text-2); }
+  .news-follow-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 20px;
+    & a { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: var(--fs-1); font-weight: 600; color: var(--text); }
+    & .c-icon { color: var(--text-2); } }
+  .news-share-list, .news-standards-toc ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;
+    & a, & button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--field); border-radius: var(--r-2); background: var(--s1);
+      font: inherit; font-size: var(--fs-1); font-weight: 600; font-stretch: var(--wd-ui); color: var(--text); text-decoration: none; cursor: pointer; transition: border-color var(--d-1) var(--e-cut); }
+    & a:hover, & button:hover { border-color: var(--text-2); }
+    & .c-icon { color: var(--text-2); } }
+  .news-share-list .is-copied { border-color: var(--text); }
+  .news-share .news-share-title { font-size: var(--fs-3); }
+  @media (scripting: none) { .news-js-only { display: none; } }
+
+  /* ===== An article's corrections, under its headline: each dated line, then the way to the policy. The lines
+     start where the note's title and link do (over the callout's own list indent). ===== */
+  .news-corrections .news-corrections-list { list-style: none; padding: 0; display: grid; gap: 6px;
+    & time { font-weight: 600; } }
+
+  /* ===== The editorial standards page: the sections as links, then one reading column ===== */
+  .news-standards-toc { padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
+  .news-standards-back { margin: 0; }
 }

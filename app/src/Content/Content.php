@@ -170,6 +170,17 @@ final class Content
         return rtrim(mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $question))), '?.! ');
     }
 
+    /**
+     * Stands in for one content file until the next flush(): the tests' way to try an owner's switch (content/site.php
+     * 'block_training', say) without editing the file.
+     *
+     * @param array<mixed> $data
+     */
+    public static function override(string $name, array $data): void
+    {
+        self::$cache[$name] = $data;
+    }
+
     public static function flush(): void
     {
         self::$faqOwners = null;

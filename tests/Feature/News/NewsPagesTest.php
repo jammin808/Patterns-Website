@@ -443,7 +443,7 @@ final class NewsPagesTest extends TestCase
         self::assertStringContainsString('<h3>For freelancers</h3>', $b, 'one level under the section');
         self::assertStringContainsString('<h2>What changed</h2>', $b);
         self::assertMatchesRegularExpression('#<div class="c-callout c-callout--info news-verdict" role="note">\s*<svg[^>]*><use href="\#i-idea"/></svg>\s*<h2 class="c-callout-title"><span class="u-visually-hidden">Our verdict: </span>Worth testing</h2>\s*<p>Try the new wording on your next invoice.</p>#', $b);
-        self::assertStringContainsString('Spotted something off? <a href="/contact/">Tell us</a> and we will put it right.', $b);
+        self::assertStringContainsString('Spotted something off? <a href="/contact/?topic=other">Tell us</a> and we will put it right.', $b);
 
         // The follow-ups both ways, at their own addresses.
         self::assertMatchesRegularExpression('#news-followup.*?Follow-up to:</strong>\s*<ul>\s*<li><a href="/news/legal/first-report/">The first report on the new pay rules</a></li>#s', $b);
@@ -587,7 +587,7 @@ final class NewsPagesTest extends TestCase
         $r = $this->request('GET', '/news/feed.xml');
         self::assertSame(200, $r->status);
         self::assertSame('application/rss+xml; charset=utf-8', $r->getHeader('Content-Type'));
-        self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
+        self::assertSame(NewsController::FEED_CACHE, $r->getHeader('Cache-Control'));
         self::assertSame([], $r->cookies());
         $xml = simplexml_load_string($r->body);
         self::assertNotFalse($xml);
@@ -797,8 +797,9 @@ final class NewsPagesTest extends TestCase
         self::assertSame(1, preg_match('/^## Industry Updates\n\n(.*?)(?:\n\n|\z)/ms', $llms, $m));
         $lines = explode("\n", trim($m[1]));
         self::assertSame('- [Industry Updates](' . self::BASE . '/news/): ' . \Psc\Content\Content::page('/news/')['description'], $lines[0]);
-        self::assertCount(11, $lines, 'the section and its ten newest articles');
-        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[1]);
+        self::assertCount(12, $lines, 'the section, its editorial standards and its ten newest articles');
+        self::assertSame('- [Editorial standards](' . self::BASE . '/news/standards/): ' . \Psc\Content\Content::page('/news/standards/')['description'], $lines[1]);
+        self::assertStringStartsWith('- [Story 1 for the answer engines](' . self::BASE . '/news/video/llms-story-1/): ', $lines[2]);
         self::assertStringNotContainsString('llms-story-11', $llms);
         self::assertSame('public, max-age=3600', $this->request('GET', '/llms.txt')->getHeader('Cache-Control'));
         self::assertStringNotContainsString('llms-draft', $llms);

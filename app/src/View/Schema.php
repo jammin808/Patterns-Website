@@ -38,9 +38,16 @@ final class Schema
         ];
     }
 
-    /** @return array<string, mixed> */
-    public static function organization(string $base, string $name): array
+    /**
+     * The organisation. $sameAs are its own profiles elsewhere (content/site.php 'same_as'), https addresses only;
+     * none leaves the property out.
+     *
+     * @param list<string> $sameAs
+     * @return array<string, mixed>
+     */
+    public static function organization(string $base, string $name, array $sameAs = []): array
     {
+        $profiles = array_values(array_unique(array_filter($sameAs, static fn (mixed $u): bool => is_string($u) && preg_match('#^https://[^\s/]+\.[^\s/]+(?:/\S*)?$#i', $u) === 1)));
         // Reached through the contact page's form: no email address is published for crawlers to collect.
         return [
             '@type' => 'Organization',
@@ -61,7 +68,7 @@ final class Schema
                 'availableLanguage' => ['en-GB'],
             ]],
             'areaServed' => 'Worldwide',
-        ];
+        ] + ($profiles !== [] ? ['sameAs' => $profiles] : []);
     }
 
     /** @return array<string, mixed> */

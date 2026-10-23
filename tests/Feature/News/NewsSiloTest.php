@@ -377,7 +377,7 @@ final class NewsSiloTest extends TestCase
         $r = $this->request('GET', '/news/audio/feed.xml');
         self::assertSame(200, $r->status);
         self::assertSame('application/rss+xml; charset=utf-8', $r->getHeader('Content-Type'));
-        self::assertSame(NewsController::CACHE, $r->getHeader('Cache-Control'));
+        self::assertSame(NewsController::FEED_CACHE, $r->getHeader('Cache-Control'));
         $xml = simplexml_load_string($r->body);
         self::assertNotFalse($xml);
         self::assertSame('Industry Updates from Patterns Show Control: Audio', (string) $xml->channel->title);

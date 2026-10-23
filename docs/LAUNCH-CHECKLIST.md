@@ -105,7 +105,27 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 
 ## After launch
 
-- [ ] Verify the domain in Google Search Console and Bing Webmaster Tools and submit `/sitemap.xml` and `/news/sitemap.xml` (Industry Updates' articles, by month, with its news sitemap); `robots.txt` names both too.
+- [ ] Verify the domain in Google Search Console (a DNS TXT record for a Domain property, or the meta tag: its
+      `content` value in `seo.google_site_verification`) and submit `/sitemap.xml` and `/news/sitemap.xml`
+      (Industry Updates' articles, by month, with its news sitemap); `robots.txt` names both too (docs/DEPLOY.md §7).
+- [ ] Bing Webmaster Tools: *Import from Google Search Console* (sites and sitemaps come across, verified), or verify
+      with the meta tag (`seo.bing_site_verification`). Then look at its AI Performance report now and then.
+- [ ] After the first news tick on the live site, the desk page shows *Last told* for IndexNow and the WebSub hub
+      (nothing to set up: the key is made and served by itself). Turn either off with `news.indexnow` false or
+      `news.websub_hub` empty.
+- [ ] List the organisation's profiles (LinkedIn, YouTube, GitHub, Companies House …) in `content/site.php` 'same_as'.
+- [x] Crawler switches in `content/site.php`, decided: 'block_training' true and 'ai_search' true (the owner's choice,
+      23 October 2026: allow AI search, block training). Blocking Google-Extended also removes the site from Gemini's
+      answers (Gemini Apps and Vertex AI grounding); Google Search, AI Overviews and AI Mode are unaffected.
+- [ ] On the live site, check that `/robots.txt` carries the training group (GPTBot, ClaudeBot, Google-Extended and the
+      rest, then `Disallow: /`) and no group for the AI search engines (docs/DEPLOY.md §7).
+- [ ] Read the editorial standards page (`/news/standards/`, words in `content/news.php` 'standards'): it names you as
+      the editor who answers for the section, says articles that pass the checks are published without a person
+      reading them first, and sets the corrections policy. Change anything you would not stand behind. If EU
+      readers matter, take advice on the EU AI Act's labelling rule for AI-written public-interest text (from
+      2 August 2026): the AI note labels every AI-written article, but the exemption needs human review.
+- [ ] Optional, on Google: share `https://www.google.com/preferences/source?q=patternsshowcontrol.co.uk` (the hubs'
+      follow row links it) so readers can make the site a preferred source in Top Stories.
 - [ ] Check whether `REMOTE_ADDR` is the visitor's own address behind Hostinger's CDN, and set
       `app.trusted_proxy_header` and `app.trusted_proxies` only if it is not (docs/DEPLOY.md §4).
 - [ ] `curl -I https://patternsshowcontrol.co.uk/.well-known/security.txt` answers 200 on LiteSpeed. security.txt

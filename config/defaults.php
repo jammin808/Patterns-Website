@@ -100,6 +100,17 @@ return [
         'check_model' => 'claude-haiku-5-5', // the banned-topic and allegation check
         'session_minutes' => 40,          // a session's deadline, from its start
         'session_ceiling_usd' => 5,       // a session stops spending once its estimated cost passes this
+        // Telling search engines and feed readers what changed (docs/NEWS.md §6.1), once per tick, in production only.
+        'indexnow' => true,               // IndexNow: Bing, Yandex, Seznam, Naver, Yep and the others that share it (not Google)
+        'indexnow_endpoint' => 'https://api.indexnow.org/indexnow',
+        'websub_hub' => 'https://pubsubhubbub.appspot.com/', // the feeds' WebSub hub, pinged when they change; '' turns it off
+    ],
+
+    'seo' => [
+        // Search Console and Bing Webmaster Tools ownership tokens: the content="..." part of the meta tag each one
+        // offers, written into the home page's <head>. Not secrets; '' leaves the tag out.
+        'google_site_verification' => '',
+        'bing_site_verification' => '',
     ],
 
     'licensing' => [

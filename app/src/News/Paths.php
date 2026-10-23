@@ -30,9 +30,10 @@ final class Paths
 
     /**
      * Path segments the routes use under /news/ or under a category (pages, the comment page, the old category
-     * pages, the tracked links, the media, the feeds and the sitemaps): never a slug, and never a category key.
+     * pages, the tracked links, the media, the feeds, the sitemaps and the editorial standards page): never a slug,
+     * and never a category key.
      */
-    public const RESERVED = ['page', 'comment', 'category', 'go', 'media', 'feed', 'sitemap'];
+    public const RESERVED = ['page', 'comment', 'category', 'go', 'media', 'feed', 'sitemap', 'standards'];
 
     /** /news/, or /news/page/{n}/ from the second page on. */
     public static function index(int $page = 1): string
@@ -83,6 +84,12 @@ final class Paths
     public static function feed(?string $key = null): string
     {
         return self::ROOT . ($key !== null && $key !== '' ? $key . '/' : '') . 'feed.xml';
+    }
+
+    /** The editorial standards page: how the section is made, who answers for it and how it is corrected. */
+    public static function standards(): string
+    {
+        return self::ROOT . 'standards/';
     }
 
     /** The tracked way out to a source, which counts the click and goes to the stored address. */

@@ -1,9 +1,10 @@
 <?php
 /**
  * /news/ and /news/{key}/, and their pages: the Industry Updates hubs (docs/NEWS.md §10). The hero (the section's
- * name, or the category's name and intro), the category bar and search, then one page of live articles: on a list's
- * first page the newest is drawn wide, the rest as a grid, then the pager, then the way across the silo (the hub and
- * every category with articles). A search lists its results under a heading of their own. The page reads the same
+ * name, or the category's name and intro, and under the intro the follow row for the page's own feed), the category
+ * bar and search,
+ * then one page of live articles: on a list's first page the newest is drawn wide, the rest as a grid, then the
+ * pager, then the way across the silo (the hub and every category with articles). A search lists its results under a heading of their own. The page reads the same
  * for every visitor (no session, no form token).
  *
  * @var array<string, mixed> $copy  content/news.php
@@ -60,6 +61,7 @@ $message = match (true) {
             <div>
                 <p class="c-hero-lede"><?= e($c['intro'] ?? ($index['lede'] ?? '')) ?></p>
             </div>
+            <?= $this->partial('news/follow', ['copy' => $copy, 'feed' => $feeds[0][0], 'feedTitle' => $feeds[0][1]]) ?>
         </div>
     </div>
 </section>

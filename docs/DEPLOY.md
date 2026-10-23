@@ -122,7 +122,7 @@ other request to `public/index.php`. Secrets and runtime data live **outside** `
 | Read contact messages | Portal → Admin → Messages (also emailed to `mail.admin_to`). |
 | Review the assistant | Portal → Admin → Assistant chats: every conversation, its scope verdicts and thumbs up/down. |
 | Change prices, features, FAQ | Edit the files in `content/` (see `docs/CONTENT.md`), push to `main`. The assistant's knowledge updates with them. |
-| Write or correct a news article | Portal → Admin → Industry Updates → open the article (or *Write an article*). AI articles held for review wait under *Held*. |
+| Write or correct a news article | Portal → Admin → Industry Updates → open the article (or *Write an article*). AI articles held for review wait under *Held*. A correction that changes what a live article says goes in *Add a correction* (one line saying what changed): the article shows it, dated, under its headline, as the editorial standards page (`/news/standards/`) promises. |
 | Run the AI desk | Portal → Admin → Industry Updates → Open the AI desk: pause or continue it, *Run a session now* (it starts within 15 minutes), change its sessions, calendar, models, cap, banned sites and topics, and its brief and voice. Each run has a page with its steps, candidates, references and estimated cost. |
 | Moderate comments | Portal → Admin → Industry Updates → Moderate comments. The first report on a comment, and the report that hides it, are emailed; so is a comment waiting for approval, at most once a day. |
 | Publish an article written in a Claude Code session | Add its JSON file to `content/news/articles/` (the shape is in docs/NEWS.md §6.4) and push to `main`: the next tick imports it once. |
@@ -143,7 +143,12 @@ other request to `public/index.php`. Secrets and runtime data live **outside** `
   (`timeout_seconds`, 600) and to connect (`connect_timeout_seconds`, 15), the check model (`check_model`), a
   session's deadline (`session_minutes`, 40) and its spending ceiling (`session_ceiling_usd`, 5 USD, estimated), and
   whether imported articles without a time go live 10 to 30 minutes apart (`import_stagger`). Everything else about
-  the desk (sessions, models, cap, lists, prompts) is set on its admin pages and kept in the database.
+  the desk (sessions, models, cap, lists, prompts) is set on its admin pages and kept in the database. Each tick also
+  tells IndexNow (`indexnow`, on; `indexnow_endpoint`) and the feeds' WebSub hub (`websub_hub`, Google's hub; `''`
+  turns it off) what went live, changed or went (§7), from the live site only.
+- `seo.google_site_verification` / `seo.bing_site_verification`: the ownership tokens Search Console and Bing
+  Webmaster Tools give you (the `content="…"` part of their meta tag; pasting the whole tag works too). The home
+  page's `<head>` carries them. They are not secrets, but they live in the server config like the rest (§7).
 - `security.turnstile_site_key` / `turnstile_secret`: add Cloudflare Turnstile to the contact form if spam appears.
 - `app.trusted_proxy_header` / `app.trusted_proxies`: how the site learns a visitor's address behind a CDN, which
   every per-address limit (sign-in, contact, register, the assistant) counts by. Leave the header `null` (the
@@ -165,7 +170,9 @@ so to remove something at once:
 1. **Unpublish it** (Portal → Admin → Industry Updates → the article → *Unpublish*), or delete it, or delete just the
    image. The site stops serving it straight away; an imported article that is deleted is never imported again.
 2. **Flush the CDN**: GitHub → Actions → *Flush CDN* → *Run workflow* (or hPanel → Performance → CDN → Flush cache).
-   Without the flush a cached copy can stay at the edge for up to about 3 minutes, an image for up to an hour.
+   Without the flush a cached copy can stay at the edge for up to about 3 minutes, an image for up to an hour. The
+   home and product pages drop the article from their latest-articles strips at once, but those pages are cached for
+   5 minutes; the flush clears them too.
 3. If the request came from outside (a correction, a complaint), note what was changed and when; the audit log
    (Portal → Admin → Audit log, `news.`) has the record.
 
@@ -182,3 +189,47 @@ session on wait as a draft; it does not touch articles already scheduled.
 Hostinger backs up files and databases daily. The data that matters is the MySQL database (news articles, comments
 and the desk's settings and prompts included), `patterns-data/` (configuration, uploads and news images, licence
 files) and `public_html/downloads-vault/`.
+
+## 7. Search engines, feed readers and answer engines
+
+What the site does by itself, and what only you can do.
+
+**By itself**
+- Every 15-minute tick tells **IndexNow** (Bing, Yandex, Seznam, Naver, Yep and the others that share it) about
+  every article that went live, changed, was corrected, was taken down or was deleted, with the hubs and feeds it
+  touched, each address once. The key it proves itself with is made on the first ping and served at
+  `https://patternsshowcontrol.co.uk/<key>.txt`; nothing to set up. Google does not take part.
+- The same tick pings the feeds' **WebSub hub** (`https://pubsubhubbub.appspot.com/`), so feed readers that use it
+  (Inoreader among them) see a new article within minutes instead of at their next poll.
+- A failure is logged (`news announce failed` in `storage/logs/`) and tried again later: at the next tick, then twice
+  as long each time, a day at most. The desk page (Portal → Admin → Industry Updates → Open the AI desk) shows what
+  each was last told, and says "Failing" with the status while one is.
+- `robots.txt` names both sitemaps; the feeds, the home and product pages' latest-articles strips and the follow and
+  share links keep the section linked from everywhere.
+
+**Your steps, once**
+1. **Google Search Console** (search.google.com/search-console): add the property. A *Domain* property is verified
+   only by a DNS record: hPanel → Domains → DNS / Nameservers, add the TXT record the wizard shows (usually
+   `google-site-verification=…`; take it exactly from the wizard). A *URL prefix* property
+   (`https://patternsshowcontrol.co.uk/`) can instead use the HTML tag: put its `content` value in
+   `seo.google_site_verification` in `patterns-data/config.php`, wait up to 5 minutes for the CDN (or run Flush CDN),
+   then press Verify. Leave the token in place for good: removing it loses the verification.
+2. In Search Console → Sitemaps, submit `https://patternsshowcontrol.co.uk/sitemap.xml` and
+   `https://patternsshowcontrol.co.uk/news/sitemap.xml` (the section's index: one sitemap a month and the news
+   sitemap of the last two days).
+3. **Bing Webmaster Tools** (bing.com/webmasters): choose *Import from Google Search Console*. It brings the site and
+   its sitemaps across and verifies it (data can take 48 hours). If you would rather verify on its own, use the meta
+   tag: put its `content` value in `seo.bing_site_verification`. Bing's *AI Performance* report then shows when
+   Copilot cites the site.
+4. Optional: in Search Console, the UK pilot of the *Search generative AI* control (AI Overviews and AI Mode) appears
+   for some sites; it is yours to decide. Robots meta tags already allow large image previews.
+5. Add the organisation's own profiles (LinkedIn, YouTube, GitHub, Companies House …) to `content/site.php`
+   'same_as' as full https addresses, and push: they become the Organization's `sameAs`.
+6. Crawlers, decided: allow AI search, block training (the owner's choice, 23 October 2026). `content/site.php`
+   'block_training' is true, which asks the model-training crawlers to stay away, and 'ai_search' is true, which keeps
+   ChatGPT search, Claude, Perplexity and Meta AI welcome. Each is its own switch; crawlers take about a day to read a
+   change. What it costs: blocking Google-Extended stops Gemini's training on the site and its grounding in Gemini
+   Apps and Vertex AI, so the site drops out of Gemini's answers. It does not touch Google Search, AI Overviews or AI
+   Mode, which come from Googlebot and follow `nosnippet` and Search Console's own control (step 4).
+7. On the live site, check: `curl -I https://patternsshowcontrol.co.uk/news/feed.xml` shows the `Link` header with
+   the hub; the desk page shows *Last told* for both channels after the first tick; and the key file answers.

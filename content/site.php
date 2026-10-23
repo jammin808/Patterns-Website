@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-/* Site-wide data: the brand, the one-sentence summary for llms.txt and the assistant, the header navigation (Products is the mega-menu), the footer columns, the trademarks line and the training-crawler policy. */
+/* Site-wide data: the brand, the one-sentence summary for llms.txt and the assistant, the header navigation (Products is the mega-menu), the footer columns, the trademarks line, the crawler policy and the organisation's profiles elsewhere. */
 
 return [
     'name' => 'Patterns Show Control',
@@ -138,6 +138,7 @@ return [
                 ['label' => 'Home', 'href' => '/'],
                 ['label' => 'About', 'href' => '/about/'],
                 ['label' => 'Industry Updates', 'href' => '/news/'],
+                ['label' => 'Editorial standards', 'href' => '/news/standards/'],
                 ['label' => 'Contact', 'href' => '/contact/'],
                 ['label' => 'How licensing works', 'href' => '/licensing/'],
                 ['label' => 'Software licence terms', 'href' => '/legal/licence-terms/'],
@@ -150,5 +151,15 @@ return [
 
     'footer_note' => 'Made in the UK by Ben Rohleder, for the crews who run conferences, AGMs and live events.',
     'trademarks' => 'NDI® is a registered trademark of Vizrt NDI AB. Bitfocus Companion, Stream Deck, PowerPoint, vMix, Philips Hue and other names belong to their owners.',
-    'block_training' => false, // robots.txt: true asks model-training crawlers to stay away
+    // robots.txt (SeoController::robots()): two separate switches. block_training true asks the model-training
+    // crawlers to stay away (GPTBot, ClaudeBot, Google-Extended, Applebot-Extended, CCBot, meta-externalagent,
+    // Bytespider; Google-Extended also covers Gemini's apps answering from the site). ai_search false asks the AI
+    // search and answer engines to stay away too (ChatGPT search, Claude, Perplexity, Meta AI). Search engines are
+    // never asked. Crawlers take about a day to read a change.
+    'block_training' => true,
+    'ai_search' => true,
+
+    // The organisation's own profiles elsewhere (LinkedIn, YouTube, GitHub, Companies House ...), full https
+    // addresses: the Organization's sameAs in every page's structured data, which ties them to this site.
+    'same_as' => [],
 ];
