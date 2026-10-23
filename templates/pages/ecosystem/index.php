@@ -12,6 +12,8 @@ use Psc\View\Schema;
 
 $eco = content('ecosystem');
 $this->push('head', '<link rel="stylesheet" href="' . e(asset('/assets/css/pages/hub.css')) . '">');
+// The tagline gathers out of a cloud of particles (docs/DESIGN.md 8.10); its words are the page's either way.
+$this->push('scripts', '<script type="module" src="' . e(asset('/assets/js/particles.js')) . '"></script>');
 
 $items = [];
 foreach (Content::PRODUCTS as $key) {
@@ -67,7 +69,7 @@ foreach ($ai['principles'] as $pr) {
                     <a class="c-btn c-btn--secondary" href="/ecosystem/integrations/">Browse integrations</a>
                 </div>
             </div>
-            <p class="c-stops hub-stops"><span class="hub-stop">Every pixel<span data-product="patterns">.</span></span> <span class="hub-stop">Every second<span data-product="stagewatch">.</span></span> <span class="hub-stop">Every person<span data-product="agmessage">.</span></span> <span class="hub-stop">Every surface<span data-product="playmap">.</span></span></p>
+            <p class="c-stops hub-stops" data-particles><span class="hub-stop" data-particles-line>Every pixel<span data-product="patterns">.</span></span> <span class="hub-stop" data-particles-line>Every second<span data-product="stagewatch">.</span></span> <span class="hub-stop" data-particles-line>Every person<span data-product="agmessage">.</span></span> <span class="hub-stop" data-particles-line>Every surface<span data-product="playmap">.</span></span></p>
         </div>
     </div>
 </section>
