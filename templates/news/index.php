@@ -86,7 +86,7 @@ $message = match (true) {
         <?php else: ?>
             <div class="news-grid">
                 <?php foreach ($articles as $i => $a): ?>
-                    <?= $this->partial('news/card', ['a' => $a, 'categories' => $categories, 'copy' => $copy, 'lead' => $lead && $i === 0]) ?>
+                    <?= $this->partial('news/card', ['a' => $a, 'categories' => $categories, 'copy' => $copy, 'lead' => $lead && $i === 0, 'category' => $category]) ?>
                 <?php endforeach; ?>
             </div>
             <?= $this->partial('news/pager', ['link' => $pageLink, 'page' => $pageNo, 'pages' => $pages, 'total' => $total, 'perPage' => \Psc\Controllers\NewsController::PER_PAGE]) ?>

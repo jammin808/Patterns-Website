@@ -8,6 +8,7 @@ use Psc\Controllers\NewsController;
 use Psc\Controllers\SeoController;
 use Psc\Db\Database;
 use Psc\Http\Response;
+use Psc\News\Art;
 use Psc\News\ArticleStore;
 use Psc\News\Categories;
 use Psc\News\Paths;
@@ -541,10 +542,25 @@ final class NewsPagesTest extends TestCase
         $card = $this->body('/news/');
         self::assertMatchesRegularExpression('#<div class="news-card-media">\s*<img src="/news/media/' . $lead . '-960\.webp" srcset="[^"]+" sizes="[^"]+" width="1600" height="900" alt="" decoding="async">#', $card, 'the card\'s picture is decoration: its title says it');
 
-        $this->makeArticle(['slug' => 'no-pictures', 'categories' => ['streaming']]);
-        $plain = $this->body('/news/streaming/no-pictures/');
-        self::assertMatchesRegularExpression('#<div class="news-lead-art"><span class="news-art news-art--wide"><svg class="news-art-svg" viewBox="0 0 160 90" aria-hidden="true" focusable="false"><use href="/assets/img/news-art\.svg\?v=[a-f0-9]+\#art-streaming"/></svg></span>#', $plain);
-        self::assertStringContainsString('#art-streaming"/>', $this->body('/news/'), 'the card has the artwork too');
+        $plainId = $this->makeArticle(['slug' => 'no-pictures', 'categories' => ['streaming']]);
+        $page = $this->body('/news/streaming/no-pictures/');
+        self::assertStringContainsString('<div class="news-lead-art">' . Art::tile('streaming', $plainId, true) . '</div>', $page, 'the band: its category\'s artwork, picked by its id');
+        self::assertMatchesRegularExpression('#<div class="news-lead-art"><span class="news-art news-art--p[0-6] news-art--f[0-3] news-art--wide"><svg class="news-art-svg news-art-band" viewBox="0 0 576 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">.*?</svg><svg class="news-art-svg news-art-tile" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">.*?</svg></span></div>#s', $page, 'its wide picture, and the card\'s for a phone');
+        $hub = $this->body('/news/');
+        self::assertTrue(str_contains($hub, Art::tile('streaming', $plainId)) || str_contains($hub, Art::tile('streaming', $plainId, false, true)), 'the card has the artwork too');
+    }
+
+    /** A card shows its primary category's artwork, and on a category's hub that category's when the article is in it. */
+    public function testACategorysHubShowsItsOwnArtworkOnItsCards(): void
+    {
+        $id = $this->makeArticle(['slug' => 'two-categories', 'categories' => ['legal', 'production']]);
+        $shows = static fn (string $page, string $key): bool => str_contains($page, Art::tile($key, $id)) || str_contains($page, Art::tile($key, $id, false, true));
+        $production = $this->body('/news/production/');
+        self::assertTrue($shows($production, 'production'), 'the hub\'s own category');
+        self::assertFalse($shows($production, 'legal'));
+        self::assertTrue($shows($this->body('/news/legal/'), 'legal'));
+        self::assertTrue($shows($this->body('/news/'), 'legal'), 'the primary category everywhere else');
+        self::assertStringContainsString('<div class="news-lead-art">' . Art::tile('legal', $id, true) . '</div>', $this->body('/news/legal/two-categories/'), 'and on the article page');
     }
 
     public function testThePreviewShowsAnyArticleUnpublishedAndUncounted(): void

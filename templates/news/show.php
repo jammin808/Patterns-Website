@@ -132,7 +132,7 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/?topic=other">
         <?php if ($lead !== null): ?>
             <?= $this->partial('news/figure', ['picture' => $lead, 'copy' => $copy, 'eager' => true]) ?>
         <?php else: ?>
-            <div class="news-lead-art"><?= $this->partial('news/art', ['key' => $primaryKey, 'wide' => true]) ?></div>
+            <div class="news-lead-art"><?= $this->partial('news/art', ['key' => $primaryKey, 'id' => (int) $article['id'], 'wide' => true]) ?></div>
         <?php endif; ?>
 
         <div class="c-prose news-body"><?= $body ?></div>

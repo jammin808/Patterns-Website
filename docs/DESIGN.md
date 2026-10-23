@@ -14,7 +14,7 @@ the browser blocks the fonts and the module scripts.
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
 | `public/assets/js/particles.js` | Ecosystem page only: the tagline gathering out of particles; its hold and canvas rules are in `pages/hub.css` (8.10) |
-| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `public/assets/img/news-art.svg` | Industry Updates' article pages (counting source clicks), its pages' styles (the follow and share rows, the corrections note and the standards page among them) and its category artwork (8.36) |
+| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `app/src/News/Art.php` and its table `app/src/News/art-data.php` (written by `tools/news-art/build.mjs`) | Industry Updates' article pages (counting source clicks), its pages' styles (the follow and share rows, the corrections note and the standards page among them) and its category artwork, printed inline by `Psc\News\Art` (8.36) |
 | `public/assets/css/pages/news-latest.css` | The latest strip, the newest Industry Updates articles on the home and product pages, pushed by `partials/news/latest.php` only when it draws (8.36) |
 | `public/assets/js/news-comments.js`, `public/assets/css/pages/news-comments.css` | The comments under an article and the comment page for readers without scripting (8.36) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
@@ -33,9 +33,12 @@ the browser blocks the fonts and the module scripts.
    ecosystem and Show Bus. Green (PVW, GO, done) and red (PGM, over time, errors) keep their broadcast meaning and
    never stand for a product. **Amber always means standing by**: the STANDBY cue, the AI approval gate, warnings
    and the keyboard focus ring. The legend under the home hero teaches this once (`.c-legend`).
-2. **Colour is a signal, not decoration.** Every coloured pixel answers "which app?" or "what state?". Status
-   never uses a product colour. Colour is never the only cue: tallies carry PGM/PVW, lamps sit beside a word, badges
-   have a dot and a word, and table cells pair an icon with hidden text.
+2. **Colour is a signal, not decoration.** Every coloured pixel answers "which app?" or "what state?". Status never
+   uses a product colour. Colour is never the only cue: tallies carry PGM/PVW, lamps sit beside a word, badges have
+   a dot and a word, and table cells pair an icon with hidden text. The one exception is Industry Updates' artwork
+   (8.36): it is drawn as a screen showing a picture, and that picture is the brand's, the seven bars together, so
+   there colour is the picture on the screen rather than a signal, and no single bar in it stands for an app or a
+   state.
 3. **Screens stay dark.** Anything drawn as a monitor (`.c-screen`, `.c-monitor`, `.c-cm`, `.c-shot-frame`, the
    UMD strip) is dark in the light theme too. The theme changes the room, not the picture.
 4. **One bold thing per page.** On the home page that is the live mixer. On a product page it is the product
@@ -1177,7 +1180,7 @@ followspot in its colour; PlayMap's card says "Early access".
 | `stagewatch-licensing` | StageWatch pricing | Standard, Pro and Production from `content/licensing/stagewatch.php`, as the pricing page shows them: Pro's badge, and a launch price as the figure with the list price struck through under an outlined "Launch price" flag |
 | `licensing`, `workflows`, `downloads`, `support`, `contact`, `about` | the hubs and pages of those names | a licence sheet; the six workflows as a cue list, each with its apps' swatches and a legend naming them; what the downloads hold; the assistant; the contact topics; the four habits the apps share (about's principles, so the card adds to its headline rather than repeating it) |
 | `news` | Industry Updates: the hub and its pages, and the editorial standards page, which shares it | what every article carries, in its own section names (confirmed, speculation, what it means, whether to test it) |
-| `news-{key}` (one per category) | each category's hub and its pages, and every article of that primary category without a picture of its own | the category's headline (its title tag without " \| Industry Updates") beside its artwork from `news-art.svg`, drawn with doubled hairlines so it reads at a thumbnail, over its name |
+| `news-{key}` (one per category) | each category's hub and its pages, and every article of that primary category without a picture of its own | the category's headline (its title tag without " \| Industry Updates") beside its artwork, the test card its pages print for its `Art::SHARE` id, painted by `pages/news.css`, over its name |
 
 Headlines are 66px (80px for one-word titles), stepping down to 50px to fit three lines (four for the home card's
 long headline, so it stays large beside the multiview); hyphenated words never
@@ -1214,7 +1217,7 @@ the banner works as below.
 - **Reopening:** any `[data-consent-open]` reopens the card with focus on the current answer, and Escape closes a
   reopened card. The openers stay hidden without scripting, because the choice needs scripting, and so does the tag.
 
-### 8.36 Industry Updates (`pages/news.css`, `pages/news-latest.css`, `news.js`, `news-art.svg`)
+### 8.36 Industry Updates (`pages/news.css`, `pages/news-latest.css`, `news.js`, `Psc\News\Art`)
 
 **The name.** "Industry Updates" is a proper name, written in title case wherever it appears: the h1, the page
 titles, the footer link, the admin navigation and the byline ("Industry Updates desk"). The header bar is the one
@@ -1271,13 +1274,40 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 - **Pictures.** An article's images are uploaded by an administrator with the right to use them, re-encoded and
   served by the site (`/news/media/`), never hotlinked: `news-figure` with every width in `srcset`, its size, alt
   text, caption and credit. The AI desk never adds a picture.
-- **The artwork rule.** An article without a picture shows its primary category's artwork: one monochrome
-  `<symbol>` per category in `news-art.svg`, used with `<use>` and `aria-hidden`, drawn in `currentColor` on 1.5px
-  hairlines that keep their weight at any size. The tile (`news-art`) sets the colours through classes, the symbol
-  in `--text-3` on a hairline grid in `--line` over `--s2`, so it follows the theme. No SMPTE bars, no product
-  colours, no inline styles. The motifs: a monitor wall (Video), a waveform (Audio), beams (Lighting), a truss
-  (Staging), a cue stack (Production), a clock (Showcalling), a signal (Streaming), nodes (Automation), a grid
-  (Interactive), a spark (AI), a network (Technology), a person (Freelance), a shield (Legal), a lightbulb (Tips).
+- **The artwork rule.** An article without a picture shows its category's artwork (`news-art`): a test card drawn for
+  the category. `Psc\News\Art` prints it inline through `partials/news/art.php` from one generated table
+  (`app/src/News/art-data.php`, written by `tools/news-art/build.mjs`, never edited by hand), and only classes in
+  `pages/news.css` paint it. It is a screen, so it stays dark in both themes and in print (`color-scheme: dark` on
+  `--bg`), as `.c-screen` does.
+- **The one place colour is a picture.** This is the exception to principle 2: here colour is the picture the screen
+  shows, and that picture is the brand's, the seven bars together in their order. The bars appear in the motif, which
+  is made of the signal (a wall showing the SMPTE card, beams landing as the bars, a shield, spark or bulb cut from
+  them, a lanyard of them), and in the test card's edge. Everything structural is drawn in the screen's greys.
+  - Where the bars are the test signal itself (the SMPTE card, which only Video shows; a pass header; a clapper) they
+    keep SMPTE order. Elsewhere the article's id chooses which bar leads, so no category owns a colour and a category
+    is known by its motif alone.
+  - A lone element (a lamp, a pressed key, a node's header, a seven-segment display, a large panel) takes only the
+    calm bars, never green or red, and nothing in the art is amber, so no tile is one app's colour and none reads as a
+    state.
+- **The motifs**, four compositions each, in three takes that differ in arrangement: screens showing the SMPTE card
+  (Video), a waveform, meters, faders (Audio), beams landing as the bars (Lighting), truss, decks, risers and rigging
+  with LED walls in the palette (Staging), cue lists, timelines and cue cards (Production), clocks, countdowns and a
+  slate (Showcalling), masts, play buttons, a carrier, an uplink (Streaming), node graphs (Automation), keys, pads
+  and a touch surface (Interactive), sparks (AI), chips, a wafer and buses (Technology), a person with a lanyard and
+  a pass (Freelance), a shield, the scales and a seal (Legal), a bulb (Tips).
+- **Variety.** The id picks the composition, the take, the lead bar and the edge: any four articles in a row show four
+  compositions, so a card never repeats the one beside or above it, and nine in a row are nine pictures. The test
+  card's edge (the bars along the top, the side or the foot, or castellations, with a staircase or a multiburst in
+  the right-hand margin) is drawn in CSS on the tile; `tools/news-art/edges.mjs` measures which edges each take leaves
+  clear, so a figure never stands on a strip of bars.
+- **Quiet in a list.** Each tile is one motif on a dark field with hairline test card furniture, so the cards stay
+  quiet enough for the page's one bold thing (principle 4); on a news list the lead card is the bold thing.
+- **Sizes.** 16:9 on a card; the whole picture on the lead card's screen, never cropped; on the article page a band
+  of 16:5 from 40rem with a wide composition of its own, and the card's picture below 40rem. The share card
+  (`news-{key}`) shows the category's strongest picture (`Art::SHARE`).
+- **Decoration.** `aria-hidden="true"` and `focusable="false"` on every svg, no title, words, ids, links or script,
+  and `pointer-events: none`, so the card's link takes the click. It moves only on its card's hover or focus (a
+  `scale` of 1.035 over `--d-2`), once, and not at all under reduced motion.
 - **Comments** (`pages/news-comments.css`, `news-comments.js`, pushed by `partials/news/comments.php`) end the
   article in `news-comments`: a list of `news-comment` cards (the author, a `c-tag` "Patterns team" badge for staff,
   the time, the plain-text body, then `news-comment-actions`) and `news-comments-box`, the sign-in link, the form or
