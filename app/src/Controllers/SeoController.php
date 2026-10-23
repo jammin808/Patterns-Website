@@ -193,8 +193,9 @@ final class SeoController extends Controller
      * robots.txt. Everyone is welcome but on the API and the tracked links (a crawler that matches a group of its own
      * reads only that group, so no other group is written while every crawler reads the same rules). Two of the
      * owner's switches in content/site.php each add a group that keeps its crawlers off the whole site:
-     * 'block_training' (false by default) for the model-training crawlers, and 'ai_search' (true by default: welcome)
-     * for the AI search and answer engines. Search engines are never in either.
+     * 'block_training' for the model-training crawlers (false when the key is missing; the site ships it true, the
+     * owner's choice), and 'ai_search' (true by default: welcome) for the AI search and answer engines. Search engines
+     * are never in either.
      */
     public function robots(Request $request): Response
     {

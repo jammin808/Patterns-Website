@@ -885,7 +885,7 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 **Article `/news/{category}/{slug}/`**, in order:
 1. Breadcrumbs: Home › Industry Updates › the primary category (its hub) › `seo_title`.
 2. The category tags (each linking to its hub), the h1 `title`, and the `dek`.
-3. A meta line: the date and time in London, the read time, "Updated" if changed, and the byline.
+3. A meta line: the date and time in London, the read time, "Updated" if changed or corrected (`dateModified`), and the byline.
 4. The corrections, when it has any (`news-corrections`, a `c-callout--info` with `id="corrections"`): "Correction" (or "Corrections"), each line with its date, then "How we correct articles", the way to `/news/standards/#corrections`.
 5. A follow-up banner (a `c-callout`): "Follow-up to:", linking to the earlier articles at their own addresses.
 6. The lead image (`<figure>` with `srcset`, width, height, alt, caption, credit), or the category artwork.
@@ -937,12 +937,12 @@ The settings page is one form, saved all at once (`Settings::save()`: every valu
 - Every news page carries `<link rel="alternate" type="application/rss+xml">`: the section's feed, and on a hub or an article its category's too.
 
 **Latest on other pages**
-- The home page (before its FAQ: "Latest from the news desk") and each product page (before its FAQ: "From Industry Updates", "The newest on video, technology and staging, the areas Patterns works in.") carry a quiet row of the 3 newest articles (`partials/news/latest.php`, `pages/news-latest.css`): each its headline linking to its own address, its primary category and its date, then "All Industry Updates" and, on a product page, "{Category} news" for each hub it draws from.
+- The home page (before its FAQ: "Latest from the news desk") and each product page (before its FAQ: "From Industry Updates", "The newest on video, streaming and automation, the areas Patterns works in.", each product's categories in `content/news.php` 'latest') carry a quiet row of the 3 newest articles (`partials/news/latest.php`, `pages/news-latest.css`): each its headline linking to its own address, its primary category and its date, then "All Industry Updates" and, on a product page, "{Category} news" for each hub it draws from that has an article in the file.
 - A product's categories are `content/news.php` 'products': Patterns video, technology and staging; StageWatch showcalling, production and automation; AGMessage production, legal and freelance; PlayMap interactive, video and lighting. An article in any of them counts, each once, the newest first.
 - **Data**: only `storage/cache/news-latest.json` (`Latest`), never the database and never a session, so the pages stay the same for every visitor and cacheable; with no file, or nothing in it, nothing is drawn. The tick writes it when the live set changes (so a scheduled article appears once its time has passed), and every article action in the admin writes it at once, so a takedown leaves the strips with the page. The strips then follow those pages' own cache (5 minutes, `app.page_cache_seconds`); Flush CDN clears them with the rest.
 
 **Editorial standards `/news/standards/`**
-- A registry page (`content/pages.php`, type `page`, parent `/news/`, section `news`), drawn by `PageController` with `templates/news/standards.php` from `content/news.php` 'standards' (Markdown; `:editor` is `app.publisher`). Its sections, each with an id for the links that lead to them: how Industry Updates is made (the AI desk, the sources and references, verified facts apart from speculation, the AI note, the check before publishing, and that articles passing every check are published automatically), what the editor does, how to report a mistake (the contact form), the corrections policy, and who publishes it.
+- A registry page (`content/pages.php`, type `page`, parent `/news/`, section `news`), drawn by `PageController` with `templates/news/standards.php` from `content/news.php` 'standards' (Markdown; `:editor` is `content/site.php` publisher name, as the about page names it). Its sections, each with an id for the links that lead to them: how Industry Updates is made (the AI desk, the sources and references, verified facts apart from speculation, the AI note, the check before publishing, and that articles passing every check are published automatically), what the editor does, how to report a mistake (the contact form), the corrections policy, and who publishes it.
 - Linked from the AI note on every AI-written article, the footer's Company column on every page, the about page, the corrections note on an article, and `llms.txt`.
 
 **Click counting**

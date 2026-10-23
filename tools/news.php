@@ -46,16 +46,19 @@ try {
             'import_failed' => count($result['failed']),
             'failed_files' => array_column($result['failed'], 'file'),
         ];
-        // The other pages' strips of the newest articles show what was just imported (the tick does the same).
+    } else {
+        $model = Psc\News\AnthropicNewsModel::fromConfig($app);
+        $report = $command === 'tick' ? $pipeline->tick($now, $model) : $pipeline->runNow($model, $now);
+    }
+    // The other pages' strips of the newest articles show what an import or a session by hand just published (the
+    // tick refreshes them itself).
+    if ($command !== 'tick') {
         try {
             $report['latest'] = Psc\News\Latest::refresh($app);
         } catch (Throwable $e) {
             $app->log->exception($e, 'news latest');
             $report['latest'] = false;
         }
-    } else {
-        $model = Psc\News\AnthropicNewsModel::fromConfig($app);
-        $report = $command === 'tick' ? $pipeline->tick($now, $model) : $pipeline->runNow($model, $now);
     }
     if ($command !== 'tick') {
         $app->log->info('news ' . $command, $report);

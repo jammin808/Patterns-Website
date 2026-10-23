@@ -1155,7 +1155,7 @@ size, so the bars stay crisp; only tile corners are smoothed.
 | `public/favicon.ico` | 16, 32, 48 | the same tile, laid out per size (the light segment is two bars wide) |
 | `brand/apple-touch-icon.png` | 180 | full bleed (iOS rounds it), mark at 62% |
 | `brand/icon-192.png`, `brand/icon-512.png` | 192, 512 | rounded tiles for the web manifest's "any" purpose |
-| `brand/icon-144.png` | 144 | the same rounded tile, the RSS feeds' channel image (`NewsController::FEED_IMAGE`); scaled from the brand icon, the one file here that `brand.py` does not draw |
+| `brand/icon-144.png` | 144 | the same rounded tile, the RSS feeds' channel image (`NewsController::FEED_IMAGE`) |
 | `brand/icon-maskable-512.png` | 512 | full bleed, the whole mark inside the 80% safe circle |
 | `brand/logo-512.png` | 512 | full bleed, for the Organization JSON-LD (`Schema.php`) |
 
