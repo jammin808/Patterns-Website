@@ -17,6 +17,7 @@
  * @var array<string, string> $products
  * @var array<string, string> $topics
  * @var bool $configShadowed a config/local.php in the web root is not the file being read
+ * @var list<array{label: string, value: string, ok: bool}> $server  AdminController::serverFacts()
  */
 $time = static fn (mixed $ts): string => (int) $ts > 0
     ? '<time datetime="' . e(date(DATE_ATOM, (int) $ts)) . '">' . e(ago((int) $ts)) . '</time>'
@@ -113,6 +114,31 @@ $news ??= null;
     <div class="pt-actions">
         <a class="pt-btn pt-btn--ghost pt-btn--small" href="/portal/admin/chats/">See the conversations</a>
         <a class="pt-btn pt-btn--ghost pt-btn--small" href="/portal/admin/chats/?refused=1">Only refused ones</a>
+    </div>
+</section>
+
+<section class="pt-section" aria-labelledby="ov-server">
+    <h2 class="pt-h2" id="ov-server">Server</h2>
+    <div class="pt-table-wrap">
+        <table class="pt-table">
+            <caption>The PHP this page ran on, as PHP reports it</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Setting</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">State</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($server as $fact): ?>
+                    <tr>
+                        <th scope="row"><?= e($fact['label']) ?></th>
+                        <td><?= e($fact['value']) ?></td>
+                        <td><span class="pt-badge pt-badge--<?= $fact['ok'] ? 'active' : 'pending' ?>"><?= $fact['ok'] ? 'As intended' : 'Check this' ?></span></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
 </section>
 

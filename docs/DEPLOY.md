@@ -1,8 +1,9 @@
 # Deploying to Hostinger
 
-The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the whole built site sits in
-`public_html`; the root `.htaccess` lets only `public/` be reached and sends every other request to
-`public/index.php`. Secrets and runtime data live **outside** `public_html`, in `../patterns-data/`.
+The site is plain PHP 8.4+ with MySQL (CI tests 8.4, the live version, and 8.5). On Hostinger Business (LiteSpeed)
+the whole built site sits in `public_html`; the root `.htaccess` lets only `public/` be reached and sends every
+other request to `public/index.php`. Secrets and runtime data live **outside** `public_html`, in
+`../patterns-data/`.
 
 ```
 /home/<user>/domains/patternsshowcontrol.co.uk/
@@ -21,10 +22,19 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
 2. **Website.** hPanel → Websites → Add website → *Empty PHP/HTML website* on the Business plan, domain
    `patternsshowcontrol.co.uk`. Wait for the free SSL to show *Active*; turn on **Force HTTPS**.
    Delete the placeholder files in `public_html` (the first Git deploy needs an empty folder).
-3. **PHP.** hPanel → Advanced → PHP Configuration: 8.3 (the version is shared by every site on the plan, including
-   agmessage.com). Keep `pdo_mysql`, `curl`, `intl`, `mbstring`, `fileinfo` and `gd` on; set `expose_php` Off. GD
-   must be built with WebP and JPEG support: Industry Updates re-encodes every uploaded image to WebP, with a JPEG
-   share card. `/health` reports `"images": true` when it can.
+3. **PHP.** hPanel → Websites → this site → Advanced → PHP Configuration: **8.4** (each website on the plan has its
+   own version; agmessage.com's is set apart). Keep `pdo_mysql`, `curl`, `intl`, `mbstring`, `fileinfo` and `gd` on;
+   set `expose_php` Off. GD must be built with WebP and JPEG support: Industry Updates re-encodes every uploaded
+   image to WebP, with a JPEG share card. `/health` reports `"images": true` when it can.
+   - The PHP options are kept per version: after changing the version, set `expose_php` Off again and check the rest.
+     The root `.htaccess` turns `session.upload_progress.enabled` off for every request (LiteSpeed applies it before
+     PHP reads the request; the site never uses upload progress), and the site itself hides arguments in error traces.
+     Portal → Admin → Overview → **Server** shows what PHP actually runs with: the version, and each of these settings
+     with whether it is as intended.
+   - Hostinger's PHP is CloudLinux's alt-php. CloudLinux back-ports security fixes into builds that keep the older
+     version number (for php.net's advisory of 21 October 2026, for example, alt-php85 8.5.11-5, before the renumbered
+     8.5.12-1 and 8.4.27-1 builds), so a version below php.net's newest is not by itself unpatched, and the version is
+     all a website or cron job can read. Only Hostinger support can read the package changelog: ask them when in doubt.
 4. **Database.** hPanel → Databases → MySQL: create a database and user (long random password). The site connects to
    `127.0.0.1:3306` and creates its tables itself on the first request (migrations run under a lock).
 5. **Email.** hPanel → Emails: create `support@` and `no-reply@` mailboxes, click *Connect automatically* (MX, SPF,
@@ -62,11 +72,13 @@ The site is plain PHP 8.2+ with MySQL. On Hostinger Business (LiteSpeed) the who
    that on your computer first), or run `tools/build-release.sh`. Upload the `patterns-site-<version>.zip` inside
    it to `public_html` with File Manager and extract it there. The data folder outside `public_html` is never
    touched by either route.
-9. **Cron.** hPanel → Advanced → Cron Jobs. Two jobs (`/usr/bin/php` is the account's PHP CLI, 8.3 today):
+9. **Cron.** hPanel → Advanced → Cron Jobs. Two jobs, each naming the PHP binary of the site's version
+   (`/usr/bin/php` follows the account's main website, agmessage.com, not this one; after changing this site's PHP
+   version, change `php84` in both lines too):
    - Housekeeping, daily (UTC):
-     `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php`
+     `/opt/alt/php84/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/cron.php`
    - Industry Updates, every 15 minutes (`*/15 * * * *`):
-     `/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/news.php tick`
+     `/opt/alt/php84/usr/bin/php /home/<user>/domains/patternsshowcontrol.co.uk/public_html/tools/news.php tick`
      Each tick imports any new article files, runs the session that is due (the sessions are London times set on
      the desk's settings page, so the clock change needs no new cron line) and records a heartbeat. A tick that
      finds another still running exits at once. The desk page (Portal → Admin → Industry Updates → Open the AI

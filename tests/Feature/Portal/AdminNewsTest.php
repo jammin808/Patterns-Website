@@ -115,7 +115,6 @@ final class AdminNewsTest extends TestCase
         imagefilledrectangle($im, 0, 0, $w - 1, $h - 1, (int) imagecolorallocate($im, 30, 120, 200));
         ob_start();
         imagepng($im);
-        imagedestroy($im);
         return $this->fakeUpload($name, (string) ob_get_clean());
     }
 

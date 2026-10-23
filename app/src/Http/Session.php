@@ -50,8 +50,8 @@ final class Session
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_only_cookies', '1');
         ini_set('session.gc_maxlifetime', (string) max($this->absoluteSeconds, 3600));
-        ini_set('session.sid_length', '48');
-        ini_set('session.sid_bits_per_character', '6');
+        // The id is PHP's own: 32 characters of 4 bits from the CSPRNG, 128 bits. Its length and alphabet are not
+        // set here (both settings are deprecated from PHP 8.4); a longer id issued before stays valid until it expires.
         if (PHP_SAPI === 'cli') {
             // Tests: the session lives in memory for this process only.
             $_SESSION = $_SESSION ?? [];
