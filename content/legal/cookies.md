@@ -1,8 +1,8 @@
-This site uses **Google Analytics** to understand how its pages are used, and Google Analytics sets cookies on the pages you read. The contact form, the client portal, the support assistant and commenting on Industry Updates set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
+This site uses **Google Analytics** to understand how its pages are used, and Google Analytics sets cookies on the pages you read. The contact form, the digest sign-up page, the client portal, the support assistant and commenting on Industry Updates set cookies of their own, each one essential to that feature. The site uses no advertising trackers.
 
 ## Analytics cookies
 
-Set by Google Analytics on every page, except pages reached through a one-time sign-in or password link (those addresses are never sent to Google).
+Set by Google Analytics on every page, except pages reached through a one-time sign-in, password or digest link (those addresses are never sent to Google).
 
 - **`_ga`**: tells one browser from another, so visits can be counted without knowing who you are. Lasts two years.
 - **`_ga_0C7QKZTNF7`**: keeps the state of your current visit. Lasts two years.
@@ -11,7 +11,7 @@ Google Analytics collects which pages are viewed, how you arrived (the referring
 
 ## Essential cookies
 
-- **Session cookie** (`__Host-psc`): keeps you signed in to the client portal and protects forms against cross-site requests. Set when you open the contact page or a client portal page, use the support assistant, or comment on an Industry Updates article (an article asks the site who you are only while the signed-in hint below is set, so reading the news sets no cookie). It is sent only to this site, only over a secure connection, and page scripts cannot read it. It ends when you close your browser, and you are signed out after two hours without activity or 12 hours after you signed in, whichever comes first.
+- **Session cookie** (`__Host-psc`): keeps you signed in to the client portal and protects forms against cross-site requests. Set when you open the contact page, the digest sign-up page or a client portal page, use the support assistant, or comment on an Industry Updates article (an article asks the site who you are only while the signed-in hint below is set, so reading the news sets no cookie). The confirm and unsubscribe links in our emails set no cookie. It is sent only to this site, only over a secure connection, and page scripts cannot read it. It ends when you close your browser, and you are signed out after two hours without activity or 12 hours after you signed in, whichever comes first.
 - **Remember-me cookie** (`__Host-psc_rm`): only if you tick "Keep me signed in". It holds a random sign-in token, never your password, and signs you back in on that browser for up to 30 days; each time it does, it is replaced by a new one for another 30 days. Like the session cookie, it is sent only to this site, only over a secure connection, and page scripts cannot read it. Signing out removes it.
 - **Signed-in hint** (`psc_li`): set when you sign in, so the page header can show "My account" instead of "Client login" and Industry Updates articles can offer you the comment box. It holds no personal data and grants no access. Page scripts can read it, which is all it is for, and it is sent only over a secure connection. It ends when you close your browser, or after 30 days if you ticked "Keep me signed in". Signing out removes it.
 

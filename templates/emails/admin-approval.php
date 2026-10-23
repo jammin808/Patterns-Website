@@ -7,6 +7,9 @@
 <?php if (!empty($user['company'])): ?>
 <tr><td style="padding:0 16px 0 0;color:#5b616e;">Company</td><td><?= e($user['company']) ?></td></tr>
 <?php endif; ?>
+<?php if (!empty($user['country'])): ?>
+<tr><td style="padding:0 16px 0 0;color:#5b616e;">Country</td><td><?= e(\Psc\Content\Content::countries()[$user['country']] ?? $user['country']) ?></td></tr>
+<?php endif; ?>
 <tr><td style="padding:0 16px 0 0;color:#5b616e;">Account</td><td>#<?= e((int) ($user['id'] ?? 0)) ?></td></tr>
 </table>
 <?= $this->render('emails/_button', ['url' => $baseUrl . '/portal/admin/users/' . (int) ($user['id'] ?? 0) . '/', 'label' => 'Review the account']) ?>

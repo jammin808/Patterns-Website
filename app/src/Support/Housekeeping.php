@@ -7,6 +7,8 @@ namespace Psc\Support;
 use Psc\App;
 use Psc\Chat\ChatStore;
 use Psc\News\ArticleStore;
+use Psc\News\Digest\Digests;
+use Psc\News\Digest\Subscribers;
 
 /**
  * The daily clean-up (tools/cron.php). Each limit is the one the privacy policy promises (content/legal/privacy.md):
@@ -15,7 +17,10 @@ use Psc\News\ArticleStore;
  * thirteen months; the AI desk's run records after six months; accounts never confirmed after thirty days; log and
  * mail files after ninety days; article images never attached to an article after a day, with their files. Session
  * files go once they are past the longest a session can live (remember-me is a database token, not a session file).
- * Safe to run at any time and any number of times.
+ * The weekly digest (docs/NEWS.md §14.2): a sign-up never confirmed goes after seven days (one that was asking to
+ * come back returns to its suppression record instead); the suppression records of those who unsubscribed stay for as
+ * long as the digest runs; each digest and its record of sends go after a year. Safe to run at any time and any
+ * number of times.
  *
  * An image file goes only with the row it belongs to, never because the connected database does not name it: a
  * database that is the wrong one (the empty SQLite fallback while db.dsn is missing, a restored copy) names none of
@@ -34,6 +39,9 @@ final class Housekeeping
     public const NEWS_CLICK_DAYS = 400;
     public const NEWS_RUN_DAYS = 180;
     public const ORPHAN_IMAGE_DAYS = 1;
+    /** A digest sign-up's confirmation link works this long (Tokens::CONFIRM_SECONDS); Subscribers::expire() keeps to it. */
+    public const DIGEST_PENDING_DAYS = 7;
+    public const DIGEST_KEEP_DAYS = 365;
 
     /** @return array<string, int> rows or files removed, by kind */
     public static function run(App $app, ?int $now = null): array
@@ -53,6 +61,12 @@ final class Housekeeping
         $report['news_link_clicks'] = $db->exec('DELETE FROM news_link_clicks WHERE day < ?', [gmdate('Y-m-d', $now - self::NEWS_CLICK_DAYS * $day)]);
         $report['news_runs'] = $db->exec('DELETE FROM news_runs WHERE created_at < ?', [$now - self::NEWS_RUN_DAYS * $day]);
         [$report['news_images'], $report['news_image_files']] = self::orphanImages($app, $now - self::ORPHAN_IMAGE_DAYS * $day);
+        $expired = (new Subscribers($app))->expire($now);
+        $report['digest_unconfirmed'] = $expired['removed'];
+        $report['digest_lapsed'] = $expired['lapsed'];
+        $pruned = (new Digests($app))->prune($now - self::DIGEST_KEEP_DAYS * $day);
+        $report['digest_sends'] = $pruned['sends'];
+        $report['digests'] = $pruned['digests'];
 
         // A session is over by its absolute or idle limit, whichever is longer; an hour's margin covers a request
         // still running at the edge.

@@ -1,7 +1,8 @@
 <?php
 /**
  * The desk's settings (docs/NEWS.md §8): the sessions (six rows, each a time, seven weekday ticks and Remove; blank
- * rows are ignored, so no script is needed), the articles per session and how newsworthy a story must be, publishing
+ * rows are ignored, so no script is needed), the weekly digest's day, time and sending caps (§14.12; its pause is on
+ * the digest's own page), the articles per session and how newsworthy a story must be, publishing
  * automatically, the research limits and lists, the models with their estimated cost, the monthly cap, the phrases
  * to avoid, the AI note and the comments. One form, saved all at once; a refused save comes back as it was typed.
  * It posts the stored values' fingerprints, so a save over someone else's newer settings is refused.
@@ -40,6 +41,11 @@ $slotError = $errors['slots'] ?? null;
 $modelKeys = array_keys(Settings::MODELS);
 $fields = [
     'slots' => 'f-slot-1-time',
+    'digest_weekday' => 'f-digest-weekday',
+    'digest_time' => 'f-digest-time',
+    'digest_per_tick' => 'f-digest-per-tick',
+    'digest_per_hour' => 'f-digest-per-hour',
+    'digest_per_day' => 'f-digest-per-day',
     'max_per_session' => 'f-max-per-session',
     'min_importance' => 'f-min-importance',
     'auto_publish' => 'f-auto-publish',
@@ -129,6 +135,20 @@ $radios = function (string $name, string $legend, array $options, string $help) 
             </fieldset>
         <?php endforeach; ?>
         <p class="pt-small">As saved, the desk runs <?= (int) $perWeek ?> <?= $perWeek === 1 ? 'session' : 'sessions' ?> a week: <?= e(implode(', ', $dayCounts)) ?>. <a href="/portal/admin/news/desk/calendar/">The calendar</a> turns single days on or off.</p>
+    </section>
+
+    <section class="pt-section" aria-labelledby="desk-digest" id="digest">
+        <h2 class="pt-h2" id="desk-digest">Weekly digest</h2>
+        <?= $field(['name' => 'digest_weekday', 'id' => 'f-digest-weekday', 'kind' => 'select', 'label' => 'Digest day', 'value' => $text($values['digest_weekday']), 'required' => true,
+            'options' => Schedule::DAYS, 'help' => 'The digest goes out once a week on this day, London time, with the articles that went live since the one before.', 'error' => $errors['digest_weekday'] ?? null]) ?>
+        <?= $field(['name' => 'digest_time', 'id' => 'f-digest-time', 'kind' => 'time', 'label' => 'Digest time', 'value' => $text($values['digest_time']), 'required' => true,
+            'help' => 'London time. It goes at the first tick after it, within 15 minutes.', 'error' => $errors['digest_time'] ?? null, 'attrs' => ['step' => 60]]) ?>
+        <?= $field(['name' => 'digest_per_tick', 'id' => 'f-digest-per-tick', 'kind' => 'number', 'label' => 'Digests sent per tick', 'value' => $text($values['digest_per_tick']), 'required' => true,
+            'help' => 'A tick comes every 15 minutes, so 25 a tick is up to 100 an hour.', 'error' => $errors['digest_per_tick'] ?? null, 'attrs' => ['min' => 1, 'max' => 50, 'inputmode' => 'numeric']]) ?>
+        <?= $field(['name' => 'digest_per_hour', 'id' => 'f-digest-per-hour', 'kind' => 'number', 'label' => 'Digests sent per hour', 'value' => $text($values['digest_per_hour']), 'required' => true,
+            'help' => 'However many ticks run in the hour.', 'error' => $errors['digest_per_hour'] ?? null, 'attrs' => ['min' => 1, 'max' => 200, 'inputmode' => 'numeric']]) ?>
+        <?= $field(['name' => 'digest_per_day', 'id' => 'f-digest-per-day', 'kind' => 'number', 'label' => 'Digests sent per 24 hours', 'value' => $text($values['digest_per_day']), 'required' => true,
+            'help' => 'The no-reply mailbox can send 1,000 emails in any 24 hours, shared with confirmations, password resets and ticket emails. 500 leaves them half.', 'error' => $errors['digest_per_day'] ?? null, 'attrs' => ['min' => 1, 'max' => 900, 'inputmode' => 'numeric']]) ?>
     </section>
 
     <section class="pt-section" aria-labelledby="desk-articles">

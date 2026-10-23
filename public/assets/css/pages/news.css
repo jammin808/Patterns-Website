@@ -255,6 +255,9 @@
     & .c-icon { color: var(--text-2); } }
   .news-share-list .is-copied { border-color: var(--text); }
   .news-share .news-share-title { font-size: var(--fs-3); }
+  /* The weekly digest's block after the share row (a link to its signup page): its title at the share row's size. */
+  .news-digest .news-digest-title { font-size: var(--fs-3); }
+  .news-digest-action { margin: 0; }
   @media (scripting: none) { .news-js-only { display: none; } }
 
   /* ===== An article's corrections, under its headline: each dated line, then the way to the policy. The lines

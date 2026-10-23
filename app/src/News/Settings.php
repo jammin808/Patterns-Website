@@ -45,6 +45,14 @@ final class Settings
         ],
         'ai_note' => 'Researched and written by our AI desk from the sources listed below. Spotted something off? Tell us and we will put it right.',
         'comments' => 'open',
+        // The weekly digest (docs/NEWS.md §14): its own pause, its London weekday (ISO, 1 is Monday) and time, and
+        // the sending caps that keep it inside the no-reply mailbox's limits.
+        'digest_enabled' => true,
+        'digest_weekday' => 5,
+        'digest_time' => '09:00',
+        'digest_per_tick' => 25,
+        'digest_per_hour' => 100,
+        'digest_per_day' => 500,
     ];
 
     /** The models the admin may choose for research and for writing. */
@@ -63,6 +71,10 @@ final class Settings
         'max_searches' => [1, 30],
         'max_fetches' => [0, 20],
         'monthly_budget_usd' => [5, 2000],
+        'digest_weekday' => [1, 7],
+        'digest_per_tick' => [1, 50],
+        'digest_per_hour' => [1, 200],
+        'digest_per_day' => [1, 900],
     ];
 
     /** List settings: [most lines, longest line]. */
@@ -514,6 +526,10 @@ final class Settings
                 'min_importance' => 'Choose how newsworthy a story must be, from 1 to 5.',
                 'max_searches' => 'Enter a number of web searches per session from 1 to 30.',
                 'max_fetches' => 'Enter a number of pages read per session from 0 to 20.',
+                'digest_weekday' => 'Choose the day the digest goes out.',
+                'digest_per_tick' => 'Enter a number of digests per tick from 1 to 50.',
+                'digest_per_hour' => 'Enter a number of digests per hour from 1 to 200.',
+                'digest_per_day' => 'Enter a number of digests per 24 hours from 1 to 900.',
                 default => 'Enter a monthly cap from 5 to 2000 US dollars, in whole dollars.',
             }];
         }
@@ -524,6 +540,9 @@ final class Settings
             'research_model', 'compose_model' => is_string($value) && isset(self::MODELS[$value]) ? [true, $value] : [false, 'Choose Opus 5.5 or Sonnet 5.5.'],
             'comments' => is_string($value) && isset(self::COMMENT_MODES[$value]) ? [true, $value] : [false, 'Choose open, approval or closed.'],
             'ai_note' => self::parseNote($value),
+            'digest_time' => is_string($value) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', trim($value)) === 1
+                ? [true, trim($value)]
+                : [false, 'Enter the digest\'s time as HH:MM, from 00:00 to 23:59.'],
             'slots' => self::parseSlots($value),
             'date_overrides' => self::parseOverrides($value),
             default => [false, 'That setting cannot be changed here.'],

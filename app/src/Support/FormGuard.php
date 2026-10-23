@@ -40,7 +40,7 @@ final class FormGuard
      * The fewest whole seconds between showing a form and accepting a send from it: three where there is a message
      * or several fields to fill in, two where there is one address to type or pick from autofill.
      */
-    public const MIN_SECONDS = ['contact' => 3, 'register' => 3, 'forgot' => 2, 'resend' => 2];
+    public const MIN_SECONDS = ['contact' => 3, 'register' => 3, 'forgot' => 2, 'resend' => 2, 'digest' => 2];
 
     public function __construct(private readonly App $app)
     {

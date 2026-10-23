@@ -121,6 +121,106 @@ return [
         'playmap' => ['interactive', 'video', 'lighting'],
     ],
 
+    // The weekly digest (docs/NEWS.md §14): the signup page, the confirm and unsubscribe pages, the account's tick and
+    // the links to the signup page. consent_version is stored with every sign-up: a change to the words a person agrees
+    // to ('page' 'consent', 'account' 'label' and the helps) changes it, to the date of the change.
+    'digest' => [
+        'consent_version' => '2026-10-23',
+        'cadence' => 'every :day from :time UK time',
+        'cadence_fallback' => 'once a week',
+        // The token pages' meta description (they are never indexed, but a shared link still shows it).
+        'description' => 'The weekly Industry Updates digest from Patterns Show Control: the week\'s new articles in one email.',
+        'follow' => 'Weekly digest by email',
+        'end' => [
+            'title' => 'Get Industry Updates by email',
+            'text' => 'One email a week with that week\'s new articles: each headline, its standfirst and a link to read it. Nothing else, and no tracking pixels.',
+            'button' => 'Get the weekly digest',
+        ],
+        'page' => [
+            'eyebrow' => 'Industry Updates',
+            'title' => 'The weekly digest',
+            'lede' => 'The articles that went live on Industry Updates that week, in one email, :cadence.',
+            'what_title' => 'What you get',
+            'what' => [
+                'One email a week with that week\'s new articles, the newest first (up to 15, with a link to any more): each headline, its standfirst and its category, with a link to read it here.',
+                'Nothing at all in a week with no new articles.',
+                'No tracking pixels, no images to load and no shortened links: every link goes to this site, or to our unsubscribe address.',
+                'A link in every digest to a page where one button unsubscribes you.',
+            ],
+            'form_title' => 'Sign up',
+            'email' => 'Email address',
+            'email_help' => 'The digest goes to this address. We use it for nothing else.',
+            'consent' => 'By pressing Send me the digest you ask Patterns Show Control to email you a weekly digest of Industry Updates. We first send a link to confirm the address, and send nothing more until you press the button on the page it opens. You can unsubscribe at any time.',
+            'privacy' => 'How we use your address',
+            'button' => 'Send me the digest',
+            'busy' => 'Sending…',
+            'account' => 'Have a client account? You can tick the box on your account page instead.',
+            'account_link' => 'Go to your account page',
+            'feed' => 'Prefer a feed reader? Industry Updates has an RSS feed.',
+            'feed_link' => 'The RSS feed',
+            'sent_title' => 'Check your inbox',
+            // The same words whatever happened, so they hold in every case ('three' is
+            // DigestController::CONFIRMATIONS_PER_DAY).
+            'sent' => 'Unless that address already gets the digest, or has had three of these emails in the last day, we have sent it an email with a link to confirm. Open it and press the button on the page it opens: nothing is sent until you do, and the link works for 7 days. Nothing after a few minutes? Check your spam folder.',
+        ],
+        'errors' => [
+            'email_empty' => 'Enter your email address.',
+            'email_long' => 'Enter an email address of up to 190 characters.',
+            'email_format' => 'Enter an email address in the format name@example.co.uk',
+            'quick' => 'That was quick. Please check your address, then press Send me the digest again.',
+            'limited' => 'Several sign-ups have been sent from your network in the last hour, so this one was not sent. Please try again in an hour.',
+            'unavailable' => 'Your sign-up could not be saved just now. Please try again in a few minutes.',
+        ],
+        // The confirm page (:title | Industry Updates is each state's <title>).
+        'confirm' => [
+            'ask_title' => 'Confirm your digest',
+            'ask' => 'Press the button to start the weekly Industry Updates digest at :email.',
+            'button' => 'Start my digest',
+            'done_title' => 'You are subscribed',
+            'done' => 'The weekly Industry Updates digest will come to :email, :cadence. Every one has a link to unsubscribe with one button.',
+            'already_title' => 'You are already subscribed',
+            'already' => 'The weekly Industry Updates digest already comes to this address, so there is nothing more to do.',
+            'expired_title' => 'This link has expired',
+            'expired' => 'A confirmation link works for 7 days. Sign up again and we will send a new one.',
+            'gone_title' => 'This link no longer works',
+            'gone' => 'The request this link was sent for has ended. To get the digest, sign up again and use the link in the newest email.',
+            'unsubscribe' => 'Changed your mind? Unsubscribe',
+        ],
+        // The unsubscribe page.
+        'unsubscribe' => [
+            'ask_title' => 'Unsubscribe from the digest',
+            'ask' => 'Press the button to stop the weekly Industry Updates digest at :email.',
+            'button' => 'Unsubscribe',
+            'done_title' => 'You are unsubscribed',
+            'done' => 'You will get no more digests. Your address is deleted from the digest; we keep only a coded record that you unsubscribed, so it is never sent to you again unless you sign up again.',
+            'already_title' => 'You are not subscribed',
+            'already' => 'This address does not get the digest, so there is nothing more to do.',
+            'test_title' => 'This was a test',
+            'test' => 'The link came from a test digest sent from the desk, so there was nothing to unsubscribe.',
+        ],
+        // Either token page, for a link that is not one of ours.
+        'invalid_title' => 'This link does not work',
+        'invalid' => 'It may have been cut short. Copy the whole link from the email into your browser, or sign up again.',
+        'again' => 'Sign up again',
+        'again_changed' => 'Changed your mind? Sign up again',
+        'news' => 'Read Industry Updates',
+        // The tick on the account page and at registration, and what saving it says ('three' in asked_limited is
+        // DigestController::CONFIRMATIONS_PER_DAY; stale and unavailable come after "Your details are saved. " when
+        // the other details were saved).
+        'account' => [
+            'label' => 'Email me the weekly Industry Updates digest',
+            'help' => 'One email a week from Patterns Show Control with that week\'s new Industry Updates articles. When you tick this and save, we send you one email, and the digest starts only when you press the button it leads to. It is separate from product news. Untick this, or use the link in any digest, to stop it.',
+            'register_help' => 'One email a week from Patterns Show Control with that week\'s new Industry Updates articles. Once your address is confirmed we send one more email, and the digest starts only when you press the button it leads to. It is separate from product news, and you can stop it at any time.',
+            'on' => 'Your details are saved. The weekly Industry Updates digest will come to :email.',
+            'asked' => 'Your details are saved. We have sent an email to :email: the weekly Industry Updates digest starts when you press the button on the page it opens. The link works for 7 days.',
+            'asked_limited' => 'Your details are saved, but we did not send the email to start the digest: :email has had three of these emails in the last day, which is as many as we send. Please tick the box and save again tomorrow.',
+            'unsent' => 'Your details are saved, but the email to start the digest could not be sent just now. Please tick the box and save again in a few minutes.',
+            'off' => 'Your details are saved. You will get no more digests.',
+            'stale' => 'The digest tick was not saved, because your subscription changed after this page was opened. The box below shows it as it is now.',
+            'unavailable' => 'The digest tick could not be saved just now. Please try again in a few minutes.',
+        ],
+    ],
+
     // /news/standards/: how the section is made, who answers for it and how it is corrected (Markdown; :editor is
     // the site's publisher, content/site.php publisher.name; :publishing is one of 'publishing' below). Every claim
     // here is one the code keeps (docs/NEWS.md §2, §6, §7).
