@@ -102,6 +102,11 @@ final class AdminNewsDeskTest extends TestCase
             'ai_note' => $s['ai_note'],
             'comments' => $s['comments'],
             'slots' => $slots,
+            'digest_weekday' => (string) $s['digest_weekday'],
+            'digest_time' => $s['digest_time'],
+            'digest_per_tick' => (string) $s['digest_per_tick'],
+            'digest_per_hour' => (string) $s['digest_per_hour'],
+            'digest_per_day' => (string) $s['digest_per_day'],
             'loaded' => $loaded,
         ];
     }
@@ -110,7 +115,7 @@ final class AdminNewsDeskTest extends TestCase
     private function loadedFingerprints(): array
     {
         preg_match_all('#<input type="hidden" name="loaded\[([a-z_]+)\]" value="([0-9a-f]{16})">#', $this->request('GET', self::DESK . 'settings/')->body, $m);
-        self::assertCount(15, $m[1], 'every setting the form posts');
+        self::assertCount(20, $m[1], 'every setting the form posts, the weekly digest\'s five among them');
         return array_combine($m[1], $m[2]);
     }
 
@@ -490,7 +495,7 @@ final class AdminNewsDeskTest extends TestCase
 
         // A form that carries no fingerprints at all is refused for every setting.
         $this->post(self::DESK . 'settings/', ['loaded' => null] + $this->settingsForm(['max_per_session' => '4']));
-        self::assertCount(15, $_SESSION['_errors'] ?? []);
+        self::assertCount(20, $_SESSION['_errors'] ?? [], 'every setting the form posts');
         self::assertSame(2, $this->settings()->get('max_per_session'));
     }
 

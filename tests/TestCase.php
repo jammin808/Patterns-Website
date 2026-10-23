@@ -155,6 +155,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     {
         ChatController::useGateway(null);
         Announcer::useTransport(null);
+        \Psc\News\Digest\DigestMail::useCourier(null);
         $_SESSION = [];
         if (isset($this->storage) && is_dir($this->storage)) {
             self::rmrf($this->storage);
@@ -253,6 +254,18 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected static function pngBytes(): string
     {
         return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+    }
+
+    /**
+     * Opens an email check's link as a person does: its GET shows the button and changes nothing, then the button's
+     * POST, to the same address with the session's CSRF token, confirms the address. The POST's response.
+     */
+    protected function confirmEmailLink(string $path): Response
+    {
+        $page = $this->request('GET', $path);
+        self::assertSame(200, $page->status, $path);
+        self::assertStringContainsString('<form method="post" action="' . e($path) . '"', $page->body, 'the link opens a page with its button');
+        return $this->post($path);
     }
 
     protected function csrf(): string

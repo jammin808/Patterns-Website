@@ -28,7 +28,10 @@ test('register, verify, sign in, report a bug and see the ideas board', async ({
   await expect(page.locator('h1')).toContainText(/email/i);
 
   const link = latestMailLink(/http:\/\/127\.0\.0\.1:8765\/portal\/verify\/\?token=[a-f0-9.]+/);
+  // The link opens a page with one button (a link scanner's visit changes nothing); pressing it confirms.
   await page.goto(link.replace('http://127.0.0.1:8765', ''));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Confirm your email address');
+  await page.getByRole('button', { name: 'Confirm my email address' }).click();
   await expect(page.locator('main')).toContainText(/confirmed|verified/i);
 
   await page.goto('/portal/login/');

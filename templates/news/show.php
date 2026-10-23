@@ -5,10 +5,11 @@
  * the corrections (dated, when it has any), the follow-up banner, the lead image or the category's artwork, the
  * body, what is confirmed and what is still speculation (each fact with its badge and its source), what it means, the
  * verdict, the other images, the numbered sources, the later updates, the note on AI-written articles (with the way
- * to the editorial standards), the share row, the newest of its category (More in) and the comments. Every source
- * link is real (rel nofollow, a new tab) and carries data-news-link, which news.js counts. Every link to another
- * article is that article's own address. The page is the same for every visitor; the administrators' preview adds a
- * banner and leaves out the counting, the share row and the comments.
+ * to the editorial standards), the share row, the weekly digest's block (a link to its signup page), the newest of
+ * its category (More in) and the comments. Every source link is real (rel nofollow, a new tab) and carries
+ * data-news-link, which news.js counts. Every link to another article is that article's own address. The page is the
+ * same for every visitor; the administrators' preview adds a banner and leaves out the counting, the share row, the
+ * digest's block and the comments.
  *
  * @var array<string, mixed> $copy  content/news.php
  * @var array<string, mixed> $article  ArticleStore::findBySlug() or find()
@@ -229,6 +230,7 @@ $note = (string) preg_replace('/\bTell us\b/', '<a href="/contact/?topic=other">
 
         <?php if (!$preview): ?>
             <?= $this->partial('news/share', ['copy' => $copy, 'url' => $seo->canonical(), 'title' => (string) $article['title']]) ?>
+            <?= $this->partial('news/digest', ['copy' => $copy]) ?>
         <?php endif; ?>
 
         <?php if ($primary !== null): ?>

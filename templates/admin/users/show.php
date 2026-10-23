@@ -30,6 +30,7 @@ $id = (int) $account['id'];
 $status = (string) $account['status'];
 $role = (string) $account['role'];
 $company = (string) ($account['company'] ?? '');
+$country = (string) ($account['country'] ?? '');
 $mailto = \Psc\Controllers\Admin\AdminController::mailto((string) $account['email']);
 $action = '/portal/admin/users/' . $id . '/';
 
@@ -79,6 +80,8 @@ if (!$isSelf && !$deleted) {
         <dd><?php if ($mailto !== null): ?><a href="<?= e($mailto) ?>"><?= e($account['email']) ?></a><?php else: ?><?= e($account['email']) ?><?php endif; ?></dd>
         <dt>Company</dt>
         <dd><?= $company !== '' ? e($company) : '<span class="pt-muted">Not given</span>' ?></dd>
+        <dt>Country</dt>
+        <dd><?= $country !== '' ? e(\Psc\Content\Content::countries()[$country] ?? $country) : '<span class="pt-muted">Not given</span>' ?></dd>
         <dt>Joined</dt>
         <dd><?= $time($account['created_at'], true) ?><?= $invited ? ' <span class="pt-muted">(invited)</span>' : '' ?></dd>
         <dt>Email confirmed</dt>
@@ -95,7 +98,7 @@ if (!$isSelf && !$deleted) {
 <section class="pt-section" id="manage" aria-labelledby="user-manage">
     <h2 class="pt-h2" id="user-manage">Manage this account</h2>
     <?php if ($isSelf): ?>
-        <div class="pt-alert pt-alert--info" role="status">This is your own account. To change your role or status, ask another administrator. Your name, company and password are on <a href="/portal/account/">your account page</a>.</div>
+        <div class="pt-alert pt-alert--info" role="status">This is your own account. To change your role or status, ask another administrator. Your name, company, country and password are on <a href="/portal/account/">your account page</a>.</div>
     <?php elseif ($deleted): ?>
         <div class="pt-alert pt-alert--info" role="status">This account was deleted by its owner. Their personal details are erased and it can never sign in again, so it cannot be changed. Its tickets and licences are kept below.</div>
     <?php else: ?>

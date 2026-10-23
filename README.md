@@ -7,7 +7,8 @@ The marketing, support and client-portal website for the Patterns Show Control e
   rendered, cacheable, with full SEO (titles, canonical URLs, Open Graph, JSON-LD with the organisation's `sameAs`,
   sitemap, Search Console and Bing verification, `robots.txt`, which asks model-training crawlers to stay away and
   welcomes search and AI answer engines, `llms.txt`).
-- **Client portal**: accounts with email confirmation, downloads, licence requests and licence files, bug reports,
+- **Client portal**: accounts with email confirmation (its link opens a page whose button confirms, so a mail
+  scanner opening it changes nothing), downloads, licence requests and licence files, bug reports,
   questions, a feature-request board with votes, and administration.
 - **Support assistant**: a chat on every page, answered by Claude and kept strictly to the Patterns Show Control
   software at a surface level (it refuses code, commands and internals, and anything off-topic).
@@ -18,9 +19,12 @@ The marketing, support and client-portal website for the Patterns Show Control e
   Administrators write, edit, schedule and take down articles with images, run and pause the desk, and moderate
   the comments signed-in clients leave. Each tick tells IndexNow and a WebSub hub what went live, changed or went;
   the feeds carry each article's picture; the hubs carry follow links and the articles share links (plain links, no
-  third-party script); the home and product pages show the newest articles; and an editorial standards page
-  (`/news/standards/`) says how the section is made and corrected, with dated corrections on the articles. See
-  [docs/NEWS.md](docs/NEWS.md).
+  third-party script); the home and product pages show the newest articles; an editorial standards page
+  (`/news/standards/`) says how the section is made and corrected, with dated corrections on the articles; and a
+  weekly email digest (`/digest/`, or a tick on the account page or at registration: double opt-in by a button on the
+  page its confirmation email opens, a link scanner never confirms or unsubscribes anyone, RFC 8058 one-click
+  unsubscribe in mail apps and a one-button page from every digest, sent by the news tick in batches within the
+  mailbox's limits) carries the week's new articles to those who ask for it. See [docs/NEWS.md](docs/NEWS.md).
 
 ## Stack
 

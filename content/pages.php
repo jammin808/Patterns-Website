@@ -417,6 +417,21 @@ return [
         'og_alt' => 'Industry Updates, AV and live event news. In every article: what\'s confirmed, what\'s still speculation, what it means for your shows and whether it is worth testing.',
         'updated' => '2026-10-23',
     ],
+    // The weekly digest's signup page (its words are content/news.php 'digest'; docs/NEWS.md §14.6). A form, so its
+    // own controller draws it with a session; it is outside /news/, whose pages never start one. Its confirm and
+    // unsubscribe pages are not in the registry: they are never indexed, listed or in the sitemap.
+    '/digest/' => [
+        'template' => 'news/digest',
+        'title' => 'Weekly digest | Industry Updates',
+        'description' => 'The week\'s new Industry Updates articles in one email: AV, live event and streaming news, with verified facts kept apart from speculation.',
+        'crumb' => 'Weekly digest',
+        'parent' => '/news/',
+        'section' => 'news',
+        'type' => 'page',
+        'og' => '/assets/img/og/news.png',
+        'og_alt' => 'Industry Updates, AV and live event news. In every article: what\'s confirmed, what\'s still speculation, what it means for your shows and whether it is worth testing.',
+        'updated' => '2026-10-23',
+    ],
     '/contact/' => [
         'template' => 'pages/contact',
         'title' => 'Contact Patterns Show Control',
@@ -449,7 +464,7 @@ return [
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => '2026-10-22',
+        'updated' => '2026-10-23',
     ],
     '/legal/terms/' => [
         'template' => 'pages/legal/terms',
@@ -474,11 +489,11 @@ return [
     '/legal/cookies/' => [
         'template' => 'pages/legal/cookies',
         'title' => 'Cookies | Patterns Show Control',
-        'description' => 'The cookies this site uses: Google Analytics cookies on the pages you read, and essential ones for the contact form, the client portal and the assistant.',
+        'description' => 'The cookies this site uses: Google Analytics on the pages you read, and essential ones for forms, the digest sign-up, the portal and the assistant.',
         'crumb' => 'Cookies',
         'parent' => '/',
         'section' => 'legal',
         'type' => 'legal',
-        'updated' => '2026-10-22',
+        'updated' => '2026-10-23',
     ],
 ];

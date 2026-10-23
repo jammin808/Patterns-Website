@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Psc\Tests\Feature;
 
 use Psc\News\ArticleStore;
+use Psc\News\Digest\Subscribers;
+use Psc\News\Digest\Tokens;
 use Psc\Support\Housekeeping;
 use Psc\Tests\TestCase;
 
@@ -162,5 +164,53 @@ final class HousekeepingTest extends TestCase
         foreach ($names as $name) {
             self::assertFileExists($dir . '/' . $name, 'the files are the only copies; the database may be the wrong one');
         }
+    }
+
+    public function testTheDigestsSignUpsAndRecordsGoAtTheirPromisedAge(): void
+    {
+        self::assertSame(Tokens::CONFIRM_SECONDS, Housekeeping::DIGEST_PENDING_DAYS * self::DAY, 'a sign-up lasts as long as its confirmation link');
+        $now = time();
+        $s = new Subscribers($this->app);
+        $short = (int) $s->request('short@example.test', 'c', 'p', $now - 7 * self::DAY + 1)['subscriber']['id'];
+        $old = (int) $s->request('old@example.test', 'c', 'p', $now - 7 * self::DAY)['subscriber']['id'];
+        // Unsubscribed a month ago, asked to come back eight days ago, never confirmed.
+        $back = $s->request('back@example.test', 'c', 'p', $now - 60 * self::DAY)['subscriber'];
+        $s->confirm((string) $back['selector'], 0, $now - 60 * self::DAY);
+        $s->unsubscribe((string) $back['selector'], 'one_click', $now - 30 * self::DAY);
+        $s->request('back@example.test', 'c', 'p', $now - 8 * self::DAY);
+        // A suppression record two years old.
+        $gone = $s->request('gone@example.test', 'c', 'p', $now - 800 * self::DAY)['subscriber'];
+        $s->confirm((string) $gone['selector'], 0, $now - 800 * self::DAY);
+        $s->unsubscribe((string) $gone['selector'], 'page', $now - 700 * self::DAY);
+
+        $digest = fn (string $week, int $age): int => $this->db->insert('news_digests', ['week' => $week, 'send_at' => $now - $age, 'window_start' => $now - $age - 7 * self::DAY, 'window_end' => $now - $age,
+            'articles' => '[]', 'left_out' => 0, 'state' => 'sent', 'recipients' => 1, 'composed_at' => $now - $age, 'finished_at' => $now - $age]);
+        $yearOld = $digest('2025-w40', 365 * self::DAY + 1);
+        $recent = $digest('2025-w45', 364 * self::DAY);
+        foreach ([$yearOld, $recent] as $d) {
+            $this->db->insert('news_digest_sends', ['digest_id' => $d, 'subscriber_id' => (int) $gone['id'], 'state' => 'sent', 'attempts' => 1, 'claimed_at' => $now - 300 * self::DAY, 'sent_at' => $now - 300 * self::DAY]);
+            $this->db->insert('news_digest_sends', ['digest_id' => $d, 'subscriber_id' => (int) $back['id'], 'state' => 'sent', 'attempts' => 1, 'claimed_at' => $now - 300 * self::DAY, 'sent_at' => $now - 300 * self::DAY]);
+        }
+
+        $report = Housekeeping::run($this->app, $now);
+        self::assertSame([1, 1, 2, 1], [$report['digest_unconfirmed'], $report['digest_lapsed'], $report['digest_sends'], $report['digests']]);
+        self::assertNull($s->find($old), 'a pending sign-up at 7 days goes');
+        self::assertSame('pending', $s->find($short)['state'], 'a second short of 7 days it stays');
+        $lapsed = $s->find((int) $back['id']);
+        self::assertSame(['unsubscribed', null, null, $now - 30 * self::DAY, 'one_click'], [$lapsed['state'], $lapsed['email'], $lapsed['user_id'], $lapsed['unsubscribed_at'], $lapsed['unsubscribe_method']]);
+        self::assertSame('unsubscribed', $s->find((int) $gone['id'])['state'], 'a suppression record stays while the digest runs');
+        self::assertNotNull($s->byEmail('gone@example.test'));
+        self::assertSame([$recent], array_map('intval', array_column($this->db->all('SELECT id FROM news_digests'), 'id')));
+        self::assertSame(2, (int) $this->db->value('SELECT COUNT(*) FROM news_digest_sends WHERE digest_id = ?', [$recent]));
+
+        // The report's keys reach the log readable.
+        $this->app->log->info('cron', $report);
+        $logged = (string) file_get_contents($this->app->storage->path('logs') . '/site-' . gmdate('Y-m-d') . '.log');
+        self::assertStringNotContainsString('***', $logged);
+        self::assertStringContainsString('"digest_unconfirmed":1', $logged);
+        self::assertStringContainsString('"digest_sends":2', $logged);
+
+        $again = Housekeeping::run($this->app, $now);
+        self::assertSame(0, $again['digest_unconfirmed'] + $again['digest_lapsed'] + $again['digest_sends'] + $again['digests'], 'safe to run again');
     }
 }

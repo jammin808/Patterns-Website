@@ -159,7 +159,7 @@ return [
             ],
             [
                 'q' => 'How do I create an account?',
-                'a' => 'Choose Create an account, enter your name, email address and a password, and accept the terms of use. We email you a link to confirm your address; once it is confirmed, sign in. If new accounts are being checked by a person first, the page tells you and we email you when yours is ready; if accounts are by invitation, the page says so and links to the contact form.',
+                'a' => 'Choose Create an account, enter your name, email address and a password, and accept the terms of use. We email you a link to confirm your address: open it and press Confirm my email address on the page it opens, then sign in. If new accounts are being checked by a person first, the page tells you and we email you when yours is ready; if accounts are by invitation, the page says so and links to the contact form.',
             ],
             [
                 'q' => 'The confirmation email has not arrived. What now?',

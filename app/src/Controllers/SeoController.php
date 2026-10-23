@@ -10,6 +10,7 @@ use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
 use Psc\News\Announcer;
+use Psc\News\Digest\Links;
 use Psc\News\ArticleStore;
 use Psc\News\Images;
 use Psc\News\Paths;
@@ -298,6 +299,11 @@ final class SeoController extends Controller
             $standards = Content::page(Paths::standards());
             if ($standards !== null) {
                 $out[] = '- [' . ($standards['crumb'] ?? $standards['title']) . '](' . $base . Paths::standards() . '): ' . $standards['description'];
+            }
+            // The weekly digest's signup page (docs/NEWS.md §14.11); its confirm and unsubscribe pages are never listed.
+            $digest = Content::page(Links::SIGNUP);
+            if ($digest !== null) {
+                $out[] = '- [' . ($digest['crumb'] ?? $digest['title']) . '](' . $base . Links::SIGNUP . '): ' . $digest['description'];
             }
             try {
                 foreach ((new ArticleStore($this->app))->live(null, null, 1, self::LLMS_ARTICLES)['items'] as $a) {

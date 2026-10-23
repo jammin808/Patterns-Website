@@ -197,6 +197,9 @@ final class AdminTest extends TestCase
             '/portal/admin/news/desk/calendar/',
             '/portal/admin/news/desk/prompt/',
             '/portal/admin/news/desk/runs/1/',
+            '/portal/admin/news/desk/digest/',
+            '/portal/admin/news/desk/digest/preview/',
+            '/portal/admin/news/desk/digest/1/',
         ] as $path) {
             yield $path => [$path];
         }
@@ -264,8 +267,11 @@ final class AdminTest extends TestCase
         $article = $this->makeArticle();
         $this->db->insert('news_comments', ['article_id' => $article, 'user_id' => $client, 'body' => 'Useful, thanks.', 'status' => 'visible', 'reports' => 1, 'created_at' => time(), 'updated_at' => time()]);
         $run = $this->db->insert('news_runs', ['slot' => '2026-10-22 06:00', 'kind' => 'scheduled', 'status' => 'skipped', 'summary' => 'Slow news', 'created_at' => time()]);
+        $digest = $this->db->insert('news_digests', ['week' => '2026-w43', 'send_at' => time() - 3600, 'window_start' => time() - 3600 - 604800, 'window_end' => time() - 3600, 'articles' => json_encode([$article]),
+            'left_out' => 0, 'state' => 'sent', 'recipients' => 0, 'composed_at' => time() - 3000, 'finished_at' => time() - 2900]);
 
-        // The article preview renders in the public layout and the media route returns an image, so neither is here.
+        // The article preview renders in the public layout, the digest's preview is the email as its own document
+        // (AdminDigestTest holds its own policy) and the media route returns an image, so none of them is here.
         foreach ([
             '/portal/admin/news/',
             '/portal/admin/news/new/',
@@ -277,6 +283,8 @@ final class AdminTest extends TestCase
             '/portal/admin/news/desk/calendar/',
             '/portal/admin/news/desk/prompt/',
             '/portal/admin/news/desk/runs/' . $run . '/',
+            '/portal/admin/news/desk/digest/',
+            '/portal/admin/news/desk/digest/' . $digest . '/',
             '/portal/admin/',
             '/portal/admin/messages/',
             '/portal/admin/messages/?status=read',

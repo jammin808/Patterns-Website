@@ -14,11 +14,16 @@
  *   category and article_live
  * @var string $deleteWord
  * @var bool $soleAdmin the only active administrator (the account cannot be deleted until there is another)
+ * @var bool|null $digest the weekly Industry Updates digest goes to the account (Subscribers::isSubscribed()), or null
+ *   when that cannot be read; its tick is consent of its own, apart from the product-news tick (docs/NEWS.md §14.7),
+ *   and digest_shown carries the state it was drawn against, so a save acts only on a tick the person moved
  * @var list<array{type: string, message: string}> $flashes
  */
 $soleAdmin ??= false;
 $newsComments ??= 0;
 $newsList ??= [];
+$digest ??= null;
+$digestWords = content('news')['digest']['account'] ?? [];
 $commentStates = ['visible' => ['public', 'Showing'], 'pending' => ['pending', 'Waiting for approval'], 'hidden' => ['private', 'Hidden by a moderator']];
 // Which of the three forms was sent last (its hidden "form" field comes back with the kept input), so a refusal no
 // field explains is said in that form's error summary and nowhere else.
@@ -32,11 +37,18 @@ $summary = fn (string $form, array $fields, string $action, string $failed): str
     'action' => $action,
     'failed' => $failed,
 ]);
-// Values typed into the details form win after a validation error; otherwise the saved ones.
+// Values typed into the details form win after a validation error; otherwise the saved ones. The digest's tick comes
+// back with the state it was first drawn against, never the state at this draw, so the next save still compares it
+// with the page the person saw: '1', '0', or empty when that page could not read it.
 $fromProfile = array_key_exists('name', $old);
 $name = $fromProfile ? $old['name'] : (string) $account['name'];
 $company = $fromProfile ? ($old['company'] ?? '') : (string) ($account['company'] ?? '');
+$country = $fromProfile ? ($old['country'] ?? '') : (string) ($account['country'] ?? '');
 $marketing = $fromProfile ? ($old['marketing'] ?? '') === '1' : (int) $account['marketing_opt_in'] === 1;
+$digestTicked = $fromProfile ? ($old['digest'] ?? '') === '1' : $digest === true;
+$digestShown = $fromProfile
+    ? (in_array($old['digest_shown'] ?? '', ['0', '1'], true) ? $old['digest_shown'] : '')
+    : ($digest === null ? '' : ($digest ? '1' : '0'));
 $isAdmin = ($account['role'] ?? '') === 'admin';
 $licenceCount = $kept['licences'] . ' ' . ($kept['licences'] === 1 ? 'licence' : 'licences');
 $ticketCount = $kept['tickets'] . ' ' . ($kept['tickets'] === 1 ? 'ticket' : 'tickets');
@@ -66,7 +78,7 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
     <form method="post" action="/portal/account/profile/" class="pt-form" novalidate>
         <?= csrf_field() ?>
         <input type="hidden" name="form" value="profile">
-        <?= $summary('profile', ['name' => 'profile-name', 'company' => 'profile-company'], 'before saving', 'Your details were not saved') ?>
+        <?= $summary('profile', ['name' => 'profile-name', 'company' => 'profile-company', 'country' => 'profile-country'], 'before saving', 'Your details were not saved') ?>
         <?= $this->render('portal/auth/_field', [
             'id' => 'profile-name',
             'name' => 'name',
@@ -86,10 +98,21 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
             'maxlength' => 160,
             'error' => $errors['company'] ?? null,
         ]) ?>
+        <?= $this->render('portal/_country', [
+            'id' => 'profile-country',
+            'value' => $country,
+            'error' => $errors['country'] ?? null,
+        ]) ?>
         <div class="pt-field pt-field--inline">
             <input id="profile-marketing" name="marketing" type="checkbox" value="1"<?= $marketing ? ' checked' : '' ?> aria-describedby="profile-marketing-help">
             <label for="profile-marketing">Email me about new releases and features</label>
             <p class="pt-help" id="profile-marketing-help">Untick this at any time to stop them.</p>
+        </div>
+        <input type="hidden" name="digest_shown" value="<?= $digestShown ?>">
+        <div class="pt-field pt-field--inline">
+            <input id="profile-digest" name="digest" type="checkbox" value="1"<?= $digestTicked ? ' checked' : '' ?> aria-describedby="profile-digest-help">
+            <label for="profile-digest"><?= e($digestWords['label'] ?? 'Email me the weekly Industry Updates digest') ?></label>
+            <p class="pt-help" id="profile-digest-help"><?= e($digestWords['help'] ?? '') ?></p>
         </div>
         <div class="pt-actions">
             <button type="submit" class="pt-btn pt-btn--primary" data-busy="Saving…">Save details</button>
@@ -167,7 +190,7 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
 
 <section class="pt-section" id="data" aria-labelledby="data-title">
     <h2 class="pt-h2" id="data-title">Your data</h2>
-    <p>Download a copy of everything your account holds: your details, tickets and their comments, licences, your comments on Industry Updates articles (including any waiting for approval or hidden) and the comments you reported, and any conversations with the support assistant while you were signed in. It is a JSON file, which most text editors can open.</p>
+    <p>Download a copy of everything your account holds: your details, tickets and their comments, licences, your comments on Industry Updates articles (including any waiting for approval or hidden) and the comments you reported, any conversations with the support assistant while you were signed in, and your weekly digest subscription. It is a JSON file, which most text editors can open.</p>
     <div class="pt-actions">
         <a class="pt-btn pt-btn--secondary" href="/portal/account/export/">Download my data</a>
     </div>
@@ -179,12 +202,15 @@ $newsCount = $newsComments . ' ' . ($newsComments === 1 ? 'comment' : 'comments'
     <div class="pt-alert pt-alert--warning" role="status">
         <p><strong>This cannot be undone.</strong> You will be signed out and will not be able to sign in again with this account.</p>
     </div>
-    <p>We remove your name, email address, company and password straight away. Some records stay because they are business records:</p>
+    <p>We remove your name, email address, company, country and password straight away. Some records stay because they are business records:</p>
     <ul>
         <li>Licences stay on record<?php if ($kept['licences'] > 0): ?> (you have <?= e($licenceCount) ?>)<?php endif; ?>. Download any licence files you need first.</li>
         <li>Tickets and their comments stay<?php if ($kept['tickets'] > 0): ?> (you have <?= e($ticketCount) ?>)<?php endif; ?>, so conversations still make sense. They show &ldquo;Deleted user&rdquo; as the author.</li>
     </ul>
     <p>Your comments on Industry Updates articles<?php if ($newsComments > 0): ?> (you have <?= e($newsCount) ?>)<?php endif; ?> are public, so they are deleted for good with your account, and so are any reports you made about other people's comments.</p>
+    <?php if ($digest === true): ?>
+    <p>The weekly Industry Updates digest stops, and your address is deleted from it.</p>
+    <?php endif; ?>
     <p>If you would like a copy of your data, <a href="/portal/account/export/">download it</a> before you continue.</p>
 
     <?php if ($soleAdmin): ?>

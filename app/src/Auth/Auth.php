@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Psc\Auth;
 
 use Psc\App;
+use Psc\Content\Content;
+use Psc\Controllers\DigestController;
+use Psc\News\Digest\DigestMail;
+use Psc\News\Digest\Subscribers;
 use Psc\Support\Audit;
 
 /**
@@ -16,6 +20,12 @@ use Psc\Support\Audit;
  *
  * Statuses: pending (email not checked) → active, or → approval (waiting for an administrator) → active;
  * disabled accounts cannot sign in.
+ *
+ * The weekly digest's tick at registration leaves a pending request (docs/NEWS.md §14.7). Proving the address (the
+ * email check's button, or a reset link for a pending account) sends the digest's own confirmation, and only the
+ * button that email leads to starts it: proving an address for an account is not consent to the digest. Nothing is
+ * sent to an address nobody has proven, and an address that already has an account learns nothing about its
+ * subscription.
  */
 final class Auth
 {
@@ -37,6 +47,8 @@ final class Auth
 
     /** The per-account ceiling on failed sign-ins from all addresses together, as a multiple of the per-address limit. */
     private const ACCOUNT_CEILING_FACTOR = 10;
+
+    public const COUNTRY_ERROR = 'Choose a country from the list.';
 
     /** @var array<string, mixed>|null|false false = not looked up yet */
     private array|null|false $user = false;
@@ -105,6 +117,85 @@ final class Auth
     public static function normaliseEmail(string $email): string
     {
         return mb_strtolower(trim($email));
+    }
+
+    /**
+     * The mailbox an address delivers to, for the limits that cap the mail one person can be sent (never stored, and
+     * never an address to send to): normalised; the local part read as RFC 5322 means it, its quotes and quoted pairs
+     * taken out ("jdoe", "j".doe and "j\doe" are jdoe), then cut at its first "+" (sub-addressing); a domain literal
+     * as one spelling of its IP address; and for Gmail the dots dropped and googlemail.com read as gmail.com. Every
+     * form that mails an address nobody has proven counts by this, so each spelling of one mailbox shares one
+     * allowance; other ways one mailbox takes many addresses (a catch-all domain) are bounded by the per-network
+     * limits.
+     */
+    public static function mailboxKey(string $email): string
+    {
+        $email = self::normaliseEmail($email);
+        $at = strrpos($email, '@');
+        if ($at === false || $at === 0) {
+            return $email;
+        }
+        $local = self::unquoted(substr($email, 0, $at));
+        $domain = self::literalKey(substr($email, $at + 1));
+        $plus = strpos($local, '+');
+        if ($plus !== false && $plus > 0) {
+            $local = substr($local, 0, $plus);
+        }
+        if ($domain === 'gmail.com' || $domain === 'googlemail.com') {
+            $domain = 'gmail.com';
+            $local = str_replace('.', '', $local);
+        }
+        return $local . '@' . $domain;
+    }
+
+    /** A local part with RFC 5322's quoting taken out: the quotes dropped, each quoted pair read as its character. */
+    private static function unquoted(string $local): string
+    {
+        if (strpbrk($local, '"\\') === false) {
+            return $local;
+        }
+        $out = '';
+        $length = strlen($local);
+        for ($i = 0; $i < $length; $i++) {
+            if ($local[$i] === '\\' && $i + 1 < $length) {
+                $out .= $local[++$i];
+            } elseif ($local[$i] !== '"') {
+                $out .= $local[$i];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * A domain literal ([1.2.3.4], [IPv6:...]) as one spelling of its address, an IPv4 address written as IPv6 read
+     * as IPv4, so each address it can be written for is one key; any other domain as it is.
+     */
+    private static function literalKey(string $domain): string
+    {
+        if (!str_starts_with($domain, '[') || !str_ends_with($domain, ']')) {
+            return $domain;
+        }
+        $literal = substr($domain, 1, -1);
+        if (str_starts_with($literal, 'ipv6:')) {
+            $literal = substr($literal, 5);
+        }
+        $packed = filter_var($literal, FILTER_VALIDATE_IP) !== false ? inet_pton($literal) : false;
+        if ($packed === false) {
+            return $domain;
+        }
+        if (strlen($packed) === 16 && str_starts_with($packed, str_repeat("\0", 10) . "\xff\xff")) {
+            $packed = substr($packed, 12);
+        }
+        return '[' . (string) inet_ntop($packed) . ']';
+    }
+
+    /**
+     * An account's country as sent: none (''), or an ISO 3166-1 alpha-2 code from the contact form's list
+     * (content/countries.php). Anything else is refused, never guessed at.
+     */
+    public static function isCountry(string $code): bool
+    {
+        return $code === '' || array_key_exists($code, Content::countries());
     }
 
     /**
@@ -237,7 +328,7 @@ final class Auth
      * Creates an account and sends the email check. An email that already has an account gets a notice instead,
      * and the caller is told "ok" either way, so the form never reveals who has an account.
      *
-     * @param array{name: string, email: string, company?: string, password: string, marketing?: bool} $input
+     * @param array{name: string, email: string, company?: string, country?: string, password: string, marketing?: bool, digest?: bool} $input
      * @return array{ok: bool, errors: array<string, string>}
      */
     public function register(array $input): array
@@ -252,7 +343,7 @@ final class Auth
         $existing = $this->findByEmail($email);
         if ($existing !== null) {
             // Capped per address, so the form cannot be used to flood someone's inbox with notices.
-            if ($this->app->limiter()->hit('register-exists:' . $email, self::EXISTING_ACCOUNT_NOTICES_PER_HOUR, 3600)) {
+            if ($this->app->limiter()->hit('register-exists:' . self::mailboxKey($email), self::EXISTING_ACCOUNT_NOTICES_PER_HOUR, 3600)) {
                 $this->app->mailer()->send($email, 'You already have an account', 'account-exists', ['name' => self::greetingName($existing)]);
             }
             return ['ok' => true, 'errors' => []];
@@ -262,6 +353,7 @@ final class Auth
             'email' => $email,
             'name' => self::cleanLine($input['name']),
             'company' => self::cleanLine($input['company'] ?? '') ?: null,
+            'country' => ($input['country'] ?? '') !== '' ? $input['country'] : null,
             'password_hash' => $hash,
             'role' => $this->isAdminEmail($email) ? 'admin' : 'client',
             'status' => 'pending',
@@ -270,8 +362,60 @@ final class Auth
             'updated_at' => $now,
         ]);
         Audit::log($this->app, $id, 'register');
+        if (!empty($input['digest'])) {
+            $this->askForDigest($id);
+        }
         $this->sendVerification($id);
         return ['ok' => true, 'errors' => []];
+    }
+
+    /**
+     * The registration's digest tick: a pending request for the new account, whose confirmation goes once the
+     * address is proven. A failure is logged and never fails the registration.
+     */
+    private function askForDigest(int $userId): void
+    {
+        try {
+            $row = $this->find($userId);
+            if ($row !== null) {
+                $versions = DigestController::versions($this->app);
+                (new Subscribers($this->app))->subscribeAccount($row, 'registration', $versions['consent'], $versions['privacy'], time());
+            }
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'register digest');
+        }
+    }
+
+    /**
+     * The account's address is proven: its waiting digest request is asked again and sent the digest's confirmation,
+     * whose button alone starts it, as on the public page. Never fails the caller.
+     */
+    private function digestVerified(int $userId): void
+    {
+        try {
+            $row = (new Subscribers($this->app))->renewAccountRequest($userId, time());
+            if ($row !== null) {
+                DigestMail::courier($this->app)->confirmation($row);
+            }
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'verify digest');
+        }
+    }
+
+    /**
+     * Whether the account asked for the digest and waits for its address to be proven, so the email check (or a
+     * pending account's reset) says a confirmation of its own follows. The request is asked again now, so it lasts
+     * 7 days from this email, longer than the link it carries: the confirmation it promises always follows the link's
+     * button. A failure is logged and reads as no.
+     */
+    private function digestWaiting(int $userId): bool
+    {
+        try {
+            return (new Subscribers($this->app))->renewAccountRequest($userId, time()) !== null;
+        } catch (\Throwable $e) {
+            $this->app->log->exception($e, 'digest waiting');
+            return false;
+        }
     }
 
     public function sendVerification(int $userId): void
@@ -285,6 +429,7 @@ final class Auth
         $this->app->mailer()->send((string) $row['email'], 'Confirm your email address', 'verify-email', [
             'name' => self::greetingName($row),
             'url' => $this->app->baseUrl() . '/portal/verify/?token=' . rawurlencode($token),
+            'digest' => $this->digestWaiting($userId),
         ]);
     }
 
@@ -305,6 +450,7 @@ final class Auth
         $status = $row['status'] === 'pending' ? ($needsApproval ? 'approval' : 'active') : (string) $row['status'];
         $this->app->db()->update('users', ['status' => $status, 'email_verified_at' => time(), 'updated_at' => time()], ['id' => (int) $row['id']]);
         Audit::log($this->app, (int) $row['id'], 'email.verified');
+        $this->digestVerified((int) $row['id']);
         $row = $this->find((int) $row['id']);
         // Administrators hear once, when the account joins the queue, not again for an account already in it.
         if ($row !== null && $joinsQueue) {
@@ -317,7 +463,7 @@ final class Auth
     public function requestReset(string $email): void
     {
         $email = self::normaliseEmail($email);
-        if (!$this->app->limiter()->hit('reset:' . $email, 3, 3600) || !$this->app->limiter()->hit('reset-ip:' . $this->app->clientIp(), 10, 3600)) {
+        if (!$this->app->limiter()->hit('reset:' . self::mailboxKey($email), 3, 3600) || !$this->app->limiter()->hit('reset-ip:' . $this->app->clientIp(), 10, 3600)) {
             return;
         }
         $row = $this->findByEmail($email);
@@ -329,6 +475,7 @@ final class Auth
         $this->app->mailer()->send((string) $row['email'], 'Reset your password', 'reset-password', [
             'name' => self::greetingName($row),
             'url' => $this->app->baseUrl() . '/portal/reset/?token=' . rawurlencode($token),
+            'digest' => $row['status'] === 'pending' && $this->digestWaiting((int) $row['id']),
         ]);
         Audit::log($this->app, (int) $row['id'], 'password.reset_requested');
     }
@@ -375,6 +522,10 @@ final class Auth
         $this->app->db()->update('users', $set, ['id' => (int) $row['id']]);
         $this->endOtherCredentials((int) $row['id']);
         Audit::log($this->app, (int) $row['id'], 'password.reset');
+        // The link proved a pending account's address, as the email check would: its digest request's confirmation goes.
+        if (isset($set['email_verified_at'])) {
+            $this->digestVerified((int) $row['id']);
+        }
         if ($needsApproval) {
             $fresh = $this->find((int) $row['id']);
             if ($fresh !== null) {
@@ -478,6 +629,9 @@ final class Auth
         }
         if (mb_strlen(self::cleanLine((string) ($input['company'] ?? ''))) > 160) {
             $errors['company'] = 'Keep the company name under 160 characters.';
+        }
+        if (!self::isCountry((string) ($input['country'] ?? ''))) {
+            $errors['country'] = self::COUNTRY_ERROR;
         }
         $pw = $this->passwordError((string) ($input['password'] ?? ''), $email);
         if ($pw !== null) {

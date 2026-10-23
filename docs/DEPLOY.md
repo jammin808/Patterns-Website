@@ -125,6 +125,7 @@ other request to `public/index.php`. Secrets and runtime data live **outside** `
 | Write or correct a news article | Portal → Admin → Industry Updates → open the article (or *Write an article*). AI articles held for review wait under *Held*. A correction that changes what a live article says goes in *Add a correction* (one line saying what changed): the article shows it, dated, under its headline, as the editorial standards page (`/news/standards/`) promises. |
 | Run the AI desk | Portal → Admin → Industry Updates → Open the AI desk: pause or continue it, *Run a session now* (it starts within 15 minutes), change its sessions, calendar, models, cap, banned sites and topics, and its brief and voice. Each run has a page with its steps, candidates, references and estimated cost. |
 | Moderate comments | Portal → Admin → Industry Updates → Moderate comments. The first report on a comment, and the report that hides it, are emailed; so is a comment waiting for approval, at most once a day. |
+| Run the weekly digest | Portal → Admin → Industry Updates → Open the AI desk → *Weekly digest*: pause or continue it, see who gets it, open the next one's preview, send yourself a test, unsubscribe someone who asked by email, and see how each digest went. Its day, time and sending limits are on the desk's *Settings* tab (§8). |
 | Publish an article written in a Claude Code session | Add its JSON file to `content/news/articles/` (the shape is in docs/NEWS.md §6.4) and push to `main`: the next tick imports it once. |
 
 ## 4. Settings worth knowing (`config/defaults.php`)
@@ -149,6 +150,9 @@ other request to `public/index.php`. Secrets and runtime data live **outside** `
 - `seo.google_site_verification` / `seo.bing_site_verification`: the ownership tokens Search Console and Bing
   Webmaster Tools give you (the `content="…"` part of their meta tag; pasting the whole tag works too). The home
   page's `<head>` carries them. They are not secrets, but they live in the server config like the rest (§7).
+- `mail.unsubscribe_to`: the mailbox every weekly digest names for unsubscribing by email (default
+  `unsubscribe@patternsshowcontrol.co.uk`, an alias of `support@`, §8). It must be a plain address: empty, or
+  anything else (such as a name with the address in angle brackets), no digest is sent and the desk says why.
 - `security.turnstile_site_key` / `turnstile_secret`: add Cloudflare Turnstile to the contact form if spam appears.
 - `app.trusted_proxy_header` / `app.trusted_proxies`: how the site learns a visitor's address behind a CDN, which
   every per-address limit (sign-in, contact, register, the assistant) counts by. Leave the header `null` (the
@@ -233,3 +237,53 @@ What the site does by itself, and what only you can do.
    Mode, which come from Googlebot and follow `nosnippet` and Search Console's own control (step 4).
 7. On the live site, check: `curl -I https://patternsshowcontrol.co.uk/news/feed.xml` shows the `Link` header with
    the hub; the desk page shows *Last told* for both channels after the first tick; and the key file answers.
+
+## 8. The weekly digest
+
+Industry Updates has a weekly email digest (docs/NEWS.md §14): people sign up at `/digest/` or tick the box on their
+account page or when they create an account (either way a confirmation email follows, and nothing is sent until they
+press the button it leads to), and the news cron's tick sends each week's new articles at the day and time on the
+desk's *Settings* tab (Friday 09:00 London time by default). It goes through the same SMTP mailbox as the site's
+other email, `no-reply@`. Before the first digest goes out:
+
+1. **The unsubscribe address.** In hPanel → Emails, add `unsubscribe@patternsshowcontrol.co.uk` as an alias of
+   `support@` (the mailbox §1 step 5 makes; a forwarder to it works too), so what arrives there is read. Every digest
+   names it, in its `List-Unsubscribe` header and in its footer; `mail.unsubscribe_to` holds it. If you point it at
+   another mailbox, the desk's help names no mailbox, so nothing else needs changing.
+2. **Requests by email.** Act on each one within 2 days: Portal → Admin → Industry Updates → Open the AI desk →
+   *Weekly digest* → *Unsubscribe someone*. Paste the email's subject (it holds the token, which finds the
+   subscription even when the request was forwarded) or the address, choose *By email to unsubscribe@…*, and press
+   *Unsubscribe*. Nobody needs to reply: the digest simply stops.
+3. **DMARC reports.** Check that the domain's DMARC record has a report address (`rua=mailto:…`, §1 step 5), so you
+   hear when mail claiming to be from the domain fails its checks.
+4. **Google Postmaster Tools** (postmaster.google.com): add `patternsshowcontrol.co.uk` and verify it with the DNS TXT
+   record it shows (hPanel → Domains → DNS / Nameservers). It reports the domain's spam rate and reputation at Gmail,
+   which matter once the list grows.
+5. **The first test send.** The desk's *Send me a test* sends the next digest, marked as a test, to the signed-in
+   administrator's own address. Send it to a Gmail address first: if yours is elsewhere, add a Gmail address to
+   `app.admin_emails`, register an account with it and send the test from that account. In Gmail, open the test, then
+   ⋮ → *Show original*:
+   - SPF, DKIM and DMARC should each say `PASS`, and DKIM's domain should be `patternsshowcontrol.co.uk`;
+   - in the `DKIM-Signature` header, the list after `h=` should include `list-unsubscribe` and
+     `list-unsubscribe-post`. RFC 8058 asks receivers to offer one-click unsubscribe only when the signature covers
+     both. If it does not, the digest still works (the link in its footer and the mailto), but Gmail and Yahoo may not
+     show their own *Unsubscribe* button; note it, as signing in the site itself is a later change (NEWS.md §14.16).
+   - Gmail should show *Unsubscribe* beside the sender's name once the domain has some sending history.
+6. **The limits.** Hostinger's Starter Business Email lets one mailbox send 1,000 emails in any 24 hours, at most 100
+   recipients a message. The digest sends one recipient a message, 25 a tick, at most 100 an hour and 500 in any 24
+   hours by default (the desk's *Settings* tab), which leaves the other half for confirmations, password resets and
+   ticket emails. 500 subscribers take about 5 hours; a digest still sending 48 hours after its time stops, and the
+   desk says so. `mail.driver` must be `smtp`: with `mail` (PHP `mail()`, capped at 100 a day) the digest does not
+   send at all, and the desk says why.
+7. **When the list grows.** At 400 subscribers the desk warns that the list is nearing what one mailbox can send
+   beside the site's other email. The way on is a mailbox of the digest's own (such as `updates@`) or Hostinger Reach;
+   either needs a small change to the site (the digest's own sending settings), which is not built yet, so ask for it
+   when the warning appears.
+8. **Never change `app.secret` while the digest runs.** It signs every confirmation and unsubscribe link and keys
+   every subscriber's record (the coded copy of the address that finds it, and keeps an unsubscribed address off the
+   list): a new secret breaks every link in every digest already sent, and the site can no longer find anyone's
+   record by their address. If it ever must change (a leak), pause the digest first: the records need re-keying
+   before it goes again, which is a change to the site to ask for.
+9. **A development or staging copy** must have `mail.driver` set to `log` (emails are written to
+   `storage/mail/` as files and reach nobody), most of all when it runs on a copy of the live database, which holds
+   real subscribers. The desk shows "This server writes emails to files" while it is.

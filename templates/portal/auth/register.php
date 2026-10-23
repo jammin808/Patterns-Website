@@ -11,6 +11,9 @@
  */
 $quick ??= false;
 $termsError = $errors['terms'] ?? null;
+// The weekly digest's tick (docs/NEWS.md §14.7): consent of its own, apart from product news, taking effect only once
+// the address is confirmed.
+$digestWords = content('news')['digest']['account'] ?? [];
 ?>
 <div class="pt-auth">
     <header class="pt-header">
@@ -42,7 +45,7 @@ $termsError = $errors['terms'] ?? null;
             <?= form_guard('register', $old) ?>
             <?= $this->partial('error-summary', [
                 'errors' => $errors,
-                'fields' => ['name' => 'register-name', 'email' => 'register-email', 'company' => 'register-company', 'password' => 'register-password', 'terms' => 'register-terms'],
+                'fields' => ['name' => 'register-name', 'email' => 'register-email', 'company' => 'register-company', 'country' => 'register-country', 'password' => 'register-password', 'terms' => 'register-terms'],
                 'flashes' => $flashes ?? [],
                 'action' => 'before creating your account',
                 'failed' => $quick ? 'Your account is not created yet' : 'Your account was not created',
@@ -79,6 +82,11 @@ $termsError = $errors['terms'] ?? null;
                 'maxlength' => 160,
                 'error' => $errors['company'] ?? null,
             ]) ?>
+            <?= $this->render('portal/_country', [
+                'id' => 'register-country',
+                'value' => $old['country'] ?? '',
+                'error' => $errors['country'] ?? null,
+            ]) ?>
             <?= $this->render('portal/auth/_field', [
                 'id' => 'register-password',
                 'name' => 'password',
@@ -105,6 +113,11 @@ $termsError = $errors['terms'] ?? null;
                     <input id="register-marketing" name="marketing" type="checkbox" value="1"<?= ($old['marketing'] ?? '') === '1' ? ' checked' : '' ?> aria-describedby="register-marketing-help">
                     <label for="register-marketing">Email me about new releases and features</label>
                     <p class="pt-help" id="register-marketing-help">You can turn this off at any time on your account page.</p>
+                </div>
+                <div class="pt-field pt-field--inline">
+                    <input id="register-digest" name="digest" type="checkbox" value="1"<?= ($old['digest'] ?? '') === '1' ? ' checked' : '' ?> aria-describedby="register-digest-help">
+                    <label for="register-digest"><?= e($digestWords['label'] ?? 'Email me the weekly Industry Updates digest') ?></label>
+                    <p class="pt-help" id="register-digest-help"><?= e($digestWords['register_help'] ?? '') ?></p>
                 </div>
             </fieldset>
 

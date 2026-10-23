@@ -65,6 +65,83 @@ final class MigratorTest extends TestCase
         @rmdir($dir);
     }
 
+    /**
+     * A release whose migration is numbered below one already applied (two pieces of work numbered in parallel, the
+     * higher one deployed first) once kept the old marker, which named only the newest version: the lower one was
+     * never applied and the health check, which asked about the newest alone, said the schema was current.
+     */
+    public function testAVersionNumberedBelowTheNewestIsStillApplied(): void
+    {
+        $dir = sys_get_temp_dir() . '/psc-mig-' . bin2hex(random_bytes(4));
+        $root = $dir . '/migrations';
+        mkdir($root . '/sqlite', 0770, true);
+        file_put_contents($root . '/sqlite/0001_a.sql', 'CREATE TABLE a (x INT);');
+        file_put_contents($root . '/sqlite/0003_c.sql', 'CREATE TABLE c (x INT);');
+        $db = Database::connect('sqlite::memory:');
+        $m = new Migrator($db, $root, $dir . '/schema-version');
+        $m->ensure();
+        self::assertTrue($m->isCurrent());
+
+        file_put_contents($root . '/sqlite/0002_b.sql', 'CREATE TABLE b (x INT);');
+        self::assertFalse($m->isCurrent(), 'the health check sees the version that is not applied yet');
+        $m->ensure();
+        self::assertSame(0, (int) $db->value('SELECT COUNT(*) FROM b'), 'the marker no longer matches, so it is applied');
+        self::assertTrue($m->isCurrent());
+        self::assertSame(['0001_a', '0002_b', '0003_c'], array_map('strval', array_column($db->all('SELECT version FROM schema_migrations ORDER BY version'), 'version')));
+
+        foreach (['0001_a', '0002_b', '0003_c'] as $f) {
+            @unlink($root . '/sqlite/' . $f . '.sql');
+        }
+        @rmdir($root . '/sqlite');
+        @rmdir($root);
+        @unlink($dir . '/schema-version');
+        @unlink($dir . '/schema-version.lock');
+        @rmdir($dir);
+    }
+
+    /**
+     * A deploy that writes its files one by one can add a migration while a request is migrating. The marker names
+     * what that pass went through, never a later scan of the folder, so the late file is applied by the next request.
+     */
+    public function testAFileThatLandsDuringAMigrateIsAppliedByTheNextRequest(): void
+    {
+        $dir = sys_get_temp_dir() . '/psc-mig-' . bin2hex(random_bytes(4));
+        $root = $dir . '/migrations';
+        mkdir($root . '/sqlite', 0770, true);
+        file_put_contents($root . '/sqlite/0001_a.sql', 'CREATE TABLE a (x INT);');
+        $late = $root . '/sqlite/0002_b.sql';
+        // The PDO the migrator runs its statements on: the deploy lands 0002 while 0001 is being applied.
+        $pdo = new class ('sqlite::memory:', $late) extends \PDO {
+            public function __construct(string $dsn, private readonly string $late)
+            {
+                parent::__construct($dsn);
+            }
+
+            public function exec(string $statement): int|false
+            {
+                if (str_starts_with($statement, 'CREATE TABLE a') && !is_file($this->late)) {
+                    file_put_contents($this->late, 'CREATE TABLE b (x INT);');
+                }
+                return parent::exec($statement);
+            }
+        };
+        $db = new Database($pdo);
+        $m = new Migrator($db, $root, $dir . '/schema-version');
+        self::assertSame(['0001_a'], $m->migrate(), 'the pass applies what it saw');
+        self::assertFalse($m->isCurrent());
+        $m->ensure();
+        self::assertSame(0, (int) $db->value('SELECT COUNT(*) FROM b'), 'the next request applies the late file');
+        self::assertTrue($m->isCurrent());
+
+        @unlink($root . '/sqlite/0001_a.sql');
+        @unlink($late);
+        @rmdir($root . '/sqlite');
+        @rmdir($root);
+        @unlink($dir . '/schema-version');
+        @unlink($dir . '/schema-version.lock');
+        @rmdir($dir);
+    }
+
     public function testMysqlAndSqliteSchemasDeclareTheSameTables(): void
     {
         $root = dirname(__DIR__, 2) . '/database/migrations';

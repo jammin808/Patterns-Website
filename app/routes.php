@@ -11,6 +11,7 @@ use Psc\App;
 use Psc\Content\Content;
 use Psc\Controllers\ChatController;
 use Psc\Controllers\ContactController;
+use Psc\Controllers\DigestController;
 use Psc\Controllers\NewsCommentController;
 use Psc\Controllers\NewsController;
 use Psc\Controllers\NewsMediaController;
@@ -23,6 +24,7 @@ use Psc\Controllers\Portal\DownloadController;
 use Psc\Controllers\Portal\LicenceController;
 use Psc\Controllers\Portal\TicketController;
 use Psc\Controllers\Admin\AdminController;
+use Psc\Controllers\Admin\AdminDigestController;
 use Psc\Controllers\Admin\AdminLicenceController;
 use Psc\Controllers\Admin\AdminNewsCommentController;
 use Psc\Controllers\Admin\AdminNewsController;
@@ -31,6 +33,7 @@ use Psc\Controllers\Admin\AdminReleaseController;
 use Psc\Controllers\Admin\AdminTicketController;
 use Psc\Controllers\Admin\AdminUserController;
 use Psc\Http\Router;
+use Psc\News\Digest\Links;
 use Psc\News\Paths;
 
 return static function (Router $r, App $app): void {
@@ -47,6 +50,17 @@ return static function (Router $r, App $app): void {
     // Contact (a form, so it carries a session for its CSRF token).
     $r->get('/contact/', [ContactController::class, 'show'], ['session', 'nostore']);
     $r->post('/contact/', [ContactController::class, 'submit'], ['session', 'csrf', 'nostore']);
+
+    // The weekly digest (docs/NEWS.md §14.5). The signup page is a form, so it carries a session for its CSRF token
+    // and stays outside /news/, which never starts one. The confirm and unsubscribe pages carry no session, no CSRF
+    // check and no cookie: the signed token in their query is the only authority, as a mail client's RFC 8058
+    // one-click POST sends no cookie. A GET or HEAD on either changes nothing; only its POST acts.
+    $r->get(Links::SIGNUP, [DigestController::class, 'show'], ['session', 'nostore']);
+    $r->post(Links::SIGNUP, [DigestController::class, 'submit'], ['session', 'csrf', 'nostore']);
+    $r->get(Links::CONFIRM, [DigestController::class, 'confirmPage'], ['nostore']);
+    $r->post(Links::CONFIRM, [DigestController::class, 'confirm'], ['nostore']);
+    $r->get(Links::UNSUBSCRIBE, [DigestController::class, 'unsubscribePage'], ['nostore']);
+    $r->post(Links::UNSUBSCRIBE, [DigestController::class, 'unsubscribe'], ['nostore']);
 
     // The support assistant.
     $r->post('/api/chat', [ChatController::class, 'message'], ['api', 'session', 'nostore']);
@@ -110,11 +124,16 @@ return static function (Router $r, App $app): void {
     $r->get('/portal/admin/news/desk/prompt/', [AdminNewsDeskController::class, 'prompt'], $ad);
     $r->post('/portal/admin/news/desk/prompt/', [AdminNewsDeskController::class, 'savePrompt'], $adPost);
     $r->get('/portal/admin/news/desk/runs/{id:\d+}/', [AdminNewsDeskController::class, 'run'], $ad);
+    $r->get('/portal/admin/news/desk/digest/', [AdminDigestController::class, 'index'], $ad);
+    $r->post('/portal/admin/news/desk/digest/', [AdminDigestController::class, 'control'], $adPost);
+    $r->get('/portal/admin/news/desk/digest/preview/', [AdminDigestController::class, 'preview'], $ad);
+    $r->get('/portal/admin/news/desk/digest/{id:\d+}/', [AdminDigestController::class, 'show'], $ad);
 
-    // Every public page in the registry (the contact page and the news index have their own controllers above, and
-    // the news standards page its route among the section's, before the articles' /news/{slug}/ could take it).
+    // Every public page in the registry (the contact page, the digest's signup page and the news index have their
+    // own controllers above, and the news standards page its route among the section's, before the articles'
+    // /news/{slug}/ could take it).
     foreach (array_keys(Content::pages()) as $path) {
-        if ($path === '/contact/' || $path === '/news/' || $path === Paths::standards()) {
+        if ($path === '/contact/' || $path === Links::SIGNUP || $path === '/news/' || $path === Paths::standards()) {
             continue;
         }
         $r->get((string) $path, [PageController::class, 'show']);
@@ -127,7 +146,9 @@ return static function (Router $r, App $app): void {
     $r->post('/portal/login/', [AuthController::class, 'login'], $guestPost);
     $r->get('/portal/register/', [AuthController::class, 'registerForm'], $guest);
     $r->post('/portal/register/', [AuthController::class, 'register'], $guestPost);
-    $r->get('/portal/verify/', [AuthController::class, 'verify'], ['session', 'nostore']);
+    // The email check: the link's GET shows a button and changes nothing; only the button's POST proves the address.
+    $r->get('/portal/verify/', [AuthController::class, 'verifyPage'], ['session', 'nostore']);
+    $r->post('/portal/verify/', [AuthController::class, 'verify'], ['session', 'csrf', 'nostore']);
     $r->get('/portal/verify/resend/', [AuthController::class, 'resendForm'], $guest);
     $r->post('/portal/verify/resend/', [AuthController::class, 'resend'], $guestPost);
     $r->get('/portal/forgot/', [AuthController::class, 'forgotForm'], $guest);

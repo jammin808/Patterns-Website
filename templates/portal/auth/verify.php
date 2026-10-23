@@ -1,16 +1,19 @@
 <?php
 /**
- * The result of an email confirmation link.
+ * An email confirmation link: its page, with the button whose POST confirms the address (ask), and the result.
  *
- * @var string $state confirmed | approval | invalid | disabled
+ * @var string $state ask | confirmed | approval | invalid | disabled
  * @var bool $signedIn
+ * @var string|null $action the button's address, with the link's token (ask only)
  * @var string|null $next where the person was going before signing up (AuthController::RETURN_KEY), once confirmed
  * @var string|null $article that place's article, at its comments, when it is one
  */
 $next ??= null;
 $article ??= null;
+$action ??= null;
 $signIn = '/portal/login/' . ($next !== null ? '?next=' . rawurlencode($next) : '');
 $titles = [
+    'ask' => 'Confirm your email address',
     'confirmed' => 'Email address confirmed',
     'approval' => 'Email address confirmed',
     'invalid' => 'This link no longer works',
@@ -21,7 +24,9 @@ $titles = [
     <header class="pt-header">
         <p class="pt-eyebrow">Client portal</p>
         <h1 class="pt-title"><?= e($titles[$state] ?? $titles['invalid']) ?></h1>
-        <?php if ($state === 'confirmed'): ?>
+        <?php if ($state === 'ask'): ?>
+            <p class="pt-lede">Press the button to confirm this is your email address and finish setting up your account.</p>
+        <?php elseif ($state === 'confirmed'): ?>
             <p class="pt-lede">Thank you. Your account is ready.</p>
         <?php elseif ($state === 'approval'): ?>
             <p class="pt-lede">Thank you. One more step: your account is waiting for approval.</p>
@@ -30,7 +35,14 @@ $titles = [
         <?php endif; ?>
     </header>
 
-    <?php if ($state === 'confirmed'): ?>
+    <?php if ($state === 'ask' && $action !== null): ?>
+        <form method="post" action="<?= e($action) ?>" class="pt-form">
+            <?= csrf_field() ?>
+            <div class="pt-actions">
+                <button type="submit" class="pt-btn pt-btn--primary" data-busy="Confirming…">Confirm my email address</button>
+            </div>
+        </form>
+    <?php elseif ($state === 'confirmed'): ?>
         <?php if ($article !== null && !$signedIn): ?>
             <p>Sign in and you will go straight back to the article, ready to comment.</p>
         <?php endif; ?>

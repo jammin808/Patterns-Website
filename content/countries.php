@@ -1,8 +1,8 @@
 <?php
 
 /*
- * Countries for the contact form: ISO 3166-1 alpha-2 code => English name, in alphabetical order. The form lists
- * the "top" ones first, then every country.
+ * Countries for the contact form and an account's country: ISO 3166-1 alpha-2 code => English name, in alphabetical
+ * order. The forms list the "top" ones first, then every country.
  */
 
 return [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Controllers;
 
+use Psc\Auth\Auth;
 use Psc\Content\Content;
 use Psc\Http\Request;
 use Psc\Http\Response;
@@ -177,7 +178,7 @@ final class ContactController extends Controller
         if (!$limiter->hit('contact:' . $ip, self::PER_IP_PER_HOUR, 3600)) {
             return $this->backWithErrors('/contact/#form', $request, [], 'Several messages have been sent from your network in the last hour, so this one was not sent. Your message is still here: please try again in an hour.');
         }
-        if (!$limiter->hit('contact-from:' . $email, self::PER_ADDRESS_PER_DAY, 86400)) {
+        if (!$limiter->hit('contact-from:' . Auth::mailboxKey($email), self::PER_ADDRESS_PER_DAY, 86400)) {
             return $this->backWithErrors('/contact/#form', $request, [], 'You have sent ' . self::PER_ADDRESS_PER_DAY . ' messages from this email address today, so this one was not sent. Your message is still here: please try again tomorrow.');
         }
         $id = $this->app->db()->insert('contact_messages', [
@@ -199,9 +200,9 @@ final class ContactController extends Controller
         }
         // The receipt goes to an address nobody has proven, so it carries only the site's own words (the topic comes
         // from the fixed list), never the name or message typed into the form, and each address gets at most
-        // RECEIPTS_PER_DAY a day: the form cannot be used to send someone mail from this site. The message itself is
-        // always stored and passed on to the administrator.
-        if ($limiter->hit('contact-to:' . $email, self::RECEIPTS_PER_DAY, 86400)) {
+        // RECEIPTS_PER_DAY a day (counted by mailbox, Auth::mailboxKey()): the form cannot be used to send someone
+        // mail from this site. The message itself is always stored and passed on to the administrator.
+        if ($limiter->hit('contact-to:' . Auth::mailboxKey($email), self::RECEIPTS_PER_DAY, 86400)) {
             $this->app->mailer()->send($data['email'], 'We have your message', 'contact-receipt', ['topicLabel' => self::TOPICS[$data['topic']]]);
         }
         $session->set('contact_sent', true);

@@ -20,8 +20,8 @@ use Psc\Support\Audit;
 
 /**
  * The Industry Updates AI desk, for administrators (docs/NEWS.md §8, §11 Desk): its state, last tick, next sessions,
- * spend and runs; pausing, continuing and running a session now; the settings; the calendar; the prompts; and one
- * run's record. Every change goes through Psc\News\Settings (all or nothing) and is audited as desk.*.
+ * spend and runs; pausing, continuing and running a session now; the settings (the weekly digest's day, time and caps
+ * among them, §14.12); the calendar; the prompts; and one run's record. Every change goes through Psc\News\Settings (all or nothing) and is audited as desk.*.
  *
  * A form refused for its fields comes back with everything that was typed: the session keeps a full copy of the
  * settings and prompt forms (keepOld() drops lists and cuts long text, and these forms have both).
@@ -59,6 +59,11 @@ final class AdminNewsDeskController extends Controller
         'comments' => 'Comments on articles',
         'auto_publish' => 'Publish articles automatically',
         'slots' => 'Sessions',
+        'digest_weekday' => 'Digest day',
+        'digest_time' => 'Digest time',
+        'digest_per_tick' => 'Digests sent per tick',
+        'digest_per_hour' => 'Digests sent per hour',
+        'digest_per_day' => 'Digests sent per 24 hours',
     ];
 
     /** The review note on a scheduled AI article that pausing the desk turned back into a draft. */
@@ -253,7 +258,9 @@ final class AdminNewsDeskController extends Controller
             return $this->redirect(self::BASE . 'settings/', 'info', 'Nothing changed, so nothing was saved.');
         }
         Audit::log($this->app, (int) $admin['id'], 'desk.settings', null, ['fields' => $result['changed']]);
-        return $this->redirect(self::BASE . 'settings/', 'success', 'The settings are saved. The next session uses them.');
+        // The weekly digest's settings are the digest's alone, and the next digest is what they change.
+        $digestOnly = array_filter($result['changed'], static fn (string $name): bool => !str_starts_with($name, 'digest_')) === [];
+        return $this->redirect(self::BASE . 'settings/', 'success', $digestOnly ? 'The settings are saved. The next digest uses them.' : 'The settings are saved. The next session uses them.');
     }
 
     // --------------------------------------------------------------------------------------------- calendar

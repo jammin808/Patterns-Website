@@ -14,7 +14,7 @@ the browser blocks the fonts and the module scripts.
 | `public/assets/js/hero.js` | Home page only: the vision-mixer hero |
 | `public/assets/js/countdown.js` | Pages with a StageWatch confidence monitor (`[data-countdown]`) |
 | `public/assets/js/particles.js` | Ecosystem page only: the tagline gathering out of particles; its hold and canvas rules are in `pages/hub.css` (8.10) |
-| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `app/src/News/Art.php` and its table `app/src/News/art-data.php` (written by `tools/news-art/build.mjs`) | Industry Updates' article pages (counting source clicks), its pages' styles (the follow and share rows, the corrections note and the standards page among them) and its category artwork, printed inline by `Psc\News\Art` (8.36) |
+| `public/assets/js/news.js`, `public/assets/css/pages/news.css`, `app/src/News/Art.php` and its table `app/src/News/art-data.php` (written by `tools/news-art/build.mjs`) | Industry Updates' article pages (counting source clicks), its pages' styles (the follow and share rows, the digest's block, the corrections note and the standards page among them) and its category artwork, printed inline by `Psc\News\Art` (8.36) |
 | `public/assets/css/pages/news-latest.css` | The latest strip, the newest Industry Updates articles on the home and product pages, pushed by `partials/news/latest.php` only when it draws (8.36) |
 | `public/assets/js/news-comments.js`, `public/assets/css/pages/news-comments.css` | The comments under an article and the comment page for readers without scripting (8.36) |
 | `public/assets/js/chat.js` | The support assistant (it already exists; its class names are styled here) |
@@ -1320,12 +1320,28 @@ exception: there it is **News**, because the longer name does not fit the bar fr
   RSS feed (icon `broadcast`), the same feed in Feedly and in Inoreader, and Google's preferred sources page for the
   site. The last three open in a new tab: icon `external` after the word, a hidden "opens in a new tab", and
   `rel="nofollow noopener"`. They are plain links: nothing is loaded from any of them, so the security policy and
-  the cached page stay the same for every visitor.
+  the cached page stay the same for every visitor. The first item is the weekly digest's signup page (icon `mail`,
+  "Weekly digest by email", `/digest/` in the same tab), a plain link too, so the hubs set no cookie.
 - **The share row** (`news-share`, a `news-part` titled by `news-share-title`, `partials/news/share.php`) comes
   after the AI note and is left out of the admin preview. LinkedIn, X, Bluesky and WhatsApp each open their own
   share page in a new tab (icon `external`), with a hidden "Share on" before the name. Then a Copy link button (icon
   `copy`, `site.js` `data-copy`; `is-copied` turns its border to the text colour) in `news-js-only`, which is hidden
   under `@media (scripting: none)`, because only a script can copy. No network's script is loaded.
+- **The digest's block** (`news-digest`, a `news-part` titled by `news-digest-title`, `partials/news/digest.php`)
+  follows the share row and, like it, is left out of the admin preview: the h2 "Get Industry Updates by email", one
+  line, and a secondary button (icon `mail`) "Get the weekly digest" to `/digest/`. A link, never a form, so the
+  article stays cached and sets no cookie. Its title is the share row's size, and its button's paragraph
+  (`news-digest-action`) has no margin; nothing else is styled.
+- **The digest's pages** (docs/NEWS.md §14.6) use the site's components only and add no stylesheet. The signup page
+  (`/digest/`, `templates/news/digest.php`, section `news`, so the header marks News) is a `c-hero--page` with the
+  cadence in its lede, then an even `l-split`: "Check your inbox" (`c-callout--success`, `id="sent"`) after a send
+  and "What you get" (a `c-prose` list), beside the form (`c-form c-form--panel`, one `c-field` for the address, the
+  consent words as `c-help` with the link to the privacy notice, a primary button with icon `mail`) and two small
+  lines to the account page and the RSS feed. No tick box: the form has one purpose, so the button after the
+  consent words is the request. The confirm and unsubscribe pages (`templates/news/digest-link.php`) are a
+  `c-hero--page` whose h1 and lede say the state, then the one button (a form of a button only, `c-btn--primary`)
+  on the "ask" pages, or the way on (a primary "Sign up again", or a quiet "Changed your mind?" link), and "Read
+  Industry Updates".
 - **One style for these links.** The follow row, the share row and the standards page's contents are 40px outlined
   targets with their words: a `--field` border on `--s1`, the icon in `--text-2`, the border `--text-2` on hover.
   Neutral, never a product colour: they are not the page's bold thing.
@@ -1414,8 +1430,9 @@ exception: there it is **News**, because the longer name does not fit the bar fr
 | Support hub and four product help pages | `c-hero--page`, inline assistant (`c-chat--inline`), `c-support-links`, `c-faq`, `c-prose` |
 | FAQ | `c-hero--page`, `c-tabs` (groups) or section heads, `c-faq` |
 | Contact | `c-hero--page`, `c-callout--info` (show in 48 hours), `c-form--panel`, `c-kv` |
-| Industry Updates: the hub, the category hubs, articles | `c-hero--page` (with `news-follow` on the hubs), `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `news-corrections` (`c-callout--info`), `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-share`, `news-more`; comments: `news-comments`, `news-comment`, `news-comments-box`, and `news-comment-page` without scripting (8.36) |
+| Industry Updates: the hub, the category hubs, articles | `c-hero--page` (with `news-follow` on the hubs), `news-bar` (`news-cats`, `c-search`), `news-grid` + `news-card`, `news-art`, `c-pager`, `c-empty`, `news-silo`; articles: `news-tags`, `news-meta`, `news-corrections` (`c-callout--info`), `c-prose`, `news-facts` + `c-badge`, `c-callout` (verdict, follow-up, AI note), `news-figure`, `news-sources`, `news-share`, `news-digest`, `news-more`; comments: `news-comments`, `news-comment`, `news-comments-box`, and `news-comment-page` without scripting (8.36) |
 | Editorial standards (`/news/standards/`) | `c-hero--page`, `news-standards-toc`, `news-part` + `c-prose`, `news-standards-back` (8.36) |
+| Weekly digest (`/digest/` and its confirm and unsubscribe pages) | `c-hero--page`, `c-form--panel`, `c-callout--success`, `c-btn` (8.36) |
 | About, legal | `c-hero--page`, `c-prose` |
 | Portal: dashboard, downloads, licences, tickets, ideas board, account | `pt-shell`, `pt-header`, `pt-stats`, `pt-grid` + `pt-card--link`, `pt-table`, `pt-badge`, `pt-vote`, `pt-thread`, `pt-files`, `pt-kv`, `pt-alert`, `pt-empty`, `pt-pager` |
 | Admin tables | `pt-table` (+ `c-table--zebra c-table--compact`, `aria-sort` + `c-sort`), `pt-search`, `pt-tabs`, `pt-badge`, `c-table--stack` with `data-label` for phones |

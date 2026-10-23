@@ -9,7 +9,8 @@ What the owner needs to supply or confirm before the site goes live. Everything 
 - [ ] `chat.daily_token_budget`: the budget now also counts the cached system prompt (writes at 1.25, reads at 0.1 of
       an input token) and every withdrawn or cut-off answer, so each answer counts several thousand tokens more than
       before. Choose the daily figure (the default is 1,500,000).
-- [ ] Mailboxes `support@` and `no-reply@` and the SMTP password for `no-reply@`.
+- [ ] Mailboxes `support@` and `no-reply@` and the SMTP password for `no-reply@`, and `unsubscribe@` as an alias of
+      `support@` for the weekly digest (docs/DEPLOY.md §8 step 1).
 - [ ] Connect GitHub in hPanel → Git (branch `deploy`), or deploy the release zip by hand.
 - [ ] Add the `HOSTINGER_API_TOKEN` repository secret so every deploy flushes the CDN (docs/DEPLOY.md §2).
 
@@ -29,6 +30,14 @@ What the owner needs to supply or confirm before the site goes live. Everything 
       articles automatically* in the desk's settings.
 - [ ] Read the research brief and the voice on the desk's prompt page, and add any banned websites and topics.
 - [ ] Read the eight launch articles: the first tick imports them and they go live 10 to 30 minutes apart.
+- [ ] **The weekly digest** (docs/DEPLOY.md §8, docs/NEWS.md §14.15): `mail.driver` must be `smtp` and
+      `mail.unsubscribe_to` set, or the desk's *Weekly digest* tab says why nothing goes. Act on emails to
+      `unsubscribe@` within 2 days from that tab. Add a DMARC report address, register the domain in Google Postmaster
+      Tools, and send the first test digest to a Gmail address to check SPF, DKIM and DMARC, and that DKIM's `h=` covers
+      `list-unsubscribe` and `list-unsubscribe-post`. Pick its day and time (Friday 09:00 London by default) and the
+      sending limits (500 in 24 hours of `no-reply@`'s 1,000) on the desk's *Settings* tab. Whether a postal address
+      belongs in its footer is your call (none is printed). A mailbox of the digest's own, or Hostinger Reach, needs a
+      change to the site first: ask for it when the desk warns at 400 subscribers.
 - [ ] Check on the live site whether Hostinger's CDN keeps news pages for only the 2 minutes they ask for (about 3 served stale)
       (`curl -I` an article twice and compare the `age` header). Until that is known, a takedown needs the Flush CDN
       workflow (docs/DEPLOY.md §5).

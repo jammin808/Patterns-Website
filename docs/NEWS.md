@@ -6,7 +6,8 @@ This section of the site carries AV and live-event industry news. It has:
 - an admin area for writing, editing and deleting articles, with images;
 - tracked links out to the original sources;
 - comments from registered users;
-- an AI desk that researches and writes up to 3 articles per scheduled session. By default there are two sessions a day, around 06:00 and around 14:30.
+- an AI desk that researches and writes up to 3 articles per scheduled session. By default there are two sessions a day, around 06:00 and around 14:30;
+- a weekly email digest of the week's new articles, for those who ask for it (§14).
 
 This file describes the section as it is built: the design, and the contract its code and tests follow. `docs/DEPLOY.md` covers the operator's side: the cron line, the key, the Console settings and how to take an article down. `content/news/` holds the default prompt texts and the launch articles.
 
@@ -1147,7 +1148,7 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 
 ## 13. What this does not do
 
-- No email newsletter, and no social posting: the share links open each network's own page for a person to post from.
+- No email beyond the weekly digest (§14), and no social posting: the share links open each network's own page for a person to post from.
 - Nothing pings Google: it takes no IndexNow, its sitemap ping is retired, and its Indexing API is for job postings and live video only. It reads the sitemaps (named in `robots.txt`) and Search Console, where the owner submits them. Google News and Publisher Center need nothing: publications are made automatically, and Publisher Center no longer reads feeds.
 - No third-party script anywhere: no share buttons' or Google's preferred-source button's script, only links.
 - No full-text feed: the feeds carry the summary and the sources, so a reader comes to the article.
@@ -1159,3 +1160,792 @@ CI runs the suite twice, on SQLite and on MariaDB 10.11, then `tools/check-mysql
 - Pausing the desk does not stop a session already running: it finishes, and publishes or schedules its articles; the pause hold covers only what was scheduled before the pause.
 - No retry of a failed session, and of a model call only the one resend for an overload before anything was generated.
 - **AI articles go live without a human check by default.** This is what the owner asked for. Anything risky is held as a draft (§6.2, steps 5 to 7). `auto_publish` off holds every AI article for review.
+
+## 14. Weekly digest
+
+A weekly email of the week's new Industry Updates articles, sent to the people who ask for it. The owner approved "a weekly digest" when asked how to give the section more reach. This section is the design and the contract for three builders who work at the same time without talking to each other: every table, class, route, page, word and test below is fixed, and §14.13 says who writes which file and what each takes from the others. The research behind the rules (UK law, RFC 8058, Hostinger's limits, deliverability and link scanners) was done on 23 October 2026; its findings are folded in where they decide something.
+
+### 14.1 Decisions
+
+1. **Direct marketing, by consent only.** The ICO counts a message that promotes the sender "even if that is not the main purpose" as direct marketing, so the digest is treated as one. PECR reg 22 needs consent for individual subscribers, sole traders and partnerships included, and nobody can tell those from a company by the address, so everyone is asked. The soft opt-in does not apply: nobody's address reaches the site "in the course of the sale", and an industry digest is not the sender's similar products. Lawful basis: consent (UK GDPR, PECR).
+2. **Consent of its own.** `users.marketing_opt_in` is consent to "Email me about new releases and features" and nothing more: it never sends the digest, and the digest never changes it. An account holder can tick a separate, unticked box ("Email me the weekly Industry Updates digest") on the account page or at registration; anyone can ask on a public page of its own, `/digest/`. Every way in is double opt-in: a confirmation email whose link opens a page with a button, and nothing is sent until that button is pressed.
+3. **What the consent record holds** (the ICO's who, when, how and what they were told): the normalised address, the account it belongs to if any, where it was asked (`page`, `account` or `registration`), the version of the sign-up wording and of the privacy notice, when it was asked, when it was confirmed, and later when and how it was withdrawn. **No IP address is stored**, for the digest or its pages. A tick on the account page or at registration is a request, as a sign-up on the public page is: the digest's own confirmation goes to the account's address (from the account page at once, from registration once the address is proven), and only that email's button confirms. A verified address is no proof that its mailbox asked, and proving an address for an account is never consent to the digest. **Asking never rewrites a record of consent**: an `unsubscribed` row that asks again keeps where, when and with which words it was asked in its `prior_` columns, and a request that ends without its button puts them back (§14.2).
+4. **A GET never acts.** Link scanners (Microsoft Defender detonates links before delivery; RFC 8058 says anti-spam software "fetches all resources in mail header fields") and RFC 9110 §9.2.1 mean every link in an email opens a page with one button, and only the button's POST confirms or unsubscribes. No script submits a form for a person. The account's email check (`/portal/verify/`) follows the same rule: its GET shows "Confirm my email address" and only that button's POST proves the address, so a scanner never activates an account.
+5. **One-click unsubscribe, RFC 8058.** Every digest carries `List-Unsubscribe` with exactly one https URL (and a mailto) and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. The mail client's POST carries no cookie and no session, so the signed token in the URL is the only authority: the endpoint starts no session, checks no CSRF token and answers 200 with the page, never a redirect. The link in the body opens the same address, where a GET shows the button.
+6. **Unsubscribe at once.** The POST itself unsubscribes (the ICO: "immediately or as soon as possible" for automated withdrawal; Google and Yahoo allow 2 days). The address is deleted there and then; a running batch reads every recipient again just before sending. No "you have unsubscribed" email is sent.
+7. **Once a week, at the desk's day and time** (London time, default Friday 09:00), with the articles that first went live since the last digest; a week with none sends nothing. The digest has its own pause, apart from the desk's.
+8. **Never twice.** Sending is batched per tick (25 by default), within a per-hour (100) and a rolling 24-hour (500) cap, and every recipient's send is a row with a unique key on (digest, subscriber), committed as `claimed` before the message's DATA. A crash, a restart or a slow tick never sends anyone the same digest twice: a row left `claimed` is never retried (SMTP has no idempotency), and the rest go at the next tick.
+9. **Hostinger's limits.** The account's plan is Starter Business Email: 1,000 messages per rolling 24 hours per mailbox, 100 recipients a message. `no-reply@` shares that budget with every other email the site sends, so the digest's 24-hour cap defaults to 500, one recipient per message (personal tokens, never Bcc). The digest never goes through PHP `mail()` (10 a minute, 100 a day): with `mail.driver` set to `mail` the sender stops and the desk says why. Past about 400 subscribers the desk warns; a mailbox of the digest's own or Hostinger Reach needs a change to the site first (§14.15, §14.16).
+10. **Public pages stay as they are.** Every `/news/*` page stays cached and session-free: the signup page, which carries a session for its form, is outside `/news/`, and the hubs and articles only link to it. The confirm and unsubscribe pages carry no session at all, are `private, no-store` and `noindex`, and are not in the sitemap.
+11. **Text first, nothing tracked.** The email is text-led with no images, no tracking pixel (PECR reg 6, and Apple Mail fetches them on arrival), no shortened or redirected links and no per-person identifier in any link. Every article link carries the same static campaign tags (`utm_source=digest&utm_medium=email&utm_campaign=<week>`), which the site's existing analytics reads.
+
+### 14.2 Data (migration `0007_news_digest`, MySQL and SQLite)
+
+The §3 conventions hold: Unix seconds (INT), InnoDB and utf8mb4_unicode_ci with `INT UNSIGNED` ids, `KEY t_x` and `CONSTRAINT fk_t_ref` on MySQL; `INTEGER PRIMARY KEY AUTOINCREMENT`, `TEXT` for strings and separate `CREATE INDEX` / `CREATE UNIQUE INDEX` statements of the same names on SQLite; `CREATE TABLE name`, never `IF NOT EXISTS`. The files are `database/migrations/mysql/0007_news_digest.sql` and `database/migrations/sqlite/0007_news_digest.sql`, each starting with a comment that says what the tables hold.
+
+#### `news_digest_subscribers`
+
+One row per address that has ever asked. While it is `pending` or `confirmed` it holds the address; once `unsubscribed` it is the suppression record: the address is gone, and only its keyed hash, the times and the versions stay.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INT UNSIGNED` PK | |
+| `email` | `VARCHAR(190) NULL` | The address as `Auth::normaliseEmail()` gives it (trimmed, lower case). NULL once unsubscribed |
+| `email_hash` | `CHAR(64) NOT NULL` | `Tokens::emailHash()` of the address: an HMAC, never a plain hash, so it cannot be looked up from a list of addresses. Kept after unsubscribing |
+| `user_id` | `INT UNSIGNED NULL` | The account the subscription belongs to: set by the account page and registration, never by the public page; a page sign-up over a registration's waiting tick clears it (the page's request now). NULL once unsubscribed |
+| `state` | `VARCHAR(16) NOT NULL DEFAULT 'pending'` | `pending`, `confirmed` or `unsubscribed` |
+| `source` | `VARCHAR(16) NOT NULL` | Where it was asked: `page`, `account` or `registration`. On a `pending` or `confirmed` row, the latest time; on an `unsubscribed` row, its record's (a request to come back that is never confirmed puts it back). A page sign-up over a registration's waiting tick makes it `page`; a registration whose address nobody has proven never rewrites a request it does not own; the confirm button never changes it |
+| `selector` | `CHAR(24) NOT NULL` | The row's token selector (`Tokens::selector()`): 24 lower-case hex characters, random, made once and never changed for the row's life, so every unsubscribe link ever sent to it keeps working. Never `Tokens::TEST_SELECTOR` |
+| `generation` | `INT NOT NULL DEFAULT 0` | Moves on by one each time an `unsubscribed` row asks again (a page sign-up's `returning`, or an account's tick, on the account page or at registration), and stays moved on when that request ends without its button. A confirmation link carries the generation it was sent with and confirms only while it is the row's, so a link from before a withdrawal never confirms a later request, whoever made it (§14.3, what a token binds). Kept after unsubscribing |
+| `consent_version` | `VARCHAR(32) NOT NULL` | The sign-up wording's version shown (`content/news.php` 'digest' 'consent_version', a date such as `2026-10-23`) |
+| `privacy_version` | `VARCHAR(32) NOT NULL` | The privacy notice's date then (`content/pages.php` `/legal/privacy/` 'updated') |
+| `requested_at` | `INT NOT NULL` | When it was last asked for (the form sent, the box ticked; for an account's request waiting for its address to be proven, also when the email check or a pending account's reset is sent, `renewAccountRequest()`). A confirmation link works until `requested_at` + 7 days. On an `unsubscribed` row, its record's |
+| `confirmed_at` | `INT NULL` | When the consent was given: the confirm page's button, however it was asked (the public page, the account page, or registration once the address is proven). Kept after unsubscribing |
+| `unsubscribed_at` | `INT NULL` | When it was withdrawn |
+| `unsubscribe_method` | `VARCHAR(16) NULL` | `one_click` (a mail client's RFC 8058 POST), `page` (the unsubscribe page's button), `mailto` (an email to the unsubscribe address, done from the desk), `account` (the account page's tick, a change of the account's address, or the account deleted), `admin` (the desk, for any other request) or `bounce` (§14.4) |
+| `prior_source` | `VARCHAR(16) NULL` | While an `unsubscribed` row asks again (`pending`), where its record was asked; put back if the request is never confirmed. NULL otherwise |
+| `prior_consent_version` | `VARCHAR(32) NULL` | The same, for the sign-up wording's version |
+| `prior_privacy_version` | `VARCHAR(32) NULL` | The same, for the privacy notice's version |
+| `prior_requested_at` | `INT NULL` | The same, for when it was asked |
+| `bounces` | `INT NOT NULL DEFAULT 0` | Hard bounces in a row (`Delivery::hardBounce()`: a 5xx at RCPT with 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10) |
+| `bounced_at` | `INT NULL` | The first bounce of the current run of them |
+| `created_at`, `updated_at` | `INT NOT NULL` | |
+
+**Keys:** UNIQUE `news_digest_subscribers_email (email_hash)`; UNIQUE `news_digest_subscribers_selector (selector)`; UNIQUE `news_digest_subscribers_user (user_id)` (one subscription per account; NULLs never clash on either engine); `news_digest_subscribers_state (state, confirmed_at)`; `CONSTRAINT fk_news_digest_subscribers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL` (SQLite: `REFERENCES users(id) ON DELETE SET NULL` on the column). SET NULL, not CASCADE: only an account never confirmed is ever hard-deleted, and a consent or suppression record must not vanish with a row.
+
+A row that unsubscribes keeps `id`, `email_hash`, `state`, `source`, `selector`, `generation`, `consent_version`, `privacy_version`, `requested_at`, `confirmed_at`, `unsubscribed_at`, `unsubscribe_method` and the times; `email`, `user_id`, `bounces` and `bounced_at` are cleared, and the `prior_` columns are NULL. That is the ICO's "just enough information": proof of the consent and of its withdrawal, and nothing that can be mailed.
+
+**A request never rewrites a record of consent.** Asking costs nothing and proves nothing. When an `unsubscribed` row asks again (the public page's `returning`, or an account's tick, on the account page or at registration), its `source`, versions and `requested_at` are copied into the `prior_` columns before the request's own are written. A request that ends without its button puts them back and clears the `prior_` columns, with the earlier withdrawal (`unsubscribed_at` and `unsubscribe_method`, never changed while it waited): when it lapses (`expire()`), when it is withdrawn (by any method: an old digest's unsubscribe link, the account page, the desk, an address change) and when its account is deleted (`accountDeleted()`). Only `confirm()` replaces the record, with the new consent, and clears the `prior_` columns. So the suppression record always says where, when and with which words consent was given, and when and how it was withdrawn, whoever asked again since (anyone at `/digest/`, or a stranger's unproven registration). A request to come back that is withdrawn keeps its earlier withdrawal rather than writing a new one, since nobody was subscribed in between (`unsubscribe()` still answers `done`), so the desk's `left` does not count it again.
+
+#### `news_digests`
+
+One row per London week that reached its send time, whatever came of it.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INT UNSIGNED` PK | |
+| `week` | `CHAR(8) NOT NULL` | The ISO week of the send time in London, lower case: `2026-w43` (`Week::key()`). It is also the campaign tag |
+| `send_at` | `INT NOT NULL` | The scheduled send time (the setting's weekday and time in that week, London) |
+| `window_start`, `window_end` | `INT NOT NULL` | The articles it covers: first live at or after the start and before the end (§14.4, Composer) |
+| `articles` | `TEXT NULL` | A JSON list of article ids in the order the email draws them, the newest first, at most 15 (`Composer::MAX_ARTICLES`); `[]` for an empty week, NULL for a skipped one |
+| `left_out` | `INT NOT NULL DEFAULT 0` | Articles in the window beyond the 15, which the email counts ("And 4 more this week") |
+| `state` | `VARCHAR(16) NOT NULL` | `sending` (composed, recipients left), `sent` (every recipient handled), `empty` (no new articles: nothing sent), `skipped` (the digest was paused at its time) or `stopped` (§14.4) |
+| `note` | `VARCHAR(300) NULL` | Why it was skipped or stopped, in an admin's words (`Sender::NOTES`) |
+| `recipients` | `INT NOT NULL DEFAULT 0` | The confirmed subscribers when it was composed (its progress bar's whole) |
+| `composed_at` | `INT NOT NULL` | When the row was written |
+| `finished_at` | `INT NULL` | When it became `sent`, `empty`, `skipped` or `stopped` |
+
+**Keys:** UNIQUE `news_digests_week (week)`; `news_digests_state (state, composed_at)`.
+
+#### `news_digest_sends`
+
+One row per digest and recipient, written before the message is sent.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `INT UNSIGNED` PK | |
+| `digest_id` | `INT UNSIGNED NOT NULL` | FK → `news_digests`, CASCADE |
+| `subscriber_id` | `INT UNSIGNED NOT NULL` | FK → `news_digest_subscribers`, CASCADE |
+| `state` | `VARCHAR(16) NOT NULL DEFAULT 'claimed'` | `claimed` (written, the message going out or its outcome unknown), `sent` (the server answered 250 to the message), `retry` (refused with none of the message held by the server, before it went or by a 4xx reply to it: tried again at a later tick), `failed` (the message may or may not have gone, the server refused it for good with a 5xx reply to it, or 3 attempts were refused at RCPT, DATA or the message) or `bounced` (`Delivery::hardBounce()`) |
+| `attempts` | `INT NOT NULL DEFAULT 1` | The claims that counted. A refusal before the recipient was named (the connection, the greeting, EHLO, TLS, AUTH or MAIL FROM: the mailbox's fault, never the address's) gives its claim back (`Sends::release()`), so only refusals at RCPT, DATA or the message use one up; a `retry` row is claimed again only while under 3 (`Sends::MAX_ATTEMPTS`) |
+| `claimed_at` | `INT NOT NULL` | The latest claim. The caps count rows by it (§14.4) |
+| `sent_at` | `INT NULL` | When the server took the message |
+| `reply` | `VARCHAR(40) NULL` | `Delivery::summary()`: the stage and the server's codes (`rcpt 550 5.1.1`, `body timeout`), never the server's text, which can hold the address |
+
+**Keys:** UNIQUE `news_digest_sends_pair (digest_id, subscriber_id)`; `news_digest_sends_subscriber (subscriber_id)`; `news_digest_sends_claimed (claimed_at)`; `CONSTRAINT fk_news_digest_sends_digest FOREIGN KEY (digest_id) REFERENCES news_digests(id) ON DELETE CASCADE`; `CONSTRAINT fk_news_digest_sends_subscriber FOREIGN KEY (subscriber_id) REFERENCES news_digest_subscribers(id) ON DELETE CASCADE`.
+
+#### Settings (`news_settings`, through `Settings`)
+
+| Name | Default | Control | Rule |
+|---|---|---|---|
+| `digest_enabled` | `true` | "Pause the digest" and "Continue the digest" on the digest page | A bool |
+| `digest_weekday` | `5` | Settings page: "Digest day", Monday to Sunday | `BOUNDS` [1, 7], ISO (1 is Monday) |
+| `digest_time` | `"09:00"` | Settings page: "Digest time" (`input type="time"`) | `^([01]\d\|2[0-3]):[0-5]\d$` |
+| `digest_per_tick` | `25` | Settings page: "Digests sent per tick" | `BOUNDS` [1, 50] |
+| `digest_per_hour` | `100` | Settings page: "Digests sent per hour" | `BOUNDS` [1, 200] |
+| `digest_per_day` | `500` | Settings page: "Digests sent per 24 hours" | `BOUNDS` [1, 900] |
+
+They are ordinary settings (`Settings::DEFAULTS`), saved with the rest of the settings form all at once, with fingerprints; `digest_enabled` is not on the form, like the desk's own `enabled`.
+
+One deployment setting, `config/defaults.php` `mail.unsubscribe_to` (default `'unsubscribe@patternsshowcontrol.co.uk'`): the mailbox the `mailto` in `List-Unsubscribe` and the footer names. It is an alias of `support@`, the mailbox docs/DEPLOY.md §1 makes and someone reads (§8 there). Empty or not an address (the trimmed value must pass `FILTER_VALIDATE_EMAIL`, so a name with the address in angle brackets is not one), the sender stops before anything is composed or sent, and the desk says why, because every digest must carry both ways out.
+
+#### Retention and deletion (`Housekeeping`)
+
+| Rule | Constant | Report key |
+|---|---|---|
+| A `pending` row whose `requested_at` is 7 days old or more (exactly 7 included, as its link stops working then) is deleted, unless it has an `unsubscribed_at` (a lapsed request to come back), which returns to `unsubscribed` with `email` and `user_id` cleared and its record put back from the `prior_` columns | `DIGEST_PENDING_DAYS = 7` | `digest_unconfirmed`, `digest_lapsed` |
+| `unsubscribed` rows are kept for as long as the digest runs (the suppression record; the ICO: there is "no automatic right" to have one erased, and the privacy notice says so) | | |
+| `news_digests` rows whose `composed_at` is more than 365 days old are deleted with their `news_digest_sends` (the sends first, counted, then the digests) | `DIGEST_KEEP_DAYS = 365` | `digest_sends`, `digests` |
+
+The report's keys hold no word the Logger masks. `tools/cron.php`'s header comment names the three rules.
+
+### 14.3 Code layout (`Psc\News\Digest\`, `app/src/News/Digest/`)
+
+Each class says below who writes it (§14.13). Every time is Unix seconds, every London rule goes through `Psc\News\Schedule`, and no class logs an address, a token or a selector.
+
+#### Mail (builder "mail")
+
+**`Psc\Mail\Delivery`** (`app/src/Mail/Delivery.php`, final readonly): how one message went.
+- `__construct(public bool $ok, public string $stage, public int $code = 0, public string $enhanced = '', public bool $timeout = false)`.
+- `$stage`: `refused` (the Mailer refused before connecting: a header not allowed, a line break in a header, a template that failed), `connect`, `greeting`, `ehlo`, `tls`, `auth`, `mail`, `rcpt`, `data` (the DATA command, before any of the message), `body` (the reply after the message, or none), or `done`. `$code` is the reply's three digits (0 for none), `$enhanced` its RFC 3463 code (`5.1.1`, or `''`).
+- `STAGES`, the eleven stage words in order.
+- `static sent(): self` (ok, `done`).
+- `hardBounce(): bool`: a 5xx at `rcpt` whose enhanced code says the recipient's address itself is bad: `5.1.1` (no such mailbox), `5.1.2` (no such system), `5.1.3` (bad syntax), `5.1.6` (moved) or `5.1.10` (a null MX). Every other `5.1.x` is about the sender (`5.1.7`, `5.1.8`, which Postfix reports at RCPT under `smtpd_delay_reject`) or says nothing of the address (`5.1.0`), and can hit a whole list at once, so it is retryable: a fault of the sender's never unsubscribes anyone.
+- `retryable(): bool`: not ok, not a hard bounce, and either at `connect` to `data` (nothing of the message was sent) or at `body` with a 4xx reply (the server did not take it, RFC 5321 §4.2.5): it may go again.
+- `uncertain(): bool`: not ok at `body` with no 4xx or 5xx reply (none came, it timed out, the connection closed, a write failed, or the reply was a 2xx or 3xx other than 250): the server may have it, so it is never sent again.
+- A 5xx at `body` is neither: the server refused the message for good, and RFC 5321 §4.2.5 says not to send it again without someone's review.
+- `summary(): string`: the stage and codes only, at most 40 characters (`rcpt 550 5.1.1`, `body timeout`, `connect`, `done`), never the server's text, which can hold the address. Each part is checked against its form: a stage not in `STAGES` reads `unknown`, and an enhanced code not of the `n.n.n` form is left out.
+
+**`Psc\Mail\Mailer`** gains, every current call unchanged:
+- `send(string $to, string $subject, string $template, array $data = [], ?string $replyTo = null, array $headers = []): bool`. `$headers` is name ⇒ value, names only from `Mailer::LIST_HEADERS` (`List-Unsubscribe`, `List-Unsubscribe-Post`, `List-Id`), in exactly that case, each value a non-empty line of printable ASCII (no CR, LF, NUL, tab or 8-bit byte) of at most 900 bytes. Anything else refuses the whole send, fail closed: logged as `mail refused` with the template and the header's name (`invalid` when the name is not a plain token), and false; a `$to` holding a control character refuses it too. They follow `Auto-Submitted` in the order given. A header whose whole line (name, `: `, value) is over 78 characters is folded, only ever at `, ` (`,\r\n ` then the rest), never into a line of only white space, so it unfolds to the same text.
+- `deliverNow(string $to, string $subject, string $template, array $data = [], array $headers = []): Delivery`: the same message, delivered in this call (never deferred), with its outcome. With `log` it writes the `.eml` and is `done`; with `mail` it is `done` or `connect` by `mail()`'s answer; with `smtp` each step that does not get its reply says its stage and codes. Anything that goes wrong once the message is being written after DATA's 354, a throwable included, is `body`: uncertain, so never sent again, unless the server's reply to the message is a 4xx (retryable) or a 5xx (final); a throwable before that point is `connect`. A QUIT that fails in any way after the message's 250 is still `done`.
+- A failed SMTP delivery logs `mail failed` with `reply` set to `Delivery::summary()`, never an exception carrying the server's text (which can hold the address); only an unexpected throwable is logged as an exception. The `mail` driver's `sendMail()` takes the folded continuation lines of `To` and `Subject` out of the header block with them.
+- `driver(): string`.
+- `render(string $subject, string $template, array $data = []): array{html: string, text: string}`: the message's two parts as `send()` builds them. The text part is `templates/emails/{template}.text.php` rendered with the same data when that file exists, else `toText()` of the HTML as now. A template error throws.
+- `$sent[]` entries gain `headers` (array) and `text` (string).
+- `templates/emails/layout.php` takes two optional values from the template's `$data`: `_preheader` (plain text: a hidden first line of the body, which mail clients show beside the subject) and `_footer` (an email partial's name, rendered with the same data in place of the line "You received this because of an action on ..."). Without them the layout's output is unchanged, byte for byte. A `_footer` that is not `^[a-z0-9][a-z0-9-]*$`, or a `_preheader` that is not a string, throws, so `send()` refuses; an empty preheader draws no hidden line.
+
+**`Psc\News\Digest\Tokens`**: the signed links.
+- `CONFIRM = 'confirm'`, `UNSUBSCRIBE = 'unsubscribe'`, `CONFIRM_SECONDS = 604800` (7 days), `TEST_SELECTOR = '000000000000000000000000'`.
+- `__construct(#[\SensitiveParameter] string $secret)` (an empty secret throws; `__debugInfo()` shows nothing, so a dump never shows the key); `static fromApp(App $app): self` (`$app->secret()`, `app.secret`).
+- `static selector(): string`: `bin2hex(random_bytes(12))`, drawn again should it ever be the test selector. `MAX_GENERATION = 2147483647` (the column's top).
+- `make(string $purpose, string $selector, int $generation = 0): string`. An unsubscribe token is `{selector}.{mac}`, the mac base64url without padding (43 characters) of `hash_hmac('sha256', 'digest|unsubscribe|' . $selector, $key, true)`, where `$key = hash_hmac('sha256', 'psc-digest-v1', $secret, true)`. A confirmation token is `{selector}.{generation}.{mac}`, the generation in decimal and the mac over `'digest|confirm|' . $selector . '|' . $generation`. An unknown purpose, a selector that is not 24 lower-case hex characters, a generation below 0 or past `MAX_GENERATION`, or a generation given to an unsubscribe link, throws.
+- `read(string $purpose, string $token): ?string`: the selector, when the token is of `make()`'s form for that purpose (`^[a-f0-9]{24}\.[A-Za-z0-9_-]{43}$` for an unsubscribe link) and its mac is right (`hash_equals`); else null. Never throws.
+- `readConfirm(string $token): ?array{selector: string, generation: int}`: a confirmation token's selector and generation (`^[a-f0-9]{24}\.(0|[1-9][0-9]{0,9})\.[A-Za-z0-9_-]{43}$`, so no leading zero), when its mac is right; else null. Whether that generation is still the row's is `Subscribers`' question.
+- `emailHash(string $email): string`: 64 lower-case hex, `hash_hmac('sha256', 'email|' . Auth::normaliseEmail($email), $key)`.
+- **What a token binds:** its purpose (a confirmation never unsubscribes and an unsubscribe link never confirms), the subscriber row's selector, and the site's secret under a versioned key; a confirmation binds the row's generation too. Neither expires by itself. A confirmation works while its generation is the row's and for 7 days from the row's `requested_at` (`Subscribers::confirm()` checks both), so asking again restarts it, but **a confirmation link never outlives a withdrawal**: an unsubscribed row that asks again moves its generation on, and every link sent before then reads "gone". An unsubscribe link works for the row's whole life, so every old digest's link still works. A changed `app.secret` breaks every link and every hash, and the hashes cannot find anyone's row by address until they are re-keyed, which `docs/DEPLOY.md` says.
+
+**`Psc\News\Digest\Links`** (static, pure): every digest address.
+- `SIGNUP = '/digest/'`, `CONFIRM = '/digest/confirm/'`, `UNSUBSCRIBE = '/digest/unsubscribe/'`.
+- `confirm(string $token): string` (`/digest/confirm/?token=` and the token, `rawurlencode`d) and `unsubscribe(string $token): string`. The token is in the query, never the path (`App::dispatch` lower-cases paths outside `/portal/` and `/api/`), under the key `token`, a name the Logger masks.
+- `campaign(string $path, string $week): string`: the path with `utm_source=digest&utm_medium=email&utm_campaign={week}` (the week `rawurlencode`d, so `2026-w43` is unchanged) after `?`, or `&` when it already has a query; a `#fragment` stays at the end.
+- `mailto(string $address, string $token): string`: `mailto:{address}?subject=` and `rawurlencode('Unsubscribe ' . $token)`.
+- An absolute address is `$app->baseUrl()` and the path: the base host, https in production, with the routes' own trailing slash, because `force_https` and the router's slash both answer 301, which RFC 8058 forbids for the POST.
+
+**`Psc\News\Digest\Courier`** (interface; `tests/Fakes/FakeCourier.php` is the tests' stand-in):
+- `confirmation(array $subscriber): bool`
+- `digest(array $digest, array $subscriber): Delivery`
+- `test(array $digest, string $to): Delivery`
+- `render(array $digest, ?array $subscriber): array{subject: string, preheader: string, html: string, text: string, headers: array<string, string>}`. With null it is the desk's preview: the test selector and the footer's sample words.
+- `$subscriber` is a `news_digest_subscribers` row (`email`, `selector`, `source` and `confirmed_at` are read); `$digest` is the digest shape (Composer, below).
+
+**`Psc\News\Digest\DigestMail implements Courier`**:
+- `__construct(App $app, ?Tokens $tokens = null)`.
+- `static courier(App $app): Courier`: the courier every caller uses (`DigestController`, `Sender`, `AdminDigestController`): the one a test set with `static useCourier(?Courier $courier)`, else a new `DigestMail`. `tests/TestCase.php` resets it after every test, as it resets `Announcer::useTransport()`.
+- `confirmation()`: `Mailer::send()` of `digest-confirm` to the row's address, subject "Confirm your Industry Updates digest", with `Links::confirm()` of the row's confirmation token (its `generation`). False, logged with a reason and never the address, for a row with no address, a bad selector or the test selector. Its delivery waits until after the response like every page's email; the request's write, the limit and the email's build still happen in it, so a sign-up for an address already confirmed answers a fraction of a millisecond sooner, which the per-network limit keeps from being sampled often enough to read. No list headers: a confirmation is no list message. Its callers are `DigestController::submit()`, `AccountController::askForDigest()` (the account page's tick, at once) and `Auth` (registration's tick, once the address is proven).
+- `digest()`: `Mailer::deliverNow()` of `digest` with `headers()`, `_preheader` and `_footer` `digest-footer`. `test()`: the same to `$to`, with the test selector, "[Test] " before the subject and the test banner. Both refuse (stage `refused`, before any connection, logged `digest refused` with its reason) when `mail.unsubscribe_to` is not an address (`hasUnsubscribeAddress()`), or `mail.driver` is `mail` (`Sender::blocked()` says so first); `digest()` also refuses a row with no address, a bad selector or the test selector. The footer's date is `confirmed_at`, else `requested_at`; the preview uses today's London date and `name@example.co.uk`.
+- Constants: `CONFIRM_SUBJECT`, `SUBJECT_LEAD`, `SUBJECT_MAX` (110), `SAMPLE_EMAIL`, `FOOTER` (`digest-footer`).
+- `static hasUnsubscribeAddress(App $app): bool`: whether `mail.unsubscribe_to`, trimmed, passes `FILTER_VALIDATE_EMAIL` (empty, a name with the address in angle brackets, or a word does not). `digest()`, `test()` and `Sender::blocked()` all read it, so the tick says so before anything is composed, and a fix made within the 24-hour window still sends that week's digest.
+- `static headers(App $app, string $unsubscribeToken): array<string, string>`, exactly:
+  - `List-Unsubscribe`: `<{base}/digest/unsubscribe/?token={token}>, <mailto:{mail.unsubscribe_to}?subject=Unsubscribe%20{token}>`: the https URL first (RFC 2369: preference left to right), one https URL and one mailto (RFC 8058). With `mail.unsubscribe_to` empty the mailto is left out (and nothing is sent: see above).
+  - `List-Unsubscribe-Post`: `List-Unsubscribe=One-Click`.
+  - `List-Id`: `Industry Updates weekly digest <digest.{host}>`, the host of `app.url` without `www.` (RFC 2919).
+- `static subject(array $digest, bool $test = false): string`, `static preheader(array $digest): string` (§14.8; `''` when there is no article at all, which only a preview or a test on a site with none can be).
+- The Mailer's own headers stay as they are: `From` (`mail.from`, the same on every digest), `To`, `Date`, `Message-ID`, `MIME-Version`, `multipart/alternative` with the text part first, and `Auto-Submitted: auto-generated` (RFC 3834: "SHOULD be used" on mail from periodic processes). No `Precedence` (non-standard), no `Reply-To`, no `Bcc`, one recipient a message.
+
+#### Send (builder "send")
+
+**`Psc\News\Digest\Week`** (static; London time through `Schedule::zone()` and `Schedule::at()`, so a time the spring change skips runs at 02:00, and one the autumn change repeats runs once):
+- `WINDOW = 86400`: a week's digest is due from its send time until 24 hours after. Past that it is missed and never sent late.
+- `key(int $at): string`: the London ISO week, `2026-w43` (`o-\wW`, so 31 December 2026 is `2026-w53`).
+- `monday(string $week): string`: its Monday, `Y-m-d`.
+- `sendAt(string $week, Settings $settings): ?int`: the setting's weekday and time in that week.
+- `due(\DateTimeImmutable $now, Settings $settings, array $taken): ?array{week: string, send_at: int}`: of this London week's and last week's send times, the latest that is at or before now, less than `WINDOW` ago, and whose week is not in `$taken` (the weeks with a row). It ignores `digest_enabled`, so a paused week is recorded as skipped, as `Schedule::slotDue()` lets the desk record a paused slot.
+- `next(\DateTimeImmutable $from, Settings $settings, array $taken): array{week: string, send_at: int}`: the one due now, else the first send time after `$from`.
+- `label(int $at): string`: "Friday 30 October 2026 at 09:00".
+- `cadence(App $app): ?array{weekday: int, day: string, time: string}`: for the public pages' words (`day` from `Schedule::DAYS`). Null while the digest is paused or the settings cannot be read; it never throws.
+
+**`Psc\News\Digest\Subscribers`**: the only writer of `news_digest_subscribers`. A change of state is one conditional UPDATE (`WHERE id = ? AND state = ?`), so two requests never both act, and no method opens a transaction of its own, so a caller's holds it. Two private SET fragments carry §14.2's rule that a request never rewrites a record: `KEEP_PRIOR` copies the record into the `prior_` columns and comes first in its SET (MySQL reads a column assigned earlier in the same SET as its new value), and `PUT_BACK` puts it back and clears them (`putBack()`, for a request to come back that ends without its button).
+- `SOURCES = ['page', 'account', 'registration']`, `METHODS = ['one_click', 'page', 'mailto', 'account', 'admin', 'bounce']`, `BOUNCE_LIMIT = 2`, `BOUNCE_SPAN = 1209600` (14 days).
+- `__construct(App $app, ?Tokens $tokens = null)`.
+- Reading: `find(int $id): ?array`, `bySelector(string $selector): ?array`, `byEmail(string $email): ?array` (by its hash), `forAccount(array $user): ?array` (the row with the account's `user_id`, else the row for the account's address when no other account holds it), `isSubscribed(array $user): bool` (that row is `confirmed`), `counts(int $now): array{confirmed: int, pending: int, unsubscribed: int, joined: int, left: int}` (joined: rows with `confirmed_at` in the last 7 days, whatever their state now; left: `unsubscribed_at` in the last 7 days).
+- `request(string $email, string $consentVersion, string $privacyVersion, int $now): array{outcome: string, subscriber: ?array}`: the public page. The address must pass `Auth::isUsableEmail()` (otherwise it throws: the controller checks first). The outcome:
+  - `new`: a `pending` row made, `source` `page`. The caller sends the confirmation.
+  - `again`: it was `pending`; `requested_at` and the versions are renewed, so a link works for 7 days from now, and it is the page's request now (`source` `page`, `user_id` NULL), since the record names the latest ask. Send it again. The row is read back rather than its UPDATE counted: MySQL counts a row whose values were already these (the same second) as unchanged.
+  - `returning`: it was `unsubscribed`; it is `pending` again with the address, `source` `page` and its `generation` moved on, keeping its `unsubscribed_at` and method until it confirms, and its record in the `prior_` columns. Send the confirmation.
+  - `confirmed`: it already gets the digest. Nothing changes and nothing is sent.
+- `static linkState(?array $row, int $generation, int $now): string`: what a confirmation link of that generation does for its row, the confirm page's GET and its button by one rule: `ask` (`pending`, the row's own generation, asked less than `Tokens::CONFIRM_SECONDS` ago), `already` (`confirmed`), `gone` (`unsubscribed`, or the row has asked again since the link was sent: only a newer link works), `expired` (`pending`, asked `CONFIRM_SECONDS` or more ago: exactly 7 days is expired, as Housekeeping removes it then) or `missing`.
+- `confirm(string $selector, int $generation, int $now): string`: `confirmed` (`pending` to `confirmed`, in one UPDATE that checks the state, the generation and the time: `confirmed_at` now, the unsubscribe fields, the bounces and the `prior_` columns cleared, `source` kept: the record is now this consent), or `linkState()`'s `already`, `expired`, `gone` or `missing`.
+- `unsubscribe(string $selector, string $method, int $now): string`: `done` (`email`, `user_id`, `bounces` and `bounced_at` cleared; `unsubscribed_at` and `unsubscribe_method` set; a request to come back instead puts back the record it asked over, with its earlier withdrawal), `already`, `test` (the test selector: nothing changes) or `missing`. The method must be one of `METHODS`.
+- `unsubscribeEmail(string $email, string $method, int $now): string`: the same, found by address (the desk's form).
+- `subscribeAccount(array $user, string $source, string $consentVersion, string $privacyVersion, int $now): string`: the account page (`account`) and registration (`registration`). Always a request, which only the button the digest's own confirmation leads to confirms, so it never answers `confirmed`. The caller sends that confirmation: `AccountController` at once, `Auth` once the address is proven.
+  - The account's row, else the row for its address, else a new one, becomes `pending` with the account's address, its `user_id`, the source and versions, asked now: `pending`. An `unsubscribed` one asks again, as it could from the public page: its `generation` moved on and its record kept in the `prior_` columns until it confirms.
+  - A `confirmed` one answers `already`, its consent unchanged; with the address verified, one that belongs to no account is linked to the account.
+  - Without the address verified, a row of the address that is not the account's is never changed: a `confirmed` one answers `already` (so a stranger who registers someone else's address never takes over their subscription, and the account page still shows the tick through `forAccount()`'s fallback by address once the account is the address's), and someone else's `pending` request (the public page's) answers `pending` with nothing changed, so its consent record is only ever written by its own button. With the address verified, a waiting request for it becomes the account's.
+  - A row of the account's that holds another address (the account's address changed) is ended first (method `account`), so the digest never follows an account to an address that did not consent.
+- `unsubscribeAccount(array $user, int $now): string`: `unsubscribe()` with method `account` of `forAccount()`: `done`, `already` or `missing`.
+- `renewAccountRequest(int $userId, int $now): ?array`: the account's request waiting for its address to be proven (registration's tick or the account page's: `pending`, asked within 7 days, for the address the account has now) is asked again now (`requested_at`, so its link works for 7 days from then) and returned, still `pending`; null when there is none. `Auth` calls it when the email check or a pending account's reset is sent (so the request lasts longer than that 48-hour or 1-hour link, and the confirmation the email promises always follows its button) and when that link proves the address (to send the digest's own confirmation). Proving an address for an account is never consent to the digest: only the button that confirmation leads to confirms it.
+- `accountDeleted(array $user, int $now): string`: the account's row and its address's: a `confirmed` one is unsubscribed (method `account`); a `pending` one is deleted, or, when it had unsubscribed before, put back to its earlier record (`putBack()`). Returns `unsubscribed`, `removed` or `none`. It runs inside the deletion's transaction.
+- `accountEmailChanged(int $userId, int $now): string`: ends the account's subscription (method `account`): `done`, `already` or `missing` (§14.7).
+- `forExport(array $user): ?array`: `email`, `state`, `source`, `consent_version`, `privacy_version`, `requested_at`, `confirmed_at`, `unsubscribed_at`, `unsubscribe_method`, `prior` (null, or `{source, consent_version, privacy_version, requested_at}` while a request to come back waits over an earlier record), and `digests`, a list of `{week, state, sent_at}`, the newest first. Never `id`, `selector` or `email_hash`.
+- `delivered(int $id): void`: ends a run of bounces. `bounced(int $id, int $now): bool`: one more; at `BOUNCE_LIMIT` or more, the first `BOUNCE_SPAN` or more ago, it unsubscribes the row (method `bounce`) and answers true.
+- `expire(int $now): array{removed: int, lapsed: int}`: Housekeeping's rule (§14.2); a lapsed request to come back puts back its record.
+
+**`Psc\News\Digest\Digests`**: the only writer of `news_digests`.
+- `STATES = ['sending', 'sent', 'empty', 'skipped', 'stopped']`.
+- `__construct(App $app)`; `find(int $id): ?array`, `forWeek(string $week): ?array` (`articles` decoded to `list<int>`); `weeksSince(int $since): list<string>`; `lastComposed(): ?array` (the newest `sending`, `sent`, `stopped` or `empty`); `sending(): ?array` (the oldest `sending`); `recent(int $limit): list<array>` (the newest first, each with `Sends::counts()` and `unsent`).
+- `static unsent(array $digest, array $counts): int`: the recipients a `stopped` digest never reached, from its own record: `max(0, recipients - (sent + failed + bounced + claimed))`, so a leftover `retry`, a recipient never tried and one passed over as they left all count, and the number holds as the list changes later. 0 for any other state.
+- `create(array $row): ?array`: one INSERT; null when the week has a row already (its unique key: another tick wrote it).
+- `finish(int $id, int $now): bool` (`sending` to `sent`), `stop(int $id, string $note, int $now): bool` (`sending` to `stopped`).
+- `prune(int $before): array{sends: int, digests: int}`: Housekeeping.
+
+**`Psc\News\Digest\Sends`**: the only writer of `news_digest_sends`.
+- `MAX_ATTEMPTS = 3`.
+- `__construct(App $app)`.
+- `STATES`; `countDue(array $digest): int` (the recipients still due: the report's and the desk's `left`); `countWaiting(array $digest): int` (the retries that will be claimed again: the recipients still due that have a row; a retry of someone who has unsubscribed since, or confirmed again after composing, is not counted).
+- `due(array $digest, int $limit): list<array>`: the subscriber rows still to send it to, by id: `confirmed`, with an address, `confirmed_at` at or before the digest's `composed_at` (a person who confirms later starts with the next one), and no send row for it except a `retry` under `MAX_ATTEMPTS`. The first three are the private `STILL_DUE` rule, which `countDue()`, `countWaiting()` and `page()` share.
+- `claim(int $digestId, int $subscriberId, int $now): ?int`: an INSERT of a `claimed` row, or, for a `retry` row, `UPDATE news_digest_sends SET state = 'claimed', attempts = attempts + 1, claimed_at = ?, reply = NULL WHERE id = ? AND state = 'retry' AND attempts < 3`. The row's id, or null when the unique key or the condition says another claim has it. Never in a transaction, so the row is committed before the message goes.
+- `sent(int $id, int $now)`, `bounced(int $id, string $reply)`, `failed(int $id, string $reply)` (the message may or may not have gone, the server refused it for good with a 5xx reply to it, or it was never buildable), `retry(int $id, string $reply): ?string` (a refusal at RCPT or DATA, or a 4xx reply to the message: `failed` instead at `MAX_ATTEMPTS`; the state written), `release(int $id, string $reply): bool` (a refusal before the recipient was named: `retry` with the claim's attempt given back): each `WHERE id = ? AND state = 'claimed'`.
+- `countSince(int $since): int`: the rows claimed since then in any state but `retry`: what the mailbox was asked to send.
+- `counts(int $digestId): array{claimed: int, sent: int, retry: int, failed: int, bounced: int}`; `page(array $digest, int $page, int $perPage): array{items, total, page, pages}` (it takes the digest row), each item with its subscriber's address (null once unsubscribed) and `due`: whether the digest is still due to that subscriber.
+
+**`Psc\News\Digest\Composer`**:
+- `MAX_ARTICLES = 15`, `WEEK = 604800` (a fallback only: the reach-back counts London days).
+- `__construct(App $app)`.
+- `window(int $sendAt): array{start: int, end: int}`: the end is the send time. When the last composed digest is the previous ISO week's, the start is its `window_end`, however far back that is, so moving the weekday earlier or later leaves neither a gap nor an overlap (the later of 7 days and that end, as first written, dropped two days when Friday moved to Sunday). Otherwise (the first digest, or a skipped or missed week between them) the start is the later of the week before's send time and that `window_end`. The week before's send time counts London days, never 604800 seconds (private `weekBefore()`): for a send time by the settings, it is the settings' time on the date 7 days before (`Week::sendAt()` of that week, read by `Schedule::at()`), so a clock change between them moves neither end, and a send time the spring change moved (a Sunday 01:30 that went at 02:00 BST) reaches back to 01:30, not 02:00; any other time reaches back to its own London time of day on the date 7 days before. That date also gives the week a last digest must be of to count as the week before's. No article is in two digests, and a window never reaches back more than 7 days past a skipped or missed week: with the weekday unchanged, a week skipped while paused is not sent later.
+- `live(array $ids, int $now): list<int>`: which of those article ids are live at `$now` (status `published`, `published_at` passed), in one query; the sender reads it before every message.
+- `pick(int $start, int $end, int $now): array{ids: list<int>, left_out: int}`: live articles (status `published`, `published_at` passed) whose first time live (the earlier of `first_live_at`, when set, and `published_at`) is in [start, end), the newest first, at most 15. An article taken down and put back counts from when it first went live.
+- `compose(string $week, int $sendAt, int $now): array`: writes the week's row: `empty`, with `finished_at`, when it picks none; otherwise `sending`, with `recipients`. When another tick wrote it, its row.
+- `skip(string $week, int $sendAt, string $note, int $now): ?array`: writes a `skipped` row (its window as `window()` gives it, for the record; `lastComposed()` never reads it, and its articles are not sent later).
+- `articles(array $digest, ?int $now = null): list<array{id: int, title: string, dek: string, category: string, category_name: string, path: string}>`: the digest's articles still live at `$now`, in its order (`ArticleStore::find()`, `Categories::name()`, `Paths::article()`). A takedown after composing leaves the article out of every message sent after it.
+- `shape(array $digest, ?int $now = null): array`: a `news_digests` row as the digest shape, with its articles still live.
+- `preview(\DateTimeImmutable $now): array`: the next digest (`Week::next()`) as it stands, with `id` null. With no articles yet, the 3 newest live articles and `sample` true, so the preview and the test always have something to show.
+
+**The digest shape** every `Courier` method takes: `{id: ?int, week: string, send_at: int, window_start: int, window_end: int, articles: list<{id, title, dek, category, category_name, path}>, left_out: int, sample: bool}`.
+
+**`Psc\News\Digest\Sender`**:
+- `TICK_SECONDS = 120`: a batch sends nothing more once its tick has spent this long on it. `SEND_WITHIN = 172800`: a digest still `sending` 48 hours after its send time (`send_at`, never when a late tick composed it) stops, the rest unsent. `NOTES`: the words of §14.12 for each skip and stop.
+- `__construct(App $app, ?Courier $courier = null, ?\Closure $clock = null)` (`DigestMail::courier($app)` by default; `$clock` is the batch's steady clock in seconds, which a test runs fast to reach `TICK_SECONDS`). `tools/news.php` hands the step its own `new DateTimeImmutable('now')`, not the tick's starting time, since a session may have run for minutes first.
+- `tick(\DateTimeImmutable $now): array{status: string, week: ?string, sent: int, bounced: int, retry: int, failed: int, left: int, note: ?string}`: one tick's digest work (§14.4), with the pause and the articles still live read again before every message. `status` is `idle`, `blocked`, `skipped`, `empty`, `paused`, `waiting`, `sending`, `sent` or `stopped`.
+- `blocked(): ?string`: why nothing may be sent: `mail_driver` (`mail.driver` is `mail`), `no_mailto` (`mail.unsubscribe_to` is empty or not an address, by `DigestMail::hasUnsubscribeAddress()`), or null.
+- `allowance(int $now): int`: what this tick may send: the least of `digest_per_tick`, `digest_per_hour` less `countSince(now - 3600)`, and `digest_per_day` less `countSince(now - 86400)`; never below 0.
+
+**`Psc\Controllers\Admin\AdminDigestController`**: `index`, `control`, `show` and `preview` (§14.12), and `state(App $app): array{key: string, label: string, badge: string, text: string}` (static); `WARN_AT = 400`, `TESTS_PER_HOUR = 5`; `NOT_SENT` ("Not sent: the digest stopped") and `UNSUBSCRIBED` ("Not sent: unsubscribed since"); `sendState(string $state, string $digestState, bool $due): string` (static), the words for a send's state: a `retry` of a `stopped` digest is `NOT_SENT`, a `retry` on any other digest whose subscriber is no longer due (`Sends::page()`'s `due`) is `UNSUBSCRIBED`, and anything else is as `SEND_STATES` says. A failed test is worded by who stopped it (private `why()`, §14.12).
+
+#### Public (builder "public")
+
+**`Psc\Controllers\DigestController`**: `show`, `submit`, `confirmPage`, `confirm`, `unsubscribePage`, `unsubscribe` (§14.5, §14.6); `static versions(App $app): array{consent: string, privacy: string}` (`content/news.php` 'digest' 'consent_version', and the privacy page's `updated` in `content/pages.php`), which every caller of `Subscribers::request()` and `subscribeAccount()` passes. `static allowConfirmation(App $app, string $email): bool`: whether one more confirmation may go to that address's mailbox today, counting it when it may (`digest-confirm:` and `Auth::mailboxKey()`, `CONFIRMATIONS_PER_DAY` in 24 hours); the signup form and the account page's tick share it. `static cadence(App $app): string` (the pages' "every Friday from 09:00 UK time", or "once a week"). Constants `PER_IP_PER_HOUR = 10`, `CONFIRMATIONS_PER_DAY = 3` (a mailbox's, by `Auth::mailboxKey()`, so every spelling of it shares one allowance), `BAD_LINKS_PER_HOUR = 30`, `MAX_EMAIL = 190`. `FormGuard::MIN_SECONDS` gains `'digest' => 2` (one address to type). `app/routes.php` declares the three paths through `Links`' constants.
+
+**`Psc\Auth\Auth::mailboxKey(string $email): string`** (static): the mailbox an address delivers to, for the limits that cap the mail one person can be sent (never stored, never an address to send to): normalised; the local part read as RFC 5322 means it, its quotes and quoted pairs taken out (`"jdoe"`, `"j\doe"` and `"\j\d\o\e"` are `jdoe`; `"j".doe` is `j.doe`), then cut at its first `+`; a domain literal as one spelling of its IP address (`[IPv6:0:0:0:0:0:0:0:1]` and `[IPv6:::1]` are `[::1]`, and an IPv4 address written as IPv6, `[IPv6:::ffff:1.2.3.4]`, is `[1.2.3.4]`); and for `gmail.com` and `googlemail.com` its dots dropped and the domain read as `gmail.com`. The key is canonical rather than such addresses refused, so every cap keyed by it binds, the contact form's (whose address check is `FILTER_VALIDATE_EMAIL`) included. `digest-confirm`, `register-addr`, `register-exists`, `verify-resend`, `reset`, `contact-from` and `contact-to` count by it.
+
+### 14.4 Sending (the tick)
+
+**The hook.** `tools/news.php` runs the digest after `Pipeline::tick()` returns, in its own try/catch, under the lock the command already holds, so it never runs beside another tick, never delays a session (it starts only after the session work and the announcements) and never stops the tick's JSON line:
+
+```php
+if ($command === 'tick' || $command === 'digest') {
+    try {
+        $report['digest'] = (new Psc\News\Digest\Sender($app))->tick($now);
+    } catch (Throwable $e) {
+        $app->log->exception($e, 'news digest');
+        $report['digest'] = ['status' => 'failed'];
+    }
+}
+```
+
+A new command, `php tools/news.php digest`, runs only that step (for the owner and the tests); its exit code is 0 unless it could not start. The step's own log line is `news digest` with the report, whose keys hold no word the Logger masks. Its time is bounded: `Sender::TICK_SECONDS` of sending, plus the message in hand, whose SMTP session waits up to `mail.smtp.timeout` (15 seconds) for the connection and again for each of its replies (the greeting, EHLO, STARTTLS and EHLO again, the three AUTH steps, MAIL, RCPT, DATA, the message and QUIT: about a dozen), so about 3 minutes at the very worst.
+
+**`Sender::tick()`**, in order:
+1. `$app->dbAlive()`.
+2. **Blocked.** `blocked()` not null: nothing is composed or sent (`blocked`, the note says why), so a fix made within the 24-hour window still sends that week's digest.
+3. **Compose.** `Week::due($now, $settings, $digests->weeksSince(now - 8 days))`. When a week is due: paused (`digest_enabled` false) writes it `skipped` ("Skipped: the digest was paused at its time."); otherwise `Composer::compose()` writes it `sending`, or `empty` when no article went live in its window.
+4. **Send.** The oldest `sending` digest, if any:
+   - more than `SEND_WITHIN` after its send time: `stopped`, with `paused_late`'s note when it is paused ("Stopped: it was still paused 48 hours after its time, so the rest were not sent."), else `limits`' ("Stopped: it could not reach everyone within 48 hours of its time, so the rest were not sent. If the sends say the mail server refused them, check the mailbox; otherwise raise the limits on the Settings tab, or ask for the digest's own mailbox (docs/DEPLOY.md).").
+   - paused: nothing is sent (`paused`); the rest wait for "Continue the digest".
+   - its articles (`Composer::articles()`) are all taken down: `stopped` ("Stopped: every article in it was taken down.").
+   - `allowance()` is 0: nothing this tick (`waiting`).
+   - otherwise, for each of `Sends::due($digest, allowance)`, until `TICK_SECONDS` have passed:
+     1. read `digest_enabled` again: off, and the batch ends (`paused`, the rest wait); read the articles' liveness again (`Composer::live()`): one taken down since is left out of this and every later message, and with none left the digest is `stopped` (`taken_down`);
+     2. read the subscriber again (`Subscribers::find()`): not `confirmed`, or no address, and it is passed over (no row is written);
+     3. `Sends::claim()`: null, and it is passed over (another claim has it);
+     4. `Courier::digest($digest, $subscriber)`;
+     5. acts on the `Delivery` as the table below says.
+   - when `Sends::due($digest, 1)` is empty afterwards, the digest is `sent`.
+5. Return the report: `status`, `week`, this tick's counts (`sent`, `bounced`, `retry`, `failed`), `left` (the recipients still due) and `note`.
+
+**What each outcome does**
+
+| Outcome | The send row | The subscriber | The batch |
+|---|---|---|---|
+| `ok` | `sent`, `sent_at` | `delivered()` | goes on |
+| `hardBounce()` (a 5xx at RCPT with 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10: the address does not exist) | `bounced`, its `reply` | `bounced()`; the second in a row over 14 days unsubscribes it (`bounce`) | goes on |
+| `uncertain()` (no reply after the message: a timeout, a hang-up or a write that failed) | `failed`: never sent again | | stops: the next tick goes on |
+| `retryable()` before the recipient was named (connect, greeting, EHLO, TLS, AUTH or MAIL: the mailbox down, its password changed or its cap reached, never the address's fault) | `retry` with its attempt given back (`Sends::release()`), so an outage uses up nobody's attempts; `SEND_WITHIN` still bounds it | | stops: the next tick goes on |
+| `retryable()` at RCPT, DATA or a 4xx reply to the message (any other refusal at RCPT or DATA, a sender's 5.1.7, 5.1.8 or 5.1.0 included, and a 4xx after the message such as `451 4.7.1` or `451 4.3.0` from a rate limit or a content scan: Hostinger documents nothing past its cap, so a refusal is read as "stop for now") | `retry`, or `failed` at its third attempt | | stops: the next tick goes on |
+| A 5xx reply to the message (`554 5.7.1`: refused for good, which RFC 5321 §4.2.5 says not to send again without someone's review) | `failed`, never sent again | | stops: the next tick goes on |
+| `refused` (a template or header the Mailer would not send) | `failed` | | stops, and the digest is `stopped` ("Stopped: the email could not be built. The site log says why.") |
+| An exception from the Courier, or the process dies | stays `claimed`: its outcome is unknown, so it is never retried, and the digest page counts it as "Unknown" | | the exception goes to the hook's catch |
+
+**The caps.** Defaults 25 a tick (every 15 minutes: 100 an hour), 100 an hour and 500 in any 24 hours. They count the digest's own messages (the rows claimed in any state but `retry`); confirmations, tests and the site's other emails are not counted, and the default 500 leaves them the other half of `no-reply@`'s 1,000. With the defaults, 500 subscribers take 5 hours, and a digest stops 48 hours after its time, so the list can reach about 1,000 before any week is cut short; the desk warns at 400 (§14.12). Sends are spread through the day by the tick itself, never in a spike (Hostinger: "avoid sudden email spikes"; M3AAWG on warming a new mailbox, and `no-reply@` dates from 21 October 2026).
+
+### 14.5 Routes
+
+Declared beside the contact page's through `Links`' constants, before the registry loop, which skips `Links::SIGNUP` as it skips `/contact/`. The admin routes go with the desk's.
+
+```
+GET  /digest/                                   DigestController::show             ['session','nostore']   (X-Robots-Tag: index, follow)
+POST /digest/                                   DigestController::submit           ['session','csrf','nostore']
+GET  /digest/confirm/                           DigestController::confirmPage      ['nostore']   ?token=
+POST /digest/confirm/                           DigestController::confirm          ['nostore']   ?token=
+GET  /digest/unsubscribe/                       DigestController::unsubscribePage  ['nostore']   ?token=
+POST /digest/unsubscribe/                       DigestController::unsubscribe      ['nostore']   ?token=  (the page's button, and a mail client's List-Unsubscribe=One-Click)
+
+GET  /portal/admin/news/desk/digest/            AdminDigestController::index    $ad
+POST /portal/admin/news/desk/digest/            AdminDigestController::control  $adPost  (action: pause|resume|test|unsubscribe)
+GET  /portal/admin/news/desk/digest/preview/    AdminDigestController::preview  $ad
+GET  /portal/admin/news/desk/digest/{id:\d+}/   AdminDigestController::show     $ad      (?page=)
+```
+
+- **The signup page** carries a session for its CSRF token and FormGuard's signed time, so it is never cached; like the contact page it stays indexable (the handler sets `X-Robots-Tag: index, follow`, and its meta robots says the same). It is outside `/news/`, so no `/news/*` page ever starts a session.
+- **The confirm and unsubscribe pages** carry no session, no CSRF check and no cookie of any kind: the token is the only authority, as RFC 8058 needs for the POST (a mail client sends no cookie). `nostore` makes them `private, no-store` and `X-Robots-Tag: noindex, nofollow`, so no CDN keeps a copy (otherwise a session-free GET 200 is `public, max-age=300`) and no search engine lists one. They are not in the registry, the sitemap or `llms.txt`.
+- **Never a redirect.** Every answer of the two POSTs is a page drawn in the response itself: 200 for a good token, whatever state its row is in; 404 for a token that is not one of ours (`Tokens::read()` or `readConfirm()` null). A token that fails, on a GET as well as a POST, counts against `digest-link:<ip>`, `BAD_LINKS_PER_HOUR` (30) an hour, then 429 with `Retry-After: 3600` (a GET still changes no subscription: only the limiter's count moves); a good token is never limited, because a mail provider's one-click POSTs for many people come from the same few addresses. A database failure on a token page falls to the site's 500 page, whose log line holds the path only, never the token.
+- **A GET or HEAD changes nothing**, on either page, for any token.
+- **The body of the one-click POST** is `List-Unsubscribe=One-Click`, sent as `multipart/form-data` (RFC 8058's SHOULD) or `application/x-www-form-urlencoded` (MAY); PHP reads both into `$_POST`, so `$request->input('List-Unsubscribe') === 'One-Click'` names the method `one_click`, and anything else (the page's own button) is `page`. Both unsubscribe.
+- The addresses in the emails are `Links`' paths on `app.url`, slashed and in lower case, so neither `force_https` nor the router's slash ever answers them with a 301.
+
+### 14.6 Public pages
+
+All three use the site's components only (`c-hero--page`, `c-form c-form--panel`, `c-field`, `c-callout`, `c-btn`, `c-prose`), so they add no stylesheet. Each has one h1, no inline style or script, and the words of §14.9.
+
+**The signup page `/digest/`** (a registry page, `content/pages.php`; template `news/digest`; section `news`, so the header marks News)
+- Head: the registry's title and description, its own canonical, `index, follow`, the breadcrumbs Home › Industry Updates › Weekly digest, `Schema::webPage(..., 'WebPage')`, and the news share card.
+- In order:
+  1. `c-hero--page`: the eyebrow, the h1 and the lede, with `Week::cadence()` in it ("every Friday from 09:00 UK time"), or "once a week" when that is null.
+  2. After a send, a `c-callout c-callout--success` (`id="sent"`, `role="status"`): "Check your inbox" and its text. **The same words whatever happened**: a new address, one already waiting, one already subscribed, one that had unsubscribed, one past its daily limit, or a filled honeypot. The page never says whether an address is subscribed. The words name both cases in which no confirmation goes ("Unless that address already gets the digest, or has had three of these emails in the last day, ...", §14.9, "three" being `CONFIRMATIONS_PER_DAY`), so they are true in every case.
+  3. "What you get": a list of four lines.
+  4. The form, `c-form c-form--panel`, `id="form"`, `novalidate`, POST `/digest/`: the error summary partial, the email field (`type="email"`, `autocomplete="email"`, `maxlength="190"`, its help), the consent words with the link to the privacy notice, `FormGuard::fields('digest', $old)`, the CSRF field, and the button (`c-btn c-btn--primary`, `data-busy`). No tick box: the form has one purpose, and pressing its button after those words is the clear affirmative act consent needs.
+  5. Two small lines: an account holder can tick the box on the account page instead (`/portal/account/#details`), and the RSS feed (`/news/feed.xml`).
+- **A send** (`DigestController::submit()`), in this order, as the contact form does:
+  1. FormGuard `bot`: answered as sent (the flag, 303 to `/digest/#sent`); nothing is stored or sent.
+  2. The field: empty, longer than 190 characters, or not `Auth::isUsableEmail()`: back to `/digest/#form` with the error, the input kept.
+  3. FormGuard `quick`: back with the input kept and the quick message.
+  4. `digest-signup:<ip>`, `PER_IP_PER_HOUR` (10) an hour: past it, back with the limited message, nothing sent.
+  5. `Subscribers::request()` with `versions()`. For `new`, `again` and `returning`, the confirmation goes only while `digest-confirm:<mailbox>` (`Auth::mailboxKey()`, so `name+1@` and `name+2@`, Gmail's dotted spellings, a quoted local part or a domain literal written another way share one) is within `CONFIRMATIONS_PER_DAY` (3) a day (`allowConfirmation()`, which the account page's tick shares), so the form cannot flood anyone's inbox; past it, nothing is sent and nothing is said. What a catch-all domain or any other way one mailbox takes many addresses can do is bounded by the per-network limit.
+  6. The session flag `digest_sent`, then 303 to `/digest/#sent`.
+  - A database failure is logged and the form comes back with the unavailable message and the input kept.
+
+**The confirm page `/digest/confirm/?token=`** (template `news/digest-link`, `$kind` `confirm`)
+- GET: `Tokens::readConfirm()` null: the invalid page, 404. Otherwise `Subscribers::linkState()` for the row and the link's generation: `ask` draws the address and the button; `expired` (`pending` 7 days or more after `requested_at`, exactly 7 included) and `missing` (Housekeeping removed it) draw expired; `already`; `gone` (`unsubscribed`, or the row asked again since the link was sent, so a link from before a withdrawal never confirms the new request).
+- POST: `Subscribers::confirm()` with the link's generation: `confirmed` draws the done page (with the cadence and, under it, "Changed your mind? Unsubscribe", the row's own unsubscribe link); `already`, `expired`, `gone` draw their pages; `missing` draws expired.
+
+**The unsubscribe page `/digest/unsubscribe/?token=`** (the same template, `$kind` `unsubscribe`)
+- GET: `Tokens::read(UNSUBSCRIBE)` null: the invalid page, 404. The test selector: the test page. A `pending` or `confirmed` row: the address and the button ("ask"). An `unsubscribed` row or none: already.
+- POST: `Subscribers::unsubscribe()` with `one_click` or `page`: `done` draws the done page (with "Changed your mind? Sign up again"), `already` and `missing` the already page, `test` the test page. Always 200.
+
+**What both token pages share**
+- The form is a button only, POST to the page's own address with its query (`form-action 'self'` allows it); no field, no CSRF token, no script.
+- `Seo::noindex()`, no canonical, no JSON-LD beyond the base graph, and `<meta name="referrer" content="no-referrer">` pushed to the head stack, so no link on the page carries its token to the next address in a `Referer`.
+- The address is printed only on the "ask" pages and the confirm page's done page, from the row: the done words name it, and it is the person who just pressed the button, in a `no-store` response.
+
+### 14.7 The account
+
+**The account page** (`templates/portal/account/show.php`, `AccountController`)
+- The details form (`#details`) gains a second tick after "Email me about new releases and features": `div.pt-field.pt-field--inline` with `<input id="profile-digest" name="digest" type="checkbox" value="1">`, its label and its help (`aria-describedby="profile-digest-help"`). It is ticked when `Subscribers::isSubscribed()` (a confirmed subscription only: while a request waits it is unticked, and ticking it again asks again), or as posted after a refused save. Beside it, `<input type="hidden" name="digest_shown" value="1|0|">` carries the stored state the tick was drawn against, empty when it could not be read. After a save refused for a field error (an empty name, a company over 160 characters) the tick is drawn as posted and `digest_shown` as posted too (only `1` or `0`, else empty): the state the page first drew, never the state at the new draw.
+- `profile()`: the tick is compared with `digest_shown`, never with `isSubscribed()`. Not moved: the subscription is never read or changed, so a failed read never fails a save of the name. Moved: it is read again (`digestShown()`, which logs a failure and answers null) and changed only while it still matches `digest_shown`; otherwise nothing changes for the digest, the other details are still saved, and a `warning` flash says why (`stale`, or `unavailable` when it cannot be read; after "Your details are saved. " when the other details were saved). A tick moved on a page that drew no state counts as moved when ticked and is refused as `unavailable`, and a missing `digest_shown` (a crafted or very old form) changes nothing for the digest. So a page opened before an unsubscribe or a confirmation elsewhere never undoes it, and after a refused save the corrected save compares the tick with the page the person first saw. A change calls `subscribeAccount($user, 'account', ...)` or `unsubscribeAccount()`, in one transaction with the `users` update (the `users` row written only when its own columns changed), counts as a change ("Nothing to save" is said only when no detail changed and the tick was not moved) and is named `digest` in the audit's fields (the audit row written only when something changed). A tick makes a request (`subscribeAccount()` answers `pending`), and once the transaction commits `AccountController::askForDigest()` sends it the digest's own confirmation (`DigestMail::courier($app)->confirmation()`) within `DigestController::allowConfirmation()`, the same daily allowance as the public page, in a try/catch that logs. The flash says what happened (§14.9): `asked` (the email went), `asked_limited` (the allowance was used up), `unsent` (it could not be sent), `on` only when `subscribeAccount()` answers `already` (confirmed in the meantime), and `off` after unticking. The product-news tick and `marketing_opt_in` are unchanged by it, and it by them. `show()` passes `digest` as `?bool`, null when `isSubscribed()` cannot be read: the tick is then drawn unticked and `digest_shown` empty, so a save never acts on it, and the delete section's digest line is drawn only when it is `true`. A refused save goes back to `/portal/account/#profile-errors`, the form's error summary itself, which takes focus (the password and delete forms' refusals likewise land on `#password-errors` and `#delete-errors`).
+- The data paragraph's list ends "and your weekly digest subscription", and the delete section adds, when subscribed: "The weekly Industry Updates digest stops, and your address is deleted from it."
+
+**Registration** (`templates/portal/auth/register.php`, `AuthController::register()`, `Auth`)
+- The form gains the same tick after the product-news one: `register-digest`, its label and its registration help.
+- `Auth::register()` takes `digest` (bool) in its input; after the account is made, a tick calls `subscribeAccount($row, 'registration', ...)` (`Auth::askForDigest()`, which logs a failure and never fails the registration), which leaves a `pending` row. An address that already has an account takes the existing "You already have an account" path and nothing else: the digest never reveals an account either.
+- The email check (`verify-email`) gets `digest` true when `renewAccountRequest()` finds the account's waiting request, which it asks again then, so the request lasts 7 days from that email, longer than its 48-hour link, and the confirmation it promises always follows the link's button. It then says: "You also asked for the weekly Industry Updates digest. Once your address is confirmed we will send one more email about it, and the digest starts only when you press the button that email leads to." A `pending` account's reset email says the same in its own words, its request renewed the same way.
+- **The email check's link is a button page.** `GET /portal/verify/?token=` (`AuthController::verifyPage`, `['session', 'nostore']`) shows "Confirm my email address" and a button when `peekToken()` says the token is good, else the invalid page with the resend form; it changes nothing. `POST /portal/verify/?token=` (`AuthController::verify`, `['session', 'csrf', 'nostore']`) spends it and draws the result as before. A link scanner's visit therefore neither activates an account nor proves its address.
+- `Auth::verifyEmail()`, and `Auth::resetPassword()` where it proves a `pending` account's address, then call `Subscribers::renewAccountRequest()` and send that row the digest's own confirmation (`DigestMail::courier($app)->confirmation()`), in a try/catch that logs and never fails the verification (`Auth::digestVerified()`). The row stays `pending` until that email's button is pressed, as on the public page; after 7 days unconfirmed the request lapses.
+
+**A change of the account's address.** No page changes an account's email today: the profile form changes the name, the company and the product-news tick, and no admin page edits an address. The subscription holds its own address, so the digest can never follow an account silently to an address that did not consent. Any change of address added later calls `Subscribers::accountEmailChanged()`, which ends the subscription (method `account`); the person ticks the box again for the new address.
+
+**The copy of their data** (`AccountController::export()`): the last key is `news_digest`, `Subscribers::forExport()` (null without one): the address, the state, where it was asked, the two versions, the times (as ISO 8601 by the export's `isoDates()`), how it ended, `prior` (the earlier record a request to come back waits over, or null), and every digest sent to it (week, state, time). Never the selector or the hash.
+
+**Deleting the account** (`AccountController::delete()`): inside the transaction, `$removed['news_digest'] = $subscribers->accountDeleted($user, time())`: a confirmed subscription ends (the address deleted, the suppression record kept), a pending one goes (a request to come back is put back to its earlier record instead). The audit row and the admin's "An account was deleted" email say so.
+
+**An account an administrator disables** keeps its subscription: the digest is the address's consent, and its unsubscribe link works without signing in.
+
+### 14.8 The emails
+
+Text-led, no image of any kind (the layout has none either), every link a text link to the site's own https address, nothing tracked. Each has a written text part (`{template}.text.php`), never only the one derived from the HTML.
+
+**The confirmation** (`templates/emails/digest-confirm.php`, `digest-confirm.text.php`)
+- Subject: "Confirm your Industry Updates digest".
+- No list headers, no advertising, the layout's own footer line.
+- Data: `email`, `url` (the absolute confirm link, with the row's generation), `publisher` (`app.publisher`), `siteName`, `baseUrl`.
+- The text part says "open the link below" where the HTML says "press the button below" (plain text has no button), then "Confirm my digest:" and the URL, and a `--` line before the layout's footer line.
+
+**The digest** (`templates/emails/digest.php`, `digest.text.php`, `_digest-footer.php`)
+- **Subject**: "This week in Industry Updates: " and the newest article's headline, the whole cut at a word to 110 characters (`Prose::cut()`). A test starts "[Test] ".
+- **Preheader** (`_preheader`): "One new article this week on Industry Updates." or ":n new articles this week on Industry Updates, the newest first." (`:n` counts the articles shown and `left_out`).
+- **Body** (its heading an `h1` of 18px, as every other email's), in order:
+  1. On a test only (in a yellow-bordered box), a note: "A test of the next digest, sent from the desk. Its unsubscribe links change nothing.", and when `sample`: "No article has gone live since the last digest yet, so these are the newest articles instead."
+  2. The heading "The week in Industry Updates" and "Every article that went live between :start and :end, the newest first." (the window's London dates: "Friday 16 October" and "Friday 23 October 2026"; left out on a sample).
+  3. Each article: its primary category's name (small, grey), its headline as a link (an `h2`), and its standfirst as plain text (`Prose::plain()`). The link is the article's own address with the campaign: `{base}{path}?utm_source=digest&utm_medium=email&utm_campaign={week}` (`Links::campaign()`). Static per digest, never per person, so the link says nothing about who clicked; `Urls::canonical()` and the article's canonical already drop `utm_*`, and the section's moves keep the query.
+  4. With `left_out`: "And :n more this week on Industry Updates.", the name linked to `/news/` with the campaign.
+  5. A button "Open Industry Updates" to `/news/` with the campaign.
+- **Footer** (`_digest-footer`, in place of the layout's line):
+  - why: "You get this weekly digest at :email because you :how on :date." (`:how` by `source`: `page` "signed up for it on our website and confirmed it", `account` "ticked the box for it on your account page and confirmed it", `registration` "ticked the box for it when you created your account and confirmed it"; `:date` the `confirmed_at` date in London, else `requested_at`'s). A test says "You get this test because you sent it from the Industry Updates desk."; the preview shows `name@example.co.uk` and "signed up for it on our website and confirmed it".
+  - how to stop: "To stop it, open this link and press Unsubscribe or email :mailto." ("open this link and press Unsubscribe" links to the unsubscribe page, where one button stops it; only a mail client's own Unsubscribe button, the RFC 8058 POST, is one click; `:mailto` is `mail.unsubscribe_to`, linked with `Links::mailto()`).
+  - who: "From :siteName, run by :publisher, United Kingdom. How we use your address: our privacy notice." (linked to `/legal/privacy/`). The name and the publisher come from `app.name` and `app.publisher`, never typed into a template. Whether a postal address belongs here is the owner's call (§14.15); nothing is filled in.
+- **Text part**: the same words and every link written out in full, one article a block (category, headline, standfirst, link), then a `--` line and the footer's lines with the unsubscribe address written out; the stop line is two: "To stop it, open this link and press Unsubscribe: :url" and "Or email :mailto with the subject: Unsubscribe :token" (the data key `mailtoSubject`).
+- **Headers**: the Mailer's own, plus exactly the three of `DigestMail::headers()`:
+
+```
+List-Unsubscribe: <https://patternsshowcontrol.co.uk/digest/unsubscribe/?token=4f0c…e2.Q2x…Yw>,
+ <mailto:unsubscribe@patternsshowcontrol.co.uk?subject=Unsubscribe%204f0c…e2.Q2x…Yw>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Id: Industry Updates weekly digest <digest.patternsshowcontrol.co.uk>
+Auto-Submitted: auto-generated
+```
+
+- RFC 8058 §4 asks for a DKIM signature whose `h=` covers both `List-Unsubscribe` headers, or receivers "SHOULD NOT" offer one-click. Hostinger signs the mail it relays and documents nothing on which headers; the first test send settles it (docs/DEPLOY.md). If it does not cover them, the digest still works (the link and the mailto), and signing in the app with a selector of its own is a later change (§14.16).
+
+### 14.9 The words
+
+Every word a person reads is fixed here, in UK English, with no em dash and no en dash used as punctuation (the `ContentRulesTest` dash fence reads `content/`, `templates/`, emails included, and `knowledge/`). Page words live in `content/news.php` 'digest'; email words in the email templates; the desk's words in its templates and `Sender::NOTES` (§14.12).
+
+**`content/news.php` 'digest'** (transcribed as it stands; `:cadence`, `:day`, `:time` and `:email` are filled in by the templates):
+
+```php
+// The weekly digest (docs/NEWS.md §14): the signup page, the confirm and unsubscribe pages, the account's tick and
+// the links to the signup page. consent_version is stored with every sign-up: a change to the words a person agrees
+// to ('page' 'consent', 'account' 'label' and the helps) changes it, to the date of the change.
+'digest' => [
+    'consent_version' => '2026-10-23',
+    'cadence' => 'every :day from :time UK time',
+    'cadence_fallback' => 'once a week',
+    // The token pages' meta description (they are never indexed, but a shared link still shows it).
+    'description' => 'The weekly Industry Updates digest from Patterns Show Control: the week\'s new articles in one email.',
+    'follow' => 'Weekly digest by email',
+    'end' => [
+        'title' => 'Get Industry Updates by email',
+        'text' => 'One email a week with that week\'s new articles: each headline, its standfirst and a link to read it. Nothing else, and no tracking pixels.',
+        'button' => 'Get the weekly digest',
+    ],
+    'page' => [
+        'eyebrow' => 'Industry Updates',
+        'title' => 'The weekly digest',
+        'lede' => 'The articles that went live on Industry Updates that week, in one email, :cadence.',
+        'what_title' => 'What you get',
+        'what' => [
+            'One email a week with that week\'s new articles, the newest first (up to 15, with a link to any more): each headline, its standfirst and its category, with a link to read it here.',
+            'Nothing at all in a week with no new articles.',
+            'No tracking pixels, no images to load and no shortened links: every link goes to this site, or to our unsubscribe address.',
+            'A link in every digest to a page where one button unsubscribes you.',
+        ],
+        'form_title' => 'Sign up',
+        'email' => 'Email address',
+        'email_help' => 'The digest goes to this address. We use it for nothing else.',
+        'consent' => 'By pressing Send me the digest you ask Patterns Show Control to email you a weekly digest of Industry Updates. We first send a link to confirm the address, and send nothing more until you press the button on the page it opens. You can unsubscribe at any time.',
+        'privacy' => 'How we use your address',
+        'button' => 'Send me the digest',
+        'busy' => 'Sending…',
+        'account' => 'Have a client account? You can tick the box on your account page instead.',
+        'account_link' => 'Go to your account page',
+        'feed' => 'Prefer a feed reader? Industry Updates has an RSS feed.',
+        'feed_link' => 'The RSS feed',
+        'sent_title' => 'Check your inbox',
+        // The same words whatever happened, so they hold in every case ('three' is
+        // DigestController::CONFIRMATIONS_PER_DAY).
+        'sent' => 'Unless that address already gets the digest, or has had three of these emails in the last day, we have sent it an email with a link to confirm. Open it and press the button on the page it opens: nothing is sent until you do, and the link works for 7 days. Nothing after a few minutes? Check your spam folder.',
+    ],
+    'errors' => [
+        'email_empty' => 'Enter your email address.',
+        'email_long' => 'Enter an email address of up to 190 characters.',
+        'email_format' => 'Enter an email address in the format name@example.co.uk',
+        'quick' => 'That was quick. Please check your address, then press Send me the digest again.',
+        'limited' => 'Several sign-ups have been sent from your network in the last hour, so this one was not sent. Please try again in an hour.',
+        'unavailable' => 'Your sign-up could not be saved just now. Please try again in a few minutes.',
+    ],
+    // The confirm page (:title | Industry Updates is each state's <title>).
+    'confirm' => [
+        'ask_title' => 'Confirm your digest',
+        'ask' => 'Press the button to start the weekly Industry Updates digest at :email.',
+        'button' => 'Start my digest',
+        'done_title' => 'You are subscribed',
+        'done' => 'The weekly Industry Updates digest will come to :email, :cadence. Every one has a link to unsubscribe with one button.',
+        'already_title' => 'You are already subscribed',
+        'already' => 'The weekly Industry Updates digest already comes to this address, so there is nothing more to do.',
+        'expired_title' => 'This link has expired',
+        'expired' => 'A confirmation link works for 7 days. Sign up again and we will send a new one.',
+        'gone_title' => 'This link no longer works',
+        'gone' => 'The request this link was sent for has ended. To get the digest, sign up again and use the link in the newest email.',
+        'unsubscribe' => 'Changed your mind? Unsubscribe',
+    ],
+    // The unsubscribe page.
+    'unsubscribe' => [
+        'ask_title' => 'Unsubscribe from the digest',
+        'ask' => 'Press the button to stop the weekly Industry Updates digest at :email.',
+        'button' => 'Unsubscribe',
+        'done_title' => 'You are unsubscribed',
+        'done' => 'You will get no more digests. Your address is deleted from the digest; we keep only a coded record that you unsubscribed, so it is never sent to you again unless you sign up again.',
+        'already_title' => 'You are not subscribed',
+        'already' => 'This address does not get the digest, so there is nothing more to do.',
+        'test_title' => 'This was a test',
+        'test' => 'The link came from a test digest sent from the desk, so there was nothing to unsubscribe.',
+    ],
+    // Either token page, for a link that is not one of ours.
+    'invalid_title' => 'This link does not work',
+    'invalid' => 'It may have been cut short. Copy the whole link from the email into your browser, or sign up again.',
+    'again' => 'Sign up again',
+    'again_changed' => 'Changed your mind? Sign up again',
+    'news' => 'Read Industry Updates',
+    // The tick on the account page and at registration, and what saving it says ('three' in asked_limited is
+    // DigestController::CONFIRMATIONS_PER_DAY; stale and unavailable come after "Your details are saved. " when
+    // the other details were saved).
+    'account' => [
+        'label' => 'Email me the weekly Industry Updates digest',
+        'help' => 'One email a week from Patterns Show Control with that week\'s new Industry Updates articles. When you tick this and save, we send you one email, and the digest starts only when you press the button it leads to. It is separate from product news. Untick this, or use the link in any digest, to stop it.',
+        'register_help' => 'One email a week from Patterns Show Control with that week\'s new Industry Updates articles. Once your address is confirmed we send one more email, and the digest starts only when you press the button it leads to. It is separate from product news, and you can stop it at any time.',
+        'on' => 'Your details are saved. The weekly Industry Updates digest will come to :email.',
+        'asked' => 'Your details are saved. We have sent an email to :email: the weekly Industry Updates digest starts when you press the button on the page it opens. The link works for 7 days.',
+        'asked_limited' => 'Your details are saved, but we did not send the email to start the digest: :email has had three of these emails in the last day, which is as many as we send. Please tick the box and save again tomorrow.',
+        'unsent' => 'Your details are saved, but the email to start the digest could not be sent just now. Please tick the box and save again in a few minutes.',
+        'off' => 'Your details are saved. You will get no more digests.',
+        'stale' => 'The digest tick was not saved, because your subscription changed after this page was opened. The box below shows it as it is now.',
+        'unavailable' => 'The digest tick could not be saved just now. Please try again in a few minutes.',
+    ],
+],
+```
+
+**The registry entry** (`content/pages.php`, after `/news/standards/`):
+
+```php
+'/digest/' => [
+    'template' => 'news/digest',
+    'title' => 'Weekly digest | Industry Updates',
+    'description' => 'The week\'s new Industry Updates articles in one email: AV, live event and streaming news, with verified facts kept apart from speculation.',
+    'crumb' => 'Weekly digest',
+    'parent' => '/news/',
+    'section' => 'news',
+    'type' => 'page',
+    'og' => '/assets/img/og/news.png',
+    'og_alt' => (the same words as /news/'s og_alt),
+    'updated' => '2026-10-23',
+],
+```
+
+The title is 32 characters and the description 138 (the site's rules: 60 or fewer, 50 to 155).
+
+The page words above are as they stand; `consent_version` stays `2026-10-23`, the date the consent words last changed (the registration's help and the account page's changed that same day, before any sign-up was taken).
+
+**The confirmation email** (`digest-confirm.php`; the text part says the same, the link written out):
+- Heading: "Confirm your weekly digest"
+- "Someone, most likely you, asked for the weekly Industry Updates digest from :siteName to be sent to :email."
+- "To start it, press the button below, then the button on the page it opens. Nothing is sent until you do."
+- Button: "Confirm my digest" (`emails/_button`, which also prints the link to paste)
+- "The link works for 7 days. If you did not ask for this, you can ignore this email and you will hear nothing more from us."
+- Small: "The digest is one email a week with that week's new Industry Updates articles, and every one has a link to a page where one button unsubscribes you."
+- Small: "From :siteName, run by :publisher, United Kingdom. How we use your address: our privacy notice." ("our privacy notice" linked to `/legal/privacy/`)
+
+**The digest's words** are in §14.8. **The account-deleted email to the administrators** (`account-deleted-admin.php`) gains, when `$removed['news_digest']` is `unsubscribed`: "**Weekly digest:** their subscription ended, and their address was deleted from it."; when it is `removed` (a request never confirmed): "**Weekly digest:** their unconfirmed request was deleted."
+
+**The email check and the reset email** (`verify-email.php`, `reset-password.php`) gain, with `digest` true, the sentences of §14.7. The email check's own words now say to press the button below, then the button on the page it opens, and its small print: "The account stays inactive unless someone presses the button on the page the link opens." The verify page's ask state: the h1 "Confirm your email address", "Press the button to confirm this is your email address and finish setting up your account.", and the button "Confirm my email address" (busy "Confirming…"). The page after registering (`check-email.php`) names that button, in the FAQ's words: "Open the link in that email and press Confirm my email address on the page it opens to finish setting up your account. The link works for 48 hours."
+
+### 14.10 The privacy notice and the cookie notice
+
+**`content/legal/privacy.md`**, under "What we collect and why", after the comments' paragraph:
+
+> - **The Industry Updates weekly digest** (your email address; whether you asked on the digest page, on your account page or when you created your account; when you asked and when you confirmed; which version of the sign-up words and of this policy you were shown; and, for each digest, whether it was sent to you): to email you the digest you asked for, once a week. Lawful basis: your consent, which you give by pressing the button on the page our confirmation email leads to, wherever you asked: on the digest page, on your account page, or when you created your account (then that email follows once your address is confirmed). It is separate from product news. You can withdraw it at any time, as easily as you gave it: the unsubscribe link in every digest opens a page where one button stops it (a mail app that shows its own Unsubscribe button stops it in one click), and so does unticking the box on your account page or emailing the unsubscribe address each digest gives. We record no IP address for it. The digest carries no tracking pixel; its links to our articles carry only the digest's name and week (such as utm_source=digest), the same for everyone, which our site analytics reads like any other visit.
+
+Under "How long we keep it", after the click counts:
+
+> - Digest sign-ups never confirmed: 7 days, then deleted.
+> - When you unsubscribe from the digest, your address is deleted from it straight away. We keep a coded record (a keyed hash of the address, which cannot be turned back into it, with when and how you subscribed and unsubscribed and which words you were shown) for as long as we send the digest: it is our proof of your consent and of its withdrawal, and it is what stops the digest reaching you again unless you sign up again, so we keep it even after a request to delete your data.
+> - The record of which digests were sent to you: 12 months.
+
+Under "Your rights", after "Signed-in clients can download their data and delete their account from the Account page.": "The download includes your digest subscription; deleting the account ends it."
+
+Under "Cookies": "the contact form, the digest sign-up page, the client portal, the support assistant and commenting on Industry Updates set essential ones."
+
+**`content/legal/cookies.md`**: the opening paragraph's list and the session cookie's "Set when you open ..." both add "the digest sign-up page", and the session cookie's entry adds: "The confirm and unsubscribe links in our emails set no cookie." The analytics section's exception reads "except pages reached through a one-time sign-in, password or digest link (those addresses are never sent to Google)" (`Analytics::allowedOn()` drops the tag on any `?token=` address). The cookie page's description: "The cookies this site uses: Google Analytics on the pages you read, and essential ones for forms, the digest sign-up, the portal and the assistant."
+
+**`content/pages.php`**: `/legal/privacy/` and `/legal/cookies/` `updated` become `2026-10-23` (the day the change lands, if later). `DigestController::versions()` reads the privacy date, so every sign-up from then on records it.
+
+### 14.11 Where the signup is linked
+
+| Place | What | Owner |
+|---|---|---|
+| The follow row (`templates/partials/news/follow.php`, on `/news/` and every category hub) | A first item: `icon('mail', 'c-icon--sm')` and "Weekly digest by email", linking to `/digest/` in the same tab. A plain link, so the hubs stay the same for every visitor and set no cookie | public |
+| The article end (`templates/partials/news/digest.php`, drawn by `templates/news/show.php` after the share row, never in the preview) | `section.news-part.news-digest` (`aria-labelledby="news-digest"`): the h2 "Get Industry Updates by email", its line, and "Get the weekly digest" (`c-btn c-btn--secondary`). Any spacing it needs is `news-digest` in `pages/news.css`, tokens only | public |
+| The account page and registration | The tick (§14.7) | public |
+| `knowledge/website.md` | In the Industry Updates paragraph: "Industry Updates also has a weekly email digest. Anyone can sign up at /digest/ with an email address; a confirmation email follows, and nothing is sent until the button on the page it opens is pressed. An account holder can tick 'Email me the weekly Industry Updates digest' on the account page or when creating an account instead. It is separate from the product news tick. It goes out once a week with that week's new articles, and not at all in a week with none. Ticked on the account page, it starts only once the button in the digest's own confirmation email that follows is pressed. Ticked when creating an account, it starts only once the address is confirmed and that email's button is pressed. Every digest has an unsubscribe link that opens a page where one button stops it, and unticking the box on the account page stops it too." In the account steps: "Open the link in that email and press Confirm my email address on the page it opens". In the retention lines: "Deleting the account also ends any digest subscription and deletes the address from it. Unsubscribing from the digest deletes the address from it straight away."; and the essential cookies are "the contact form, the digest sign-up page, the portal, the assistant and commenting on Industry Updates" | public |
+| `llms.txt` (`SeoController::llms()`) | In "Industry Updates", after the standards line: `- [Weekly digest]({base}/digest/): {its description}` | public |
+| `/sitemap.xml` | `/digest/` through the registry, with its `updated`. The confirm and unsubscribe pages are not in the registry, the sitemap or `llms.txt`, and are `noindex` | public |
+| `README.md` | The Industry Updates bullet: "... and a weekly email digest (`/digest/`, or a tick on the account page or at registration: double opt-in by a button on the page its confirmation email opens, a link scanner never confirms or unsubscribes anyone, RFC 8058 one-click unsubscribe in mail apps and a one-button page from every digest, sent by the news tick in batches within the mailbox's limits) carries the week's new articles to those who ask for it."; the portal bullet says the email confirmation's link opens a page whose button confirms | public |
+| `docs/DESIGN.md` | 8.36: the follow row's digest link, the `news-digest` block (its title at the share row's size, its button's paragraph `news-digest-action` with no margin) and the digest pages; §12's table: a row "Weekly digest (`/digest/` and its confirm and unsubscribe pages)": `c-hero--page`, `c-form--panel`, `c-callout--success`, `c-btn` | public |
+
+Not linked from the header, the footer or the home page: the owner asked for the section's reach, and the follow row and the article end are where its readers are.
+
+### 14.12 The desk
+
+**The settings page** (`templates/admin/news/desk/settings.php`, `AdminNewsDeskController::settings()` and `saveSettings()`)
+- A `pt-section` with its `h2` "Weekly digest" (`id="digest"`) after Sessions, like the page's other groups, its fields posted, checked and saved with the rest of the form (one `Settings::save()`, all or nothing, with fingerprints; its fields come next in the error summary after the sessions'). The form now posts 20 settings, not 15:
+
+| Field | Control | Help |
+|---|---|---|
+| `digest_weekday`, "Digest day" | `select`, Monday to Sunday (`Schedule::DAYS`) | "The digest goes out once a week on this day, London time, with the articles that went live since the one before." |
+| `digest_time`, "Digest time" | `input type="time"` | "London time. It goes at the first tick after it, within 15 minutes." |
+| `digest_per_tick`, "Digests sent per tick" | number, 1 to 50 | "A tick comes every 15 minutes, so 25 a tick is up to 100 an hour." |
+| `digest_per_hour`, "Digests sent per hour" | number, 1 to 200 | "However many ticks run in the hour." |
+| `digest_per_day`, "Digests sent per 24 hours" | number, 1 to 900 | "The no-reply mailbox can send 1,000 emails in any 24 hours, shared with confirmations, password resets and ticket emails. 500 leaves them half." |
+
+- `SETTING_NAMES` gains those five names with those labels. `Settings::parse()`'s errors: "Choose the day the digest goes out.", "Enter the digest's time as HH:MM, from 00:00 to 23:59.", "Enter a number of digests per tick from 1 to 50.", "Enter a number of digests per hour from 1 to 200.", "Enter a number of digests per 24 hours from 1 to 900."
+- A save that changed only digest settings says "The settings are saved. The next digest uses them."; any other keeps the desk's words.
+
+**The tabs** (`_nav.php`): a fifth, "Weekly digest", `/portal/admin/news/desk/digest/` (`$current` `digest`; a digest's own page marks it `aria-current="true"`, as a run's page marks the overview).
+
+**The digest page** (`/portal/admin/news/desk/digest/`, `templates/admin/news/desk/digest.php`, page title "Weekly digest")
+- The header: eyebrow "Industry Updates", `h1.pt-title` "Weekly digest", lede "The weekly email of the week's new articles: who gets it, what the next one holds and how each one went."; then the tabs.
+- **State** (`AdminDigestController::state()`): a `pt-badge` with its word and a sentence, the first that applies:
+
+| Key | Label (badge) | Sentence |
+|---|---|---|
+| `mail_driver` | Stopped: PHP mail() (`declined`) | "The site's mail goes through PHP mail(), which Hostinger caps at 100 a day. Set mail.driver to smtp in the server's config file, as docs/DEPLOY.md describes." |
+| `no_mailto` | Stopped: no unsubscribe address (`declined`) | "mail.unsubscribe_to is empty or is not an email address, and every digest must offer an address to unsubscribe by email. Set it in the server's config file." |
+| `no_tick` | Stopped: no tick yet (`declined`) | "The cron job has not ticked yet, and the digest goes only at a tick. Add the news cron job in hPanel, as docs/DEPLOY.md describes." |
+| `stopped` | Stopped: cron not ticking (`declined`) | "The cron job has not ticked for more than 35 minutes, and the digest goes only at a tick. Check the news cron job in hPanel." |
+| `paused` | Paused (`pending`) | "No digest is composed or sent until you continue it. A week whose time passes while it is paused is skipped; a digest partly sent waits, and goes on when you continue it, up to 48 hours after its time." |
+| `on` | On (`active`) | "The next digest goes out :label." |
+
+  With `mail.driver` `log`, a `pt-alert pt-alert--info` under it: "This server writes emails to files (mail.driver is log), so nothing reaches anyone's inbox."
+- `pt-actions`: "Pause the digest" or "Continue the digest".
+- **Subscribers**, `pt-stats`: "Getting the digest", "Waiting to confirm", "Joined in the last 7 days", "Left in the last 7 days", "Unsubscribed, kept so they are never sent it again". Under them: "Sent in the last 24 hours: :n of the :cap the settings allow." At 400 confirmed or more, a `pt-alert pt-alert--warning`: "The list is nearing what one mailbox can send in a day beside the site's other email. Giving the digest a mailbox of its own (such as updates@) or Hostinger Reach needs a change to the site first, as docs/DEPLOY.md says, so ask for it now."
+- **The next digest** (`h2.pt-h2`): "Week of :monday, going out :label."; its articles so far, each headline linking to its edit page, with its category, then "and :n more"; or "No article has gone live since the last digest yet, so nothing would be sent. The preview and a test show the newest articles instead." Then "Open the email preview" (`target="_blank"`, to the preview route), and the test form: "Send me a test", help "Sends the next digest as it stands to :email, your own address, marked as a test. Its unsubscribe links change nothing." A `<details>` "The plain-text part" shows the text part in `pre.pt-mono`.
+- **Unsubscribe someone** (`h2.pt-h2`): a `pt-form`: "Email address, or the token from an unsubscribe email" (`unsubscribe_who`), help "Requests to :mailto arrive wherever that address delivers (docs/DEPLOY.md, section 8): act on each within 2 days. Their subject holds the token, which finds the subscription even when the request was forwarded." (no mailbox named: `mail.unsubscribe_to` can be set to any); radios "How they asked": "By email to :mailto" (`mailto`, chosen) and "Some other way" (`admin`); the button "Unsubscribe".
+- **Past digests** (`h2.pt-h2`): a stacking `pt-table`, caption "The last 12 digests", columns Week ("Week of 19 October 2026", linking to its page), Sent from, Articles, State (a `pt-badge`: `sending` "Sending" `in_progress`, `sent` "Sent" `done`, `empty` "Nothing to send" `closed`, `skipped` "Skipped" `pending`, `stopped` "Stopped" `declined`), Sent, Not sent (failed, bounced and unknown, and for a stopped digest every recipient it never reached, by its own record: `Digests::unsent()`, so its Sent and Not sent add up to its recipients and hold as the list changes), numbers in `td.pt-num`. None yet: `pt-empty` "No digest has gone out yet."
+
+**A digest's page** (`/portal/admin/news/desk/digest/{id}/`, `templates/admin/news/desk/digest-show.php`, page title "Digest for the week of :monday")
+- `h1.pt-title` "Digest for the week of 19 October 2026"; the lede is its state's word and its note.
+- `pt-kv`: Week (`2026-w43`, "also its campaign tag"), Sent from, Articles from (the window's dates), Recipients when composed, Composed, Finished (or "Not yet").
+- Its articles, each linking to its edit page; one taken down since is marked "Taken down since: left out of the messages sent after that".
+- `pt-stats`: Sent; then, for a `stopped` digest, "Not sent: the digest stopped" (`Digests::unsent()`: the recipients it never reached, a leftover retry among them), else Still to send (`Sends::countDue()`) and Waiting to retry (`Sends::countWaiting()`: only the retries still due), both 0 unless it is `sending`; then Bounced, Failed, Unknown ("the tick stopped while sending").
+- A stacking `pt-table`, caption "Who it was sent to, 50 a page": Address (or "Unsubscribed since"), State (`sendState()`: "Unknown", "Sent", "Waiting to retry", "Failed", "Bounced"; a retry of a stopped digest reads "Not sent: the digest stopped", and a retry on any other digest whose subscriber has unsubscribed since reads "Not sent: unsubscribed since", since a digest can finish as Sent with such a row), When, Server's answer (`reply`); then `pt-pager`. Addresses are shown to administrators only, as the comments' moderation shows emails.
+
+**The preview** (`/portal/admin/news/desk/digest/preview/`): `Courier::render(Composer::preview($now), null)['html']`, alone as its own document: `private, no-store`, `noindex`, and `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` (an email's styles are inline, which the site's own policy refuses). It is outside the admin shell, so it is named beside the article preview among the shell fences' exemptions.
+
+**The actions** (`control()`, CSRF; each answers 303 to the digest page with a flash):
+- `pause`: `digest_enabled` false; audit `digest.paused`; "The digest is paused. Nothing is composed or sent until you continue it." (info when it was: "The digest is already paused.")
+- `resume`: true; audit `digest.resumed`; "The digest is on again. The next one goes out :label." (info when it was: "The digest is already on.")
+- `test`: to the signed-in administrator's own address only, never one posted; at most 5 an hour (`digest-test:<user id>`: "You have sent 5 tests in the last hour. Please wait a while, then try again."); `blocked()` says the state's sentence; sent at once by `Courier::test()`; audit `digest.test` (`{week, sent}`, no address). "A test digest is on its way to :email." A failure says who stopped it (private `why()`): "The test was not sent: :why. The site log has more.", where `:why` is, for `refused` or an exception from the courier, "the site could not build the email"; for a reply with a code, "the mail server answered :summary"; for `connect` with no code, "the site could not reach the mail server"; for `tls` with no code and no timeout (a handshake that failed after the server's 220, most often over a certificate not issued to `mail.smtp.host`, or a connection closed at STARTTLS), "the site could not set up a secure connection to the mail server"; and for any other stage with no code (a timeout, a hang-up), "the mail server did not reply (:summary)".
+- `unsubscribe`: a token anywhere in the field (`[a-f0-9]{24}\.[A-Za-z0-9_-]{43}`, so a pasted subject line works) goes to `Subscribers::unsubscribe()` only when `Tokens::read()` accepts its mac (a forged one answers "No subscription matches"), otherwise a usable address to `unsubscribeEmail()`, with the chosen method (`mailto` unless `admin` is posted); audit `digest.unsubscribed` (with the method, never the address). "That address is unsubscribed and gets no more digests." (success), "That address was already unsubscribed. Nothing changed." (info), "No subscription matches that address or token. Nothing changed." (warning), each back to `#unsubscribe`; an empty or unusable field: "Enter an email address, or paste the token from the unsubscribe email.", back to `#unsubscribe-summary`, the error summary's own id, so the summary takes focus (a fragment on its section leaves focus on the page).
+- Any other action is refused as the desk refuses one.
+
+**Audit actions:** `digest.` `paused`, `resumed`, `test`, `unsubscribed`; a change of the digest's settings is the desk's `desk.settings`. None has a subject with a page, so `AdminController::subjectUrl` is unchanged.
+
+**`Sender::NOTES`**, a digest row's `note`: `paused` "Skipped: the digest was paused at its time."; `paused_late` "Stopped: it was still paused 48 hours after its time, so the rest were not sent."; `limits` "Stopped: it could not reach everyone within 48 hours of its time, so the rest were not sent. If the sends say the mail server refused them, check the mailbox; otherwise raise the limits on the Settings tab, or ask for the digest's own mailbox (docs/DEPLOY.md)."; `taken_down` "Stopped: every article in it was taken down."; `unbuildable` "Stopped: the email could not be built. The site log says why." A blocked tick writes no row.
+
+**The desk's other words**, beside the ones above: "Back to the digest", the eyebrow "Weekly digest" on a digest's page, its headings "The digest", "Its articles" and "Its sends", "None: the week was skipped.", "None went live in its window.", "It has not been sent to anyone.", "Article :n, since deleted", "(:n attempts)" (only past one), "and :n more, counted in the email", and "No article is live yet, so the preview has nothing to show." No new class: the pages reuse `pt-desk-state`, `pt-desk-next`, `pt-desk-brief` and `pt-desk-rules`, so `admin-desk.css` and `docs/PORTAL-UI.md` are unchanged.
+
+### 14.13 The builders: who writes what
+
+No file is written by two builders, stubs included. `docs/NEWS.md` is written by none: this section is the contract, and a builder that has to depart from it says so in its report for the integrator to fold in.
+
+**Builder "mail"**
+- `app/src/Mail/Mailer.php`, `app/src/Mail/Delivery.php` (new)
+- `app/src/News/Digest/Tokens.php`, `Links.php`, `Courier.php`, `DigestMail.php` (new)
+- `templates/emails/layout.php`; `templates/emails/digest-confirm.php`, `digest-confirm.text.php`, `digest.php`, `digest.text.php`, `_digest-footer.php` (new); `templates/emails/account-deleted-admin.php`
+- `config/defaults.php` and `config/config.example.php` (`mail.unsubscribe_to`)
+- `docs/DEPLOY.md` (§14.15's checklist: the alias, the DMARC report address, Google Postmaster Tools, the first test send and its DKIM check, acting on emailed requests within 2 days, the limits and when to add a mailbox, never changing `app.secret` while the digest runs, a development copy on the `log` driver)
+- Tests: `tests/Unit/MailerTest.php`, `tests/Unit/News/Digest/TokensTest.php`, `tests/Unit/News/Digest/LinksTest.php`, `tests/Feature/News/Digest/DigestMailTest.php`, `tests/Fakes/FakeSmtpServer.php` and `tests/Fakes/smtp-server.php` (new); `tests/TestCase.php` (the courier's reset in `tearDown()`, one line)
+
+**Builder "send"**
+- `database/migrations/mysql/0007_news_digest.sql`, `database/migrations/sqlite/0007_news_digest.sql`
+- `app/src/News/Digest/Week.php`, `Subscribers.php`, `Digests.php`, `Sends.php`, `Composer.php`, `Sender.php` (new)
+- `app/src/News/Settings.php` (the six settings)
+- `app/src/Controllers/Admin/AdminDigestController.php` (new), `app/src/Controllers/Admin/AdminNewsDeskController.php` (the settings fields)
+- `templates/admin/news/desk/_nav.php`, `settings.php`, `digest.php` and `digest-show.php` (new)
+- `public/assets/css/pages/admin-desk.css` and `docs/PORTAL-UI.md`'s desk table, only if a class the portal contract lacks is needed (`pt-desk-digest-*`)
+- `app/src/Support/Housekeeping.php`, `tools/cron.php` (its comment), `tools/news.php`
+- Tests: `tests/Unit/News/Digest/WeekTest.php`, `tests/Feature/News/Digest/SubscribersTest.php`, `ComposerTest.php`, `SenderTest.php`, `DigestTickTest.php`, `tests/Feature/Portal/AdminDigestTest.php`, `tests/Fakes/FakeCourier.php` (new); additions to `tests/Feature/Portal/AdminTest.php`, `tests/Feature/News/SettingsTest.php` and `tests/Feature/HousekeepingTest.php`
+
+**Builder "public"**
+- `app/routes.php` (all ten routes of §14.5, the admin ones included, and the registry loop's skip)
+- `app/src/Controllers/DigestController.php` (new), `app/src/Support/FormGuard.php` (`'digest' => 2`)
+- `app/src/Controllers/Portal/AccountController.php`, `app/src/Controllers/Portal/AuthController.php`, `app/src/Auth/Auth.php`
+- `app/src/Controllers/SeoController.php` (the `llms.txt` line)
+- `templates/news/digest.php`, `templates/news/digest-link.php`, `templates/partials/news/digest.php` (new); `templates/partials/news/follow.php`, `templates/news/show.php`, `templates/portal/account/show.php`, `templates/portal/auth/register.php`
+- `public/assets/css/pages/news.css` (`news-digest`, if it needs any style)
+- `content/news.php`, `content/pages.php`, `content/legal/privacy.md`, `content/legal/cookies.md`, `knowledge/website.md`
+- `README.md`, `docs/DESIGN.md`
+- Tests: `tests/Feature/News/Digest/DigestPagesTest.php`, `tests/Feature/Portal/DigestAccountTest.php`, `tools/e2e/tests/digest.spec.mjs` (new)
+
+**What each takes from the others**
+
+| Takes | From | What, exactly | Until it is in the tree |
+|---|---|---|---|
+| send, public | mail | `Tokens` (§14.3): `fromApp()`, `selector()`, `make()`, `read()`, `emailHash()`, the four constants | Pure and small: the stub is §14.3's code |
+| send, public | mail | `Links`: the three paths, `confirm()`, `unsubscribe()`, `campaign()`, `mailto()` | The same |
+| send | mail | `Psc\Mail\Delivery` and its four questions | The same |
+| send, public | mail | `Courier`, and `DigestMail::courier(App $app): Courier` (static: the courier a test set with `DigestMail::useCourier(?Courier $courier)`, else a new `DigestMail`), which every caller uses: `DigestController`, `Sender`'s default and `AdminDigestController` | send: `FakeCourier`; public: a `Courier` of its own scratch stub that records its calls. Public's feature tests read the real emails through the log driver once `DigestMail` lands |
+| mail | send | The digest shape and the subscriber row (§14.3) | Build them by hand in the tests |
+| mail | public | The account-deleted email's data: `$removed['news_digest']`, one of `unsubscribed`, `removed` or `none` (absent on older calls: no line) | Pass it by hand in the tests |
+| public | send | `Subscribers`: `request()`, `confirm()`, `unsubscribe()`, `bySelector()`, `forAccount()`, `isSubscribed()`, `subscribeAccount()`, `unsubscribeAccount()`, `accountVerified()` (since replaced by `renewAccountRequest()`, §14.3), `accountDeleted()`, `forExport()`; and the migration | Needs the tables: public writes against the signatures and runs its feature tests once send's migration and `Subscribers` land (send writes those first) |
+| public | send | `Week::cadence(App $app): ?array` | null (the pages say "once a week") |
+| send | public | The four admin routes in `app/routes.php` | public writes `app/routes.php` first; send's admin tests run once it is there |
+
+**How to stub.** A builder never writes into another builder's files or folders. While a class it needs is missing, it codes against the signature here and runs its tests with a scratch bootstrap in its own scratch folder (`.../scratchpad/digest/<name>/stubs.php`, which requires `tests/bootstrap.php`, then declares each missing class only when `class_exists($name)` (autoloading) finds no real one), with `tools/phpunit/vendor/bin/phpunit --bootstrap <that file>`. When the real file lands the stub stops loading by itself, and the builder runs the suite as it is.
+
+**What each writes first**, so the others stop stubbing early: mail: `Delivery`, `Tokens`, `Links`, `Courier`, then `DigestMail`; send: the migration, the `Settings` keys, `Week`, `Subscribers`; public: `app/routes.php`.
+
+**The courier seam**, as `Announcer::useTransport()` is the pings': `DigestMail::useCourier(?Courier $courier)` (static) makes `DigestMail::courier($app)` answer that courier instead of a new `DigestMail`, and `tests/TestCase.php`'s `tearDown()` resets it with `DigestMail::useCourier(null)` (the mail builder's one line in that file). Send's tests of the sender pass `FakeCourier` to `Sender`'s constructor; its desk tests set it with `useCourier()`.
+
+### 14.14 Tests and fences
+
+**mail**
+- `MailerTest`: `send()` without headers is unchanged (but for `Date`, `Message-ID` and the boundary); the three list headers in their order after `Auto-Submitted`; an unknown name, a CR, an LF, a NUL or a value over 900 bytes refuses the send (false, nothing written, `mail refused` logged without the value); a long `List-Unsubscribe` folds after its comma and unfolds to itself; `$sent` keeps `headers` and `text`; `render()` takes a `.text.php` when there is one and `toText()` when not; the layout without `_preheader` and `_footer` is unchanged byte for byte, and with them shows both; `deliverNow()` on the log driver writes one `.eml` and is `done`. Against `FakeSmtpServer` (a scripted server on 127.0.0.1, port 0, started with `proc_open`): 250 throughout is `done`; 550 5.1.1 at RCPT a hard bounce; 451 4.7.1 at RCPT, 554 at MAIL and 535 at AUTH retryable; a refused connection `connect`; after the message, a 451 retryable and not uncertain, a 554 neither (final), and no reply or a hang-up `uncertain` (the first with `timeout`); a QUIT that fails after 250 still `done`; no `summary()` holds the server's words or the address; a table of replies to the message (421 and 452 retryable; 550 and 554 final; none, 251 and 354 uncertain).
+- `TokensTest`: a round trip for each purpose; the other purpose, one changed character, another secret, another selector, an empty string, no dot, padding, upper-case hex, a 42 or 44-character mac: all null; a confirmation binds its generation (another generation with the same mac, a leading zero, a negative one, none, one past the top: all null; `make()` refuses a generation out of range or one given to an unsubscribe link); `make()` refuses a bad purpose or selector; `selector()` is 24 lower-case hex and never the test selector; `emailHash()` ignores case and outer spaces, changes with the secret, and is 64 lower-case hex.
+- `MailerTest` also: a sender's 550 5.1.8, 5.1.7 and 5.1.0 at RCPT (as Postfix words them) are retryable, never a bounce; only 5xx with 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10 bounces. `MailboxKeyTest` (unit): sub-addresses and Gmail's spellings are one mailbox, other domains and other dots stay apart; quoted spellings (`"jdoe"@`, `"j\doe"@`, `"\j\d\o\e"@`) and the spellings of one domain literal are one mailbox.
+- `LinksTest`: the paths; the token in the query, encoded; `campaign()` with and without a query, `utm_source=digest&utm_medium=email&utm_campaign=2026-w43` exactly; `mailto()`.
+- `DigestMailTest` (log driver): the confirmation (its subject, a link whose token `Tokens::read()` accepts for the row's selector, "7 days", the identity line, no `List-Unsubscribe`, no `<img`); the digest (the subject with the lead headline cut at a word; the preheader for one and for several; each article's category, its headline linked with exactly the campaign, its standfirst as plain text; "And :n more"; the button; the footer's reason for each source, its unsubscribe link and mailto, the identity line; the three headers exactly as §14.8, with the token of that subscriber's selector; the text part with every link written out; no `<img` and no link off the site's host; `From` as on every other email); a test (the "[Test]" subject, the note, the sample line, the test selector in its links and headers); `render()` with null; no digest or test (`refused`, nothing sent) while `mail.unsubscribe_to` is empty, a name with the address in angle brackets or a word, or through PHP mail(); the account-deleted email's digest line.
+
+**send**
+- `WeekTest`: keys at the ISO year's edges (31 December 2026 is `2026-w53`, 4 January 2027 `2027-w01`); `sendAt()` in GMT, in BST, at the spring change (a 01:30 time on 29 March 2026 is 02:00) and the autumn one (once); `due()` at its time, within and past 24 hours, a Sunday 23:30 time still due at 00:10 on Monday, a taken week, a weekday moved; `next()`; `cadence()` null while paused and with no settings table.
+- `SubscribersTest`: `request()`'s four outcomes and what each changes (`returning` moves the generation on, and a link of the old generation is `gone`); `confirm()`'s five, 7 days to the second; a registration's tick asked again, never confirmed, by `renewAccountRequest()`, and confirmed by its button; an unproven registration leaves someone else's waiting request as it is; a page sign-up over a waiting registration tick is the page's request; `unsubscribe()` clearing the address, the account and the bounces, keeping the record, idempotent, refusing a method not in `METHODS`, leaving the test selector alone; `subscribeAccount()` a request that only its button confirms (new, ticked again, a waiting page request at a verified account's address, an unsubscribed record asked again: `pending`, and confirmed only by `confirm()`; a confirmed row `already`, a page row linked; unverified: `renewAccountRequest()` asks it again but never confirms it, and does nothing after 7 days; never linked to someone else's confirmed row); a request never confirmed leaves the record of consent as it was (a lapse after a page request, a stranger's unproven registration, a withdrawal by an old digest's unsubscribe link, the account deleted while an account page request waits; the export's `prior`; a confirmation replacing the record); `unsubscribeAccount()`; `accountDeleted()`'s three answers inside a transaction; `accountEmailChanged()`; `forExport()` without `id`, `selector` or `email_hash`; `counts()`; the bounces (two a week apart do nothing, a third at 14 days unsubscribes, a delivery between resets them); `expire()`.
+- `ComposerTest`: the first window; one after a `sent`, an `empty` and a `stopped` digest; a `skipped` one not counted; the weekday moved earlier and later (no gap, no overlap); only articles first live in the window and live now, the newest first; one taken down and put back counted from its first time; 15 and `left_out`; an empty week `empty` with `finished_at`; a week composed twice gives the first row; `articles()` without one taken down after composing; `preview()` and its sample; the reach-back counts London days across a clock change (the first digest after the autumn change reaches back to 09:00 BST; after a skipped week, an article live at 09:30 BST on the skipped Friday is in the next digest and one at 08:30 in none; the spring change; the skipped Sunday 01:30); a Sunday 01:30 digest that went at 02:00 BST, after a skipped week, reaches back to 01:30 GMT the Sunday before (an article live at 01:45 is in it, one at 01:15 in none), and a time not the settings' own keeps its time of day.
+- `SenderTest` (with `FakeCourier`, whose `digest()` checks that its send row is already `claimed` in the database): composed at its time and not before; a paused week skipped with its note; a pause mid-send holding the rest until it is continued; each cap (per tick, per hour counting earlier rows, per 24 hours, `retry` rows not counted); `TICK_SECONDS` ending a slow batch; each row of §14.4's table, with what it writes and whether the batch goes on; nobody who unsubscribed between ticks, or confirmed after the digest was composed, sent it; a row left `claimed` (the courier throws) never sent again; `sent` when nobody is left; `SEND_WITHIN` and every article taken down each stopping it; a digest still paused 48 hours and a minute after its time stopping with `paused_late` (at exactly 48 hours it still waits); a pause saved after the second message of a batch of ten sending no third (`paused`, sent 2, left 8), and an article taken down mid-batch in no message after it, the last one's takedown stopping it (`taken_down`); a `body 451 4.7.1` waiting as `retry` (attempt 1) and sent at the next tick, a `body 554 5.7.1` `failed` and never sent again; `blocked()` for the `mail` driver and for a `mail.unsubscribe_to` that is empty, blank, a named address (`Unsubscribe <…>`) or a word, none of which composes or sends anything; a fence: ten ticks with failures between them, and nobody gets two copies (each recipient's counted attempts are its messages not refused by the mailbox itself); an outage of seven ticks refused at connect, AUTH and MAIL uses up nobody's attempts and the next tick sends to everyone once; three weeks of a sender's 5.1.x refusals at RCPT bounce nobody and keep every address; `SEND_WITHIN` measured from the send time; the log line masks nothing (no `***`).
+- `DigestTickTest`: `tools/news.php tick` prints one JSON line with `digest`; a digest step that throws leaves the session's report and the exit code as they were; `tools/news.php digest` runs that step alone, under the same lock.
+- `AdminDigestTest`: access (signed out, a client, CSRF); the state for each key (`no_mailto` for a named address too), the counts, the budget line and the warning at 400; the next digest's articles and the empty line; the preview (its own policy, `no-store`, `noindex`, the test selector, outside the shell); pause and continue with their audit rows; the test (to the administrator's own address whatever is posted, its limit of 5, each failure flash by who stopped it: the email not built, the server not reached, a secure connection not set up, a timeout at TLS or after the message, and the server's answer); unsubscribing by address and by a pasted subject line, `mailto` and `admin`, its three answers, an audit row without the address; the past digests and a digest's page with its counts, 50 sends a page, an unsubscribed row without an address; a stopped digest's leftovers (a retry and three never tried) reading "Not sent: the digest stopped" (4) with no "Waiting to retry", and that number holding when those it never reached leave later; a retry of someone who unsubscribed since reading "Not sent: unsubscribed since" and not waiting, while the digest sends and once it finishes as Sent; the settings page's digest fields saved, refused with §14.12's words, kept when refused, refused when stale.
+- Additions: `AdminTest::adminPages()` gains `/portal/admin/news/desk/digest/`, `/portal/admin/news/desk/digest/preview/` and `/portal/admin/news/desk/digest/1/`; `testEveryAdminPageRendersForAnAdministratorWithData` gains the digest page and a digest's page (with a digest row made), and names the preview beside the article preview as an exemption. `SettingsTest`: the six defaults and bounds. `HousekeepingTest`: a pending row a second short of 7 days kept and one at 7 days gone, a lapsed return kept as `unsubscribed` without its address, suppression rows kept, digests and their sends at 365 days.
+
+**public**
+- `DigestPagesTest`:
+  - the signup page: 200, one h1, the words, `index, follow` with `private, no-store`, a session and a CSRF field, FormGuard's fields, its canonical, its title and description within the site's lengths, in `/sitemap.xml` and `llms.txt`;
+  - a send for a new address (a `pending` row with both versions, one confirmation whose link's token `Tokens::read()` accepts), the same address again, a confirmed one (no email), an unsubscribed one (pending again, an email): each answered with the same status, page and words, a fence that the bodies match but for the form's token and time;
+  - each field error with the input kept; the honeypot (answered as sent, nothing stored or sent); a quick send; the per-network limit; the per-address limit (silent: the same answer, no fourth email); a missing CSRF token, 419;
+  - confirm: a GET and a HEAD change nothing (the row stays `pending`), set no cookie, are `private, no-store` and `noindex, nofollow`, and carry the `no-referrer` meta; the POST confirms and draws the done page with its unsubscribe link; expired (7 days after `requested_at`), already and gone; a link from before an unsubscribe never confirms the request someone makes afterwards, and the newest link does; a bad token 404, and after 30 of them 429; no redirect anywhere; sub-addresses of one mailbox (and Gmail's spellings, and its quoted spellings) share its 3 confirmations a day; an address already confirmed gets no email and the same words, which name both cases in which none goes ("three" spelled from `CONFIRMATIONS_PER_DAY`);
+  - unsubscribe: a GET changes nothing; the page's POST unsubscribes (`page`); the RFC 8058 POST, `List-Unsubscribe=One-Click` as `multipart/form-data` and as `application/x-www-form-urlencoded`, with no cookie: 200 (never 3xx), no cookie set, unsubscribed (`one_click`, the address gone); a second POST 200; the test token's page; a bad token 404; the exact URL `DigestMail::headers()` writes answers without a redirect;
+  - the follow row on `/news/` and a category hub links to `/digest/`; the article end's block on an article and not in the preview; `NewsPagesTest`'s no-cookie fence still passes;
+  - the privacy notice's paragraph (its whole lawful-basis sentence, and nowhere "by ticking the box") and date, and the cookie notice's mention.
+- `DigestAccountTest`: the tick on the account page (unticked without a subscription; ticked with one, and with a page subscription at the account's address); ticking and saving asks (`pending`, `account`, the `user_id`), sends the digest's own confirmation with the "asked" flash and draws the box unticked while it waits, and only that email's button starts it; the tick's confirmation shares the mailbox's daily allowance with the public page ("asked_limited" past it); unticking unsubscribes (`account`) with the "off" flash; a save acts only on a tick the person moved, on a page that is still true (an outdated page after a one-click unsubscribe or a confirmation elsewhere changes nothing for the digest, and a tick moved on it is refused as "stale"; when the subscription cannot be read the page still answers, a name still saves, and a moved tick is refused as "unavailable"); a save refused for a field error keeps the state the tick was first drawn against (after a one-click unsubscribe elsewhere, the corrected save with the tick left alone asks nothing: the row stays `unsubscribed`, `one_click`, and no confirmation goes; a tick moved off is refused as "stale"; after a confirmation elsewhere, the corrected save leaves it `confirmed`); a late email check (and a pending account's reset) renews the waiting request, so the confirmation it promises follows its button; `marketing_opt_in` untouched by it and it by `marketing_opt_in`; "Nothing to save" still said; registration's tick leaves a `pending` row and the email check says a confirmation follows; a link scanner's GET or HEAD of the email check changes nothing; the email check's button (and a reset that proves the address) sends the digest's own confirmation and leaves the row `pending` until that email's button is pressed; without the tick the email check says nothing of the digest; nothing for an address that already has an account; the export's `news_digest`, without `id`, `selector` or `email_hash`; deleting the account ends the subscription, keeps the record without the address, and the administrators' email says so.
+- `tools/e2e/tests/digest.spec.mjs`: from `/news/`, the follow row's link; the form sent (after FormGuard's 2 seconds); "Check your inbox"; the newest `.eml` in the e2e storage read for the confirm link; that page opened (its button, nothing done yet), the button pressed: "You are subscribed"; its unsubscribe link opened and its button pressed: "You are unsubscribed"; and the one-click POST to that address with `request.post`, a multipart body and no cookies: 200 and no `set-cookie`.
+
+- `AccountsTest`: the email check's GET and HEAD, with no cookie, change nothing; a POST without the page's CSRF token is refused (419); only the button's POST confirms, once. Every account test opens the link as a person does (`TestCase::confirmEmailLink()`: the GET, then the button), and the page after registering names that button. `FormsTest`: the account page's refusals land on their forms' error summaries (`#profile-errors`, `#password-errors`, `#delete-errors`). `AdminDigestTest`: the unsubscribe form's refusal lands on `#unsubscribe-summary`; the desk names no mailbox. The e2e specs press "Confirm my email address".
+
+**The fences every builder keeps**
+- One h1 on every page (`h1.pt-title` on the admin's); no `style=` and no `<script` in a page's markup (emails are the exception by design: their styles must be inline); every admin table has a caption; every admin GET route is in `AdminTest::adminPages()`, the preview with its stated exemption.
+- `ContentRulesTest`: no em dash and no spaced en dash in `content/`, `templates/` (the emails included) or `knowledge/`, and no internal notes.
+- `NewsPagesTest`'s fence that no `/news/*` page sets a cookie or differs for a signed-in administrator; `NewsAssetsTest`'s tokens-only, prefixed `pages/news.css`; `SiteTest`'s fences on every registry page; `MigratorTest`'s same tables in both dialects.
+- `phpunit.xml` fails on any deprecation, notice or warning. Every query runs on SQLite and on MariaDB 10.11 (CI runs both), and `tools/check-mysql.php` passes the MySQL migration and the digest's statements that differ between the engines (the generation and the `prior_` columns in one SET, the retry CASE, `countDue()`'s NOT EXISTS, `countWaiting()`'s EXISTS, `page()`'s `due` and `prune()`).
+- No log line holds an address, a token or a selector, and no report key holds a word the Logger masks.
+- No test reaches the network: the log driver, `FakeCourier` or `FakeSmtpServer` on 127.0.0.1.
+
+### 14.15 For the owner
+
+1. **A postal address.** "Patterns Show Control" is a business name (Companies Act 2006 s.1200); s.1201 and s.1202 ask for the owner's name and a UK address for documents on "business letters", and the E-Commerce Regulations (reg 6) ask for a geographic address on the site. The site publishes none today, and whether an email is a business letter is not settled. The digest says "Patterns Show Control, run by Ben Rohleder, United Kingdom"; adding an address is the owner's decision, a line in the footer and the confirmation once there is one to add. The builders leave it out.
+2. **The unsubscribe address.** Create `unsubscribe@` as an alias of `support@` (the mailbox docs/DEPLOY.md §1 makes) before the first digest, and act on what arrives within 2 days from the desk.
+3. **Deliverability.** Add a reporting address to DMARC (`rua=`), register the domain in Google Postmaster Tools, and send a test digest to a Gmail address first: "Show original" should say SPF, DKIM (`d=patternsshowcontrol.co.uk`) and DMARC pass, and the DKIM signature's `h=` should list `list-unsubscribe` and `list-unsubscribe-post`.
+4. **Growth.** Past about 400 subscribers the desk warns. A third mailbox for the digest (such as `updates@`) or Hostinger Reach needs a change to the site first (the digest's own sending settings, §14.16), so ask for it then; creating the mailbox alone changes nothing.
+5. **The day and time.** Friday 09:00 by default; the settings page changes it.
+
+### 14.16 What this does not do
+
+- No tracking: no pixel, no per-person link, no open or click counted for anyone.
+- No other email on this consent, and the digest never on `marketing_opt_in`'s.
+- No bounce processing from the mailbox: a bounce that comes back later as an email to `no-reply@` is not read (PHP 8.4 has no bundled IMAP); only a 5xx refusal at RCPT with 5.1.1, 5.1.2, 5.1.3, 5.1.6 or 5.1.10 counts. A 4.7.x rate limit at RCPT still uses up the first recipient's attempts (only refusals before RCPT give theirs back).
+- No automatic handling of emails to the unsubscribe address: a person acts on them from the desk.
+- No DKIM signing by the site (§14.8 says when it would be needed).
+- No exact words for a certificate that does not match on port 465. With `mail.smtp.encryption` `ssl` (the example config's), TLS starts inside the connection itself, so a certificate not issued to `mail.smtp.host` fails at `connect`, and the desk's test says "the site could not reach the mail server" rather than naming the secure connection (on 587 with `tls` it does). Telling the two apart would need a plain connection first and TLS after it, which changes every email the site sends; the words are not false, only less exact.
+- No sending outside a tick, no week sent more than 24 hours late, and no digest still sending 48 hours after its time.
+- No mailbox of the digest's own: `mail.from` and `mail.smtp` are the site's one sending identity, which `DigestMail` uses. A digest mailbox (settings such as `mail.digest.*`, read by `DigestMail`) or Hostinger Reach is a later change, asked for when the desk warns at 400.
+- No carry-over of a skipped week: a window reaches back to the week before's send time at most (7 London days, so a clock change moves neither end), so a week skipped while paused is not sent later.
+- No site-wide ceiling on mail to unproven addresses, and no grouping of IPv6 addresses by /64 in the per-network limits: both are site-wide follow-ups, not the digest's (a silent daily ceiling would let a few networks deny every genuine sign-up its confirmation).
+- No preferences (categories, frequency): one digest with everything new.
+- No email after unsubscribing, and no list import: nobody is on the list without asking.
+- No consent refresh after two years (the ICO's "if in doubt"); every digest's footer says why it came.
+- No full articles: each headline, standfirst and link, so the article stays the page people read.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psc\Tests\Feature\Portal;
 
+use Psc\Auth\Auth;
 use Psc\Controllers\Controller;
 use Psc\Http\Response;
 use Psc\Tests\TestCase;
@@ -96,6 +97,8 @@ final class AccountsTest extends TestCase
         self::assertSame(200, $check->status);
         self::assertStringContainsString('Check your email', $check->body);
         self::assertStringContainsString('nina@example.test', $check->body);
+        // Opening the link confirms nothing: the page names the button on the page it opens, which does.
+        self::assertStringContainsString('Open the link in that email and press Confirm my email address on the page it opens', $check->body);
         self::assertStringNotContainsString('action="/portal/register/"', $check->body);
         self::assertStringContainsString('action="/portal/register/"', $this->request('GET', '/portal/register/')->body, 'shown once: reloading never sends the form again');
 
@@ -111,7 +114,21 @@ final class AccountsTest extends TestCase
         $url = $this->mailUrl('nina@example.test', 'verify-email');
         self::assertStringStartsWith('https://patternsshowcontrol.test/portal/verify/?token=', $url);
 
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        // Opening the link (as a mail scanner does, with no cookie) shows the button and changes nothing; so does a
+        // POST without the page's CSRF token.
+        $path = '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url));
+        $_SESSION = [];
+        $this->jar = [];
+        foreach (['GET', 'HEAD'] as $method) {
+            $opened = $this->request($method, $path);
+            self::assertSame(200, $opened->status, $method);
+            self::assertSame('pending', $this->db->value('SELECT status FROM users WHERE id = ?', [(int) $user['id']]), $method . ' changes nothing');
+        }
+        self::assertStringContainsString('>Confirm my email address</button>', $this->request('GET', $path)->body, 'the button the page after signing up names');
+        self::assertSame(419, $this->post($path, [], false)->status);
+        self::assertSame('pending', $this->db->value('SELECT status FROM users WHERE id = ?', [(int) $user['id']]), 'only the button confirms');
+
+        $verify = $this->confirmEmailLink($path);
         self::assertSame(200, $verify->status);
         self::assertStringContainsString('Email address confirmed', $verify->body);
         self::assertStringContainsString('href="/portal/login/"', $verify->body);
@@ -120,8 +137,9 @@ final class AccountsTest extends TestCase
         self::assertSame('active', $user['status']);
         self::assertNotNull($user['email_verified_at']);
 
-        $again = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $again = $this->request('GET', $path);
         self::assertStringContainsString('This link no longer works', $again->body, 'a confirmation link works once');
+        self::assertStringContainsString('This link no longer works', $this->post($path)->body, 'and its button too');
 
         $login = $this->signIn('nina@example.test', self::PASSWORD);
         self::assertRedirect($login, '/portal/');
@@ -229,7 +247,7 @@ final class AccountsTest extends TestCase
 
         $this->register('nina@example.test');
         $url = $this->mailUrl('nina@example.test', 'verify-email');
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
         self::assertSame(200, $verify->status);
         self::assertStringContainsString('waiting for approval', $verify->body);
         self::assertSame('approval', $this->db->value('SELECT status FROM users WHERE email = ?', ['nina@example.test']));
@@ -369,7 +387,7 @@ final class AccountsTest extends TestCase
         $resend = $this->post('/portal/verify/resend/', ['email' => 'pending@example.test'] + $this->filledIn('resend'));
         self::assertRedirect($resend, '/portal/login/');
         $url = $this->mailUrl('pending@example.test', 'verify-email');
-        $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE id = ?', [$id]));
         self::assertRedirect($this->signIn('pending@example.test', self::PASSWORD), '/portal/');
     }
@@ -634,7 +652,7 @@ final class AccountsTest extends TestCase
         self::assertSame(1, (int) $this->db->value("SELECT COUNT(*) FROM audit_log WHERE action = 'account.profile_updated' AND user_id = ?", [$me]));
 
         $r = $this->post('/portal/account/profile/', ['name' => '   ', 'company' => '']);
-        self::assertRedirect($r, '/portal/account/#details');
+        self::assertRedirect($r, '/portal/account/#profile-errors');
         self::assertSame('Casey Cue', $this->db->value('SELECT name FROM users WHERE id = ?', [$me]));
         $page = $this->request('GET', '/portal/account/');
         self::assertMatchesRegularExpression('/id="profile-name"[^>]*aria-invalid="true"[^>]*aria-describedby="profile-name-error"/', $page->body);
@@ -653,7 +671,7 @@ final class AccountsTest extends TestCase
         self::assertSame(419, $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD], false)->status);
 
         $wrong = $this->post('/portal/account/password/', ['current_password' => 'not it at all', 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD]);
-        self::assertRedirect($wrong, '/portal/account/#password');
+        self::assertRedirect($wrong, '/portal/account/#password-errors');
         self::assertSame($before, $this->hashOf($id));
         $page = $this->request('GET', '/portal/account/');
         self::assertStringContainsString('That is not your current password.', $page->body);
@@ -661,7 +679,7 @@ final class AccountsTest extends TestCase
         self::assertStringNotContainsString('not it at all', $page->body);
 
         $mismatch = $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => 'something else']);
-        self::assertRedirect($mismatch, '/portal/account/#password');
+        self::assertRedirect($mismatch, '/portal/account/#password-errors');
         self::assertSame($before, $this->hashOf($id));
 
         $ok = $this->post('/portal/account/password/', ['current_password' => self::PASSWORD, 'new_password' => self::NEW_PASSWORD, 'new_password_confirm' => self::NEW_PASSWORD]);
@@ -678,7 +696,7 @@ final class AccountsTest extends TestCase
     public function testDeletingAnonymisesTheAccountKeepsBusinessRecordsAndBlocksSignIn(): void
     {
         $id = $this->makeUser();
-        $this->db->update('users', ['company' => 'Front of House Ltd', 'marketing_opt_in' => 1], ['id' => $id]);
+        $this->db->update('users', ['company' => 'Front of House Ltd', 'country' => 'GB', 'marketing_opt_in' => 1], ['id' => $id]);
         $ticket = $this->db->insert('tickets', ['user_id' => $id, 'type' => 'bug', 'product' => 'stagewatch', 'title' => 'Clock drifts', 'body' => 'It drifts.', 'last_activity_at' => time(), 'created_at' => time(), 'updated_at' => time()]);
         $licence = $this->db->insert('licences', ['user_id' => $id, 'product' => 'stagewatch', 'tier' => 'pro', 'status' => 'issued', 'reference' => 'SW-TEST-1', 'created_at' => time(), 'updated_at' => time()]);
         $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'remember' => '1']);
@@ -687,9 +705,9 @@ final class AccountsTest extends TestCase
         self::assertSame(419, $this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'DELETE'], false)->status);
 
         $wrongPassword = $this->post('/portal/account/delete/', ['delete_password' => 'not it at all', 'delete_confirm' => 'DELETE']);
-        self::assertRedirect($wrongPassword, '/portal/account/#delete');
+        self::assertRedirect($wrongPassword, '/portal/account/#delete-errors');
         $wrongWord = $this->post('/portal/account/delete/', ['delete_password' => self::PASSWORD, 'delete_confirm' => 'delete']);
-        self::assertRedirect($wrongWord, '/portal/account/#delete');
+        self::assertRedirect($wrongWord, '/portal/account/#delete-errors');
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE id = ?', [$id]), 'nothing happens without both');
         self::assertSame([], array_filter($this->mails(), static fn (array $m): bool => $m['template'] === 'account-deleted-admin'));
 
@@ -700,6 +718,7 @@ final class AccountsTest extends TestCase
         self::assertSame('deleted-' . $id . '@deleted.invalid', $row['email']);
         self::assertSame('Deleted user', $row['name']);
         self::assertNull($row['company']);
+        self::assertNull($row['country']);
         self::assertSame(0, (int) $row['marketing_opt_in']);
         self::assertFalse(password_verify(self::PASSWORD, (string) $row['password_hash']));
         self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM user_tokens WHERE user_id = ?', [$id]));
@@ -857,7 +876,7 @@ final class AccountsTest extends TestCase
         $this->app->auth()->invite('Ivy Wing', 'ivy@example.test', null);
         $invite = self::tokenFrom($this->mailUrl('ivy@example.test', 'invite'));
         $this->post('/portal/verify/resend/', ['email' => 'ivy@example.test'] + $this->filledIn('resend'));
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('ivy@example.test', 'verify-email'))));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('ivy@example.test', 'verify-email'))));
         self::assertStringContainsString('Email address confirmed', $verify->body);
         self::assertSame('active', $this->db->value('SELECT status FROM users WHERE email = ?', ['ivy@example.test']));
         self::assertNull($this->lastMailTo('owner@example.test'), 'nothing for an administrator to approve');
@@ -872,7 +891,7 @@ final class AccountsTest extends TestCase
         $this->bootApp(['security' => ['registration' => 'approval']]);
         $id = $this->makeUser('nina@example.test', self::PASSWORD, 'client', 'approval');
         $token = $this->app->auth()->issue($id, 'verify');
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode($token));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode($token));
         self::assertStringContainsString('waiting for approval', $verify->body);
         self::assertSame('approval', $this->db->value('SELECT status FROM users WHERE id = ?', [$id]));
         self::assertNull($this->lastMailTo('owner@example.test'));
@@ -1061,7 +1080,7 @@ final class AccountsTest extends TestCase
         $id = $this->makeUser();
         $this->signIn();
         $r = $this->post('/portal/account/profile/', ['name' => "Nina \xff\xfe", 'company' => 'Cue Lights']);
-        self::assertRedirect($r, '/portal/account/#details');
+        self::assertRedirect($r, '/portal/account/#profile-errors');
         self::assertSame('Test Client', $this->db->value('SELECT name FROM users WHERE id = ?', [$id]), 'not UTF-8: refused, nothing stored');
 
         $this->post('/portal/account/profile/', ['name' => "Nina\r\n\tStage\x00", 'company' => "Front\x07 of\n\nHouse "]);
@@ -1203,10 +1222,11 @@ final class AccountsTest extends TestCase
         self::assertSame('Deleted user', $this->db->value('SELECT name FROM users WHERE id = ?', [$me]), 'the account row is still anonymised, not removed');
 
         $audit = json_decode((string) $this->db->value("SELECT meta FROM audit_log WHERE action = 'account.deleted'"), true);
-        self::assertSame(['news_comments' => 4, 'news_reports' => 1], $audit['removed']);
+        // news_digest: the weekly digest's subscription, none here (docs/NEWS.md §14.7; DigestAccountTest has the rest).
+        self::assertSame(['news_comments' => 4, 'news_reports' => 1, 'news_digest' => 'none'], $audit['removed']);
         $mail = $this->lastMailTo('owner@example.test');
         self::assertNotNull($mail);
-        self::assertSame(['news_comments' => 4, 'news_reports' => 1], $mail['data']['removed']);
+        self::assertSame(['news_comments' => 4, 'news_reports' => 1, 'news_digest' => 'none'], $mail['data']['removed']);
         self::assertStringContainsString('4 comments on Industry Updates articles and 1 report of other people', $mail['html']);
         self::assertStringContainsString('0 comments on tickets', $mail['html']);
     }
@@ -1222,7 +1242,7 @@ final class AccountsTest extends TestCase
         self::assertStringContainsString('take you back to the article you were reading', $check->body);
 
         $url = $this->mailUrl('nina@example.test', 'verify-email');
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
         self::assertStringContainsString('Email address confirmed', $verify->body);
         self::assertStringContainsString('<a class="pt-btn pt-btn--primary" href="/portal/login/?next=' . e(rawurlencode('/news/video/good-read/#comments')) . '">Sign in</a>', $verify->body);
         self::assertStringContainsString('<a class="pt-btn pt-btn--ghost" href="/news/video/good-read/#comments">Continue to the article</a>', $verify->body);
@@ -1239,7 +1259,7 @@ final class AccountsTest extends TestCase
         $this->request('GET', '/portal/register/');
         $this->register('nina@example.test');
         $url = $this->mailUrl('nina@example.test', 'verify-email');
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
         self::assertStringContainsString('href="/news/switch-story/#comments">Continue to the article</a>', $verify->body);
         self::assertStringContainsString('href="/portal/login/?next=' . e(rawurlencode('/news/switch-story/comment/')) . '"', $verify->body);
     }
@@ -1256,7 +1276,7 @@ final class AccountsTest extends TestCase
         $this->freshBrowser();
         $this->request('GET', '/portal/register/?next=' . rawurlencode('/portal/tickets/new/'));
         $this->register('nina@example.test');
-        $verify = $this->request('GET', '/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('nina@example.test', 'verify-email'))));
+        $verify = $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($this->mailUrl('nina@example.test', 'verify-email'))));
         self::assertStringContainsString('href="/portal/login/?next=' . e(rawurlencode('/portal/tickets/new/')) . '"', $verify->body);
         self::assertStringNotContainsString('Continue to the article', $verify->body);
 
@@ -1278,5 +1298,91 @@ final class AccountsTest extends TestCase
         self::assertSame('/news/old-story/comment/', $_SESSION[\Psc\Controllers\Portal\AuthController::RETURN_KEY]);
         $this->post('/portal/login/', ['email' => 'client@example.test', 'password' => self::PASSWORD, 'next' => '/news/old-story/comment/']);
         self::assertArrayNotHasKey(\Psc\Controllers\Portal\AuthController::RETURN_KEY, $_SESSION);
+    }
+
+    // ------------------------------------------------------------ country
+
+    public function testSigningUpTakesAnOptionalCountryFromTheList(): void
+    {
+        $form = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<select id="register-country" name="country" autocomplete="country">', $form);
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $form, 'none is chosen until the person chooses');
+        self::assertStringContainsString('<optgroup label="Most common">', $form);
+        self::assertStringContainsString('<option value="IE">Ireland</option>', $form);
+
+        $this->register('none@example.test');
+        $none = $this->db->one('SELECT id, country FROM users WHERE email = ?', ['none@example.test']);
+        self::assertNotNull($none);
+        self::assertNull($none['country'], 'no choice is stored as none');
+        self::assertStringContainsString('Check your email', $this->request('GET', '/portal/register/')->body);
+
+        $r = $this->register('bogus@example.test', ['country' => 'XX']);
+        self::assertRedirect($r, '/portal/register/');
+        self::assertSame(0, (int) $this->db->value('SELECT COUNT(*) FROM users WHERE email = ?', ['bogus@example.test']), 'a code not on the list is refused, never stored');
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<a href="#register-country">' . Auth::COUNTRY_ERROR . '</a>', $page);
+        self::assertStringContainsString('<select id="register-country" name="country" autocomplete="country" aria-invalid="true" aria-describedby="register-country-error">', $page);
+
+        $this->register('kept@example.test', ['country' => 'IE', 'terms' => '']);
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertSame(1, substr_count($page, '<option value="IE" selected>'), 'the choice comes back with the rest of the form');
+        self::assertStringContainsString('<option value="">Choose a country</option>', $page);
+
+        $this->register('gb@example.test', ['country' => 'GB']);
+        self::assertSame('GB', $this->db->value('SELECT country FROM users WHERE email = ?', ['gb@example.test']));
+        self::assertStringContainsString('Check your email', $this->request('GET', '/portal/register/')->body);
+        $page = $this->request('GET', '/portal/register/')->body;
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $page, 'a sign-up that went through leaves nothing chosen');
+
+        $this->register('gb-again@example.test', ['country' => 'GB', 'terms' => '']);
+        self::assertSame(1, substr_count($this->request('GET', '/portal/register/')->body, '<option value="GB" selected>'), 'a country in both groups is selected once, in the first');
+
+        $this->signInAdmin();
+        $id = (int) $this->db->value('SELECT id FROM users WHERE email = ?', ['gb@example.test']);
+        $admin = $this->request('GET', '/portal/admin/users/' . $id . '/')->body;
+        self::assertStringContainsString("<dt>Country</dt>\n        <dd>United Kingdom</dd>", $admin);
+        $admin = $this->request('GET', '/portal/admin/users/' . (int) $none['id'] . '/')->body;
+        self::assertStringContainsString("<dt>Country</dt>\n        <dd><span class=\"pt-muted\">Not given</span></dd>", $admin);
+    }
+
+    public function testTheApprovalEmailNamesTheCountry(): void
+    {
+        $this->bootApp(['security' => ['registration' => 'approval']]);
+        $this->register('nina@example.test', ['country' => 'IE']);
+        $url = $this->mailUrl('nina@example.test', 'verify-email');
+        $this->confirmEmailLink('/portal/verify/?token=' . rawurlencode(self::tokenFrom($url)));
+        $admin = $this->lastMailTo('owner@example.test');
+        self::assertNotNull($admin);
+        self::assertSame('admin-approval', $admin['template']);
+        self::assertStringContainsString('>Country</td><td>Ireland</td>', $admin['html']);
+    }
+
+    public function testTheAccountPageSetsChangesAndClearsTheCountry(): void
+    {
+        $me = $this->makeUser();
+        $this->signIn();
+        $page = $this->request('GET', '/portal/account/')->body;
+        self::assertStringContainsString('<select id="profile-country" name="country" autocomplete="country">', $page);
+        self::assertStringContainsString('<option value="" selected>Choose a country</option>', $page);
+
+        $r = $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => 'US']);
+        self::assertRedirect($r, '/portal/account/');
+        self::assertSame('US', $this->db->value('SELECT country FROM users WHERE id = ?', [$me]));
+        self::assertSame(1, substr_count($this->request('GET', '/portal/account/')->body, '<option value="US" selected>'));
+        $audit = json_decode((string) $this->db->value("SELECT meta FROM audit_log WHERE action = 'account.profile_updated' AND user_id = ? ORDER BY id DESC LIMIT 1", [$me]), true);
+        self::assertSame(['country'], $audit['fields'] ?? null, 'only what changed is recorded');
+
+        $r = $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => 'Narnia']);
+        self::assertRedirect($r, '/portal/account/#profile-errors');
+        self::assertSame('US', $this->db->value('SELECT country FROM users WHERE id = ?', [$me]), 'a refused change keeps the saved one');
+        $page = $this->request('GET', '/portal/account/')->body;
+        self::assertStringContainsString('<a href="#profile-country">' . Auth::COUNTRY_ERROR . '</a>', $page);
+        self::assertStringContainsString('aria-describedby="profile-country-error"', $page);
+
+        $data = json_decode($this->request('GET', '/portal/account/export/')->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('US', $data['profile']['country'], 'the copy of their data holds it');
+
+        $this->post('/portal/account/profile/', ['name' => 'Test Client', 'company' => '', 'country' => '']);
+        self::assertNull($this->db->value('SELECT country FROM users WHERE id = ?', [$me]), 'choosing none clears it');
     }
 }

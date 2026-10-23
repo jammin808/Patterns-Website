@@ -50,6 +50,7 @@ test('comment on an article while signed in, then delete it', async ({ page, req
   await expect(page.locator('h1')).toContainText(/email/i);
   const link = new URL(latestMailLink(/https?:\/\/[^/\s]+\/portal\/verify\/\?token=[a-f0-9.]+/));
   await page.goto(link.pathname + link.search);
+  await page.getByRole('button', { name: 'Confirm my email address' }).click();
   await expect(page.getByRole('link', { name: 'Continue to the article' })).toBeVisible();
   // The confirmation page's own sign-in (the portal's switch above the card has one too) carries the way back.
   await page.locator('.pt-main').getByRole('link', { name: 'Sign in', exact: true }).click();

@@ -160,7 +160,7 @@ final class AdminUserController extends Controller
     {
         $admin = $this->currentUser();
         $db = $this->app->db();
-        $user = $db->one('SELECT id, email, name, company, role, status, email_verified_at, marketing_opt_in, last_login_at, created_at, updated_at FROM users WHERE id = ?', [$request->attrInt('id')]);
+        $user = $db->one('SELECT id, email, name, company, country, role, status, email_verified_at, marketing_opt_in, last_login_at, created_at, updated_at FROM users WHERE id = ?', [$request->attrInt('id')]);
         if ($user === null) {
             return $this->notFound();
         }

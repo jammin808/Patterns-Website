@@ -20,6 +20,15 @@ function mailsWith(marker) {
 const asAPerson = (page) => page.waitForTimeout(3_100);
 
 /**
+ * A send made the moment the page opens has to land inside that window, which counts whole seconds, so it can be as
+ * short as two. With motion allowed, the page scrolls smoothly to each field it fills (html:focus-within), about a
+ * second on a phone for a long form, and that is not what is timed: those sends are made with motion reduced, and
+ * the rest of each test runs with the browser's own setting.
+ */
+const atOnce = (page) => page.emulateMedia({ reducedMotion: 'reduce' });
+const withMotion = (page) => page.emulateMedia({ reducedMotion: null });
+
+/**
  * Watches the next send of the form on this page: counts its posts to $path (each held back a second, so a second
  * press lands while the first is on its way), and keeps what the busy form's button says in this tab's session
  * storage, which outlives the page the button was on.
@@ -86,6 +95,7 @@ test('contact: too quick and too many links both keep the message; pressed twice
   const marker = `e2e-contact-${info.project.name}-${Date.now()}`;
   const message = `The countdown froze at 00:10 during rehearsal. ${marker}`;
   // Filled in and sent the moment the page opens, sooner than a person types: not sent yet, the input kept.
+  await atOnce(page);
   await page.goto('/contact/');
   await page.locator('#name').fill('E2E Walker');
   await page.locator('#email').fill(`walker-${info.project.name}@example.test`);
@@ -98,6 +108,7 @@ test('contact: too quick and too many links both keep the message; pressed twice
   await expect(summary).toContainText('press Send message again');
   await expect(page.locator('#message')).toHaveValue(message);
   expect(mailsWith(marker)).toBe(0);
+  await withMotion(page);
 
   // Too many links: what to fix, with the limit, however fast.
   const spammy = `Links https://a.example/1 https://b.example/2 www.c.example https://d.example/4 ${marker}`;
@@ -133,6 +144,7 @@ test('sign-up: what to fix comes first, a quick send asks for the password again
 
   // Filled in and sent the moment the page opens: not created yet, the details kept but never the password.
   const email = `walker-${info.project.name}-${Date.now()}@example.test`;
+  await atOnce(page);
   await page.goto('/portal/register/');
   await page.locator('#register-name').fill('E2E Walker');
   await page.locator('#register-email').fill(email);
@@ -143,6 +155,7 @@ test('sign-up: what to fix comes first, a quick send asks for the password again
   await expect(page.locator('[data-error-summary]')).toContainText('type your password again, then press Create account');
   await expect(page.locator('#register-email')).toHaveValue(email);
   await expect(page.locator('#register-password')).toHaveValue('');
+  await withMotion(page);
 
   // An address in the wrong form is said first, however fast.
   await page.locator('#register-email').fill('walker.example.test');

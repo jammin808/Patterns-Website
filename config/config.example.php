@@ -25,6 +25,8 @@ return [
         'driver' => 'smtp',
         'from' => 'no-reply@patternsshowcontrol.co.uk',
         'admin_to' => 'you@example.com',
+        // The weekly digest's unsubscribe mailbox (an alias of support@, docs/DEPLOY.md §8); every digest names it.
+        'unsubscribe_to' => 'unsubscribe@patternsshowcontrol.co.uk',
         'smtp' => [
             'host' => 'smtp.hostinger.com',
             'port' => 465,

@@ -20,7 +20,7 @@ $article ??= null;
 
     <div class="pt-card">
         <div class="pt-card-body">
-            <p>Open the link in that email to confirm your address and finish setting up your account. The link works for 48 hours.</p>
+            <p>Open the link in that email and press Confirm my email address on the page it opens to finish setting up your account. The link works for 48 hours.</p>
             <p>If this address already has an account, the email says so and explains how to sign in instead.</p>
             <?php if ($article !== null): ?>
                 <p>Open the link in this browser and the confirmation page will take you back to the article you were reading.</p>

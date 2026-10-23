@@ -45,6 +45,9 @@ return [
         'from' => 'no-reply@patternsshowcontrol.co.uk',
         'from_name' => 'Patterns Show Control',
         'admin_to' => '',                 // where contact messages, licence requests and new tickets are sent
+        // The mailbox every weekly digest names for unsubscribing by email (its List-Unsubscribe mailto and its
+        // footer): an alias of support@ that someone reads (docs/DEPLOY.md §8). Empty, no digest is sent (docs/NEWS.md §14.2).
+        'unsubscribe_to' => 'unsubscribe@patternsshowcontrol.co.uk',
         'smtp' => [
             'host' => 'smtp.hostinger.com',
             'port' => 465,
