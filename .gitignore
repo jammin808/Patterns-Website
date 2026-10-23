@@ -17,6 +17,7 @@ test-results/
 /tests/e2e/.artifacts/
 .phpunit.result.cache
 .phpunit.cache/
+__pycache__/
 
 # Editors and OS
 .DS_Store
