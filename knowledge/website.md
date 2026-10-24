@@ -6,7 +6,7 @@ This site is the home of Patterns, StageWatch, AGMessage and PlayMap. Anyone can
 
 - Products: each app has an overview, a features page, a licensing page and a help page under Support.
 - Ecosystem: how the four apps work together, the integrations, and how AI is used with a person approving.
-- Workflows: step-by-step guides, such as lining up an LED wall, blending projectors, running a conference day, answering AGM questions, mapping an object and running the show from a Stream Deck.
+- Workflows: step-by-step guides, such as lining up an LED wall, blending projectors, running a conference's screens, slides and graphics, running a conference day on time, running audience polls and quizzes on the big screen, answering AGM questions, mapping an object, running the show from a Stream Deck and running a lobby or shop window screen by the clock.
 - Licensing: how licensing works across the apps, with each product's own licensing page for its plans.
 - Support: getting-started guides, troubleshooting, the FAQ and this assistant.
 - Downloads: what is available to download. Signed-in clients get every build open to them in the portal.

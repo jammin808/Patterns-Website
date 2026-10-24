@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-/* The six show workflows, keyed by slug (/workflows/<slug>/): each step names the product that does it; plain text, only what the apps do today. */
+/* The nine show workflows, keyed by slug (/workflows/<slug>/): each step names the product that does it; plain text, only what the apps do today. */
 
 return [
     'led-wall-line-up' => [
         'title' => 'Line up and test an LED wall',
         'h1' => 'Line up an LED wall at load-in',
-        'summary' => 'A load-in checklist for LED walls with Patterns: number the panels the way the LED crew does, check the raster pixel for pixel, test colour, low grey and motion, hold every output to its signal contract, then hand the proven canvas to the show.',
+        'summary' => 'A load-in checklist for LED walls with Patterns: number the panels the way the LED crew does, check the raster pixel for pixel, test colour, low grey and motion, hold every output to its signal contract, then hand the checked canvas to the show.',
         'audience' => 'LED and video technicians at load-in, and the show operator who takes the wall over',
         'products' => ['patterns'],
         'duration' => 'Part of load-in, once the wall and its processor are powered and fed',
@@ -51,12 +51,12 @@ return [
             ],
             [
                 'title' => 'Hold each output to its signal contract',
-                'text' => 'Give each screen its signal contract (resolution, rate and colour) and read MATCH or MISMATCH against what Windows sends and what the display reports. Then press SAVE KNOWN GOOD: from then on, Patterns tells you if a driver, mode or display drifts from the rig you proved.',
+                'text' => 'Give each screen its signal contract (resolution, rate and colour) and read MATCH or MISMATCH against what Windows sends and what the display reports. Then press SAVE KNOWN GOOD: from then on, Patterns tells you if a driver, mode or display drifts from the rig you checked.',
                 'product' => 'patterns',
             ],
             [
                 'title' => 'Hand the canvas to the show',
-                'text' => 'Save the wall in the show file, run Super Check on the Machine page before doors, and build the show\'s looks on the canvas you have just proved.',
+                'text' => 'Save the wall in the show file, run Super Check on the Machine page before doors, and build the show\'s looks on the canvas you have just checked.',
                 'product' => 'patterns',
             ],
         ],
@@ -88,7 +88,7 @@ return [
     'projector-edge-blending' => [
         'title' => 'Blend projectors into one picture',
         'h1' => 'Blend projectors into one widescreen',
-        'summary' => 'Turn two, three or more overlapping projectors into one seamless picture with Patterns: lay out the blend in one press, line up the geometry, match the joins\' gamma and black level, and save it all with the show.',
+        'summary' => 'Turn two, three or more overlapping projectors into one even picture with Patterns: lay out the blend in one press, line up the geometry, match the joins\' gamma and black level, and save it all with the show.',
         'audience' => 'Video technicians and AV crews setting up widescreen and multi-projector screens',
         'products' => ['patterns', 'playmap'],
         'duration' => 'Part of the projection line-up, before rehearsals start',
@@ -134,7 +134,7 @@ return [
                 'product' => 'patterns',
             ],
         ],
-        'outcome' => 'One seamless picture across every projector, with each join checked and the whole rig saved with the show.',
+        'outcome' => 'One even picture across every projector, with each join checked and the whole rig saved with the show.',
         'tips' => [
             'Build the blend before the projectors arrive: planned screens at the projectors\' native resolution let you lay out the grid and the content at home.',
             'Tune gamma and black level with the room lit as it will be for the show.',
@@ -156,6 +156,86 @@ return [
             ],
         ],
         'related' => ['led-wall-line-up', 'projection-mapping-an-object'],
+    ],
+
+    'conference-screens' => [
+        'title' => 'Run a conference\'s screens from one desk',
+        'h1' => 'Run a conference\'s screens, slides and graphics from one desk',
+        'summary' => 'Plan the screens before you travel, turn the speaker list into lower thirds and the running order into cues, load the decks and web videos, then run the day from a safe preview with a Stream Deck, a phone and the presenter\'s clicker.',
+        'audience' => 'Show operators, producers and corporate event teams running the screens at a conference, a launch or an awards night',
+        'products' => ['patterns', 'stagewatch'],
+        'duration' => 'A prep session before the event, then the show day',
+        'you_need' => [
+            'Patterns on the show laptop: one portable app, run from any folder or a USB stick, as the full download if the show plays video files',
+            'The speaker list and the running order as Excel or CSV files',
+            'The client\'s decks as PDF or PowerPoint files (PowerPoint needs the free LibreOffice on the show laptop), and any web pages or videos you will show',
+            'Optional: a Stream Deck with Bitfocus Companion 5, a presenter\'s USB clicker, and StageWatch for cue ladders, department cues the crew confirm and a show report',
+        ],
+        'steps' => [
+            [
+                'title' => 'Plan the screens before you travel',
+                'text' => 'Switch to PREP and add planned screens at the venue\'s sizes: the main wall, the confidence monitors and a foyer screen. Give each its role. Confidence and info screens keep their own picture through every look and cue until you send them something on purpose.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Bring in the people and the running order',
+                'text' => 'Import the speaker list into the lower-thirds library and the running order into the cue stack, from Excel or CSV. Each row brings its planned start and length, and the break, lunch and end marks come in with it.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Dress it in the client\'s colours',
+                'text' => 'Make a brand kit from the client\'s colours and logo, pick a lower-thirds style and adjust it, and build a walk-in look with a particle or sound-reactive scene and a countdown to the start.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Load the decks, clips and web pages',
+                'text' => 'Add the PDF and PowerPoint decks, the clips and the web pages. Cue a web video in the preview, find where it should start and ARM it, so it plays from that mark the moment it goes to air.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Build the looks and let the stack check itself',
+                'text' => 'Save the looks on F1 to F12, give one screen a sponsor picture of its own where the client wants one, and time the steps inside each cue. Any cue that cannot run is flagged with the reason as you build.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Adopt the screens and line them up',
+                'text' => 'At the venue, switch to SHOW, adopt each planned screen onto its real display and put up the test card. Plug in the charger, run Super Check on the Machine page and turn on the show lock.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Run the day from the preview',
+                'text' => 'Build each change in the preview and TAKE it when it is ready. Put lower thirds up in the preview for sign-off first, hand the presenter the clicker for their deck, and put looks, people and cues on Stream Deck keys that label themselves.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Give the speakers their countdown',
+                'text' => 'With remote control on, open the speaker view of Patterns\' stage page on the confidence monitor or a tablet at the lectern: green, then amber at two minutes and red at one unless you set other times. Messages to the speaker or the crew come back marked as seen, and a cue can send one. For cue ladders, department cues the crew confirm and a show report, link StageWatch from the Nodes page, and the stage pages follow its clock.',
+                'product' => 'patterns',
+            ],
+        ],
+        'outcome' => 'One laptop runs every screen in the room: decks, videos, web pages, lower thirds and walk-in graphics, built in a preview the audience never sees and taken to air when they are ready.',
+        'tips' => [
+            'Put lower thirds through the preview first, so the director approves the name before the room reads it.',
+            'A lower third leaves by itself after its hold, so a busy operator never leaves a speaker\'s name up through the next session.',
+            'Check converted PowerPoint decks once before doors: animations become still pages and a missing font is replaced. For a deck that needs its animations, show PowerPoint for the web as a web page.',
+            'The God\'s Eye shows the whole rig on one map, worst problem first, which is quicker than walking the room.',
+            'If a confidence monitor must show something else for one session, send it a picture of its own. It keeps it until you send it the programme again.',
+        ],
+        'faqs' => [
+            [
+                'q' => 'Can Patterns run the slides as well as the screens?',
+                'a' => 'Yes. PDF decks play full frame with instant page turns, PowerPoint, Keynote and Impress files are converted through the free LibreOffice, and web decks such as Google Slides play as pages. The presenter\'s clicker turns the pages.',
+            ],
+            [
+                'q' => 'Can I get the speaker names from a spreadsheet?',
+                'a' => 'Yes. Import the speaker list from Excel or CSV into the lower-thirds library, and any name goes into any design in one press. A cue that names someone who is not in the list is flagged before the show.',
+            ],
+            [
+                'q' => 'What does the audience see while I build?',
+                'a' => 'Only what is already on air. EDIT SAFE keeps every edit in the preview until you press TAKE or CUT. Looks, cues and remote commands you fire still go straight to air, so fire them when you mean it.',
+            ],
+        ],
+        'related' => ['conference-timing', 'stream-deck-show-control'],
     ],
 
     'conference-timing' => [
@@ -237,6 +317,89 @@ return [
             ],
         ],
         'related' => ['agm-shareholder-questions', 'stream-deck-show-control'],
+    ],
+
+    'audience-polls' => [
+        'title' => 'Run audience polls and quizzes on the big screen',
+        'h1' => 'Run audience polls, word clouds and quizzes on the big screen',
+        'summary' => 'Switch on audience play, put a room code and a QR on the wall, and the audience joins from their phones. Run polls, word clouds and timed quizzes with the results growing on screen, while a word list, the host and an optional AI check stand between what the room writes and the wall.',
+        'audience' => 'Producers, hosts and show operators at conferences, awards nights, away days and parties',
+        'products' => ['patterns'],
+        'duration' => 'Set up in the prep session, then run whenever the agenda allows',
+        'you_need' => [
+            'Patterns on the machine that drives the wall: the show laptop itself, or a second computer running Patterns out front',
+            'A Wi-Fi network for the audience\'s phones that can reach that machine, ideally kept apart from the show network',
+            'An admin passcode set on Patterns\' Install page, which opens the host page',
+            'Optional: the AI assistant, to take the first look at what the room writes. It needs the internet and your own Anthropic API key',
+        ],
+        'steps' => [
+            [
+                'title' => 'Switch on audience play',
+                'text' => 'On SETUP → Remote, turn on remote control and then the audience listener. The phones join on a separate port that serves only the play pages and never show control, so you can open that port, and only that port, to the audience Wi-Fi.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Prepare the questions',
+                'text' => 'Before the day, put each question in a cue as an add-a-question step, so it is saved with the show: polls with one choice, several or a scale, word clouds, and quizzes with a time limit and the right answer marked. On the day you can also add questions on the desk\'s Arcade page or the host page.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Put the room code on the wall',
+                'text' => 'Show the join screen with the room code and its QR. People scan it, pick a nickname and a table, and they are in, with nothing to install.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Open a question',
+                'text' => 'Open the next poll or quiz from the desk, the host page, a cue or a Stream Deck key, and close it when the time is up. The answers arrive as people tap.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Reveal the results',
+                'text' => 'Put the results on the wall as bars that grow or a word cloud that blooms, and bring up the leaderboard after a quiz. The fastest right answers score the most.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Keep the wall clean',
+                'text' => 'Everything the room writes meets the room\'s word list first, then waits for your approval on the host page, one by one or all at once. With the AI assistant set up, it takes the first look: plainly fine words go through, plainly unfit ones are turned away, and doubtful ones wait for you. The list matches whole words, so Scunthorpe is welcome.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Talk back to the room',
+                'text' => 'Send a message to the whole room, one table or one phone, from "The poll closes in 30 seconds" to "Table 4, you won".',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Play something in the interval',
+                'text' => 'Put draughts on the wall for two phones to play, one for each side, tell a story the room votes on at every fork, or run Pong, Snake or Breakout on the big screen with game pads or phones as the controllers and the computer taking any empty seat.',
+                'product' => 'patterns',
+            ],
+        ],
+        'outcome' => 'The room takes part from its own phones, the results land on the wall as they come in, and nothing the room writes reaches the wall without passing the word list and then the host or the AI check.',
+        'tips' => [
+            'If the venue Wi-Fi puts every phone behind one address, set the audience network to Venue NAT on SETUP → Remote. The room\'s status line says when joins were refused and what to change.',
+            'On a machine with two networks, use the Bind to boxes on SETUP → Remote: remote control on the show network\'s address and the audience port on the audience Wi-Fi\'s, so the phones only ever see the play pages.',
+            'A cue can open a question or put the leaderboard up, so the reveal lands on its moment in the running order.',
+            'Run a warm-up poll during the walk-in, so the first real question is not also the first time anyone looks for the QR.',
+        ],
+        'faqs' => [
+            [
+                'q' => 'Can the audience vote from their phones?',
+                'a' => 'Yes, once you switch audience play on. People join from a room code or QR on the wall, then answer polls, word clouds and timed quizzes, with the results and a leaderboard on screen. What the room writes meets a word list, then waits for the host, or for the AI check when the assistant is set up.',
+            ],
+            [
+                'q' => 'Do people need an app to join?',
+                'a' => 'No. They scan the QR or type the address and the room code into their phone\'s browser, then pick a nickname.',
+            ],
+            [
+                'q' => 'Can someone in the audience reach the show controls?',
+                'a' => 'No. Audience phones join on a port of their own that serves only the play pages and never takes a show command.',
+            ],
+            [
+                'q' => 'Does audience play need the internet?',
+                'a' => 'No. The phones join Patterns over the venue\'s own Wi-Fi. Only the optional AI check needs a connection.',
+            ],
+        ],
+        'related' => ['conference-screens', 'stream-deck-show-control'],
     ],
 
     'agm-shareholder-questions' => [
@@ -467,7 +630,7 @@ return [
         'faqs' => [
             [
                 'q' => 'Is there one module for the whole network?',
-                'a' => 'Each app has its own Companion module, and all three load into one Companion, so one Stream Deck carries keys from every app. A single module for the whole network is coming.',
+                'a' => 'Each app has its own Companion module, and all three load into one Companion, so one Stream Deck carries keys from every app.',
             ],
             [
                 'q' => 'Which version of Companion do I need?',
@@ -479,5 +642,79 @@ return [
             ],
         ],
         'related' => ['conference-timing', 'led-wall-line-up'],
+    ],
+
+    'lobby-screens' => [
+        'title' => 'Run a lobby screen by the clock',
+        'h1' => 'Run a lobby, shop window or museum screen by the clock',
+        'summary' => 'Set up a screen nobody sits at: programmes on a rota by time, weekday and season, adverts and announcements at their times, a TODAY view of what the clock will do, and care from elsewhere with updates that roll back by themselves.',
+        'audience' => 'Integrators and AV teams looking after hotel lobbies, shop windows, museums, receptions and other permanent screens',
+        'products' => ['patterns'],
+        'duration' => 'An afternoon to set up, then it runs by itself',
+        'you_need' => [
+            'Patterns on the machine that drives the screens, run from any folder you can write to',
+            'The looks the site will show, built in Patterns',
+            'Optional: a VPN for reaching the site over the internet, and a web service of your own if you want the site to check in',
+        ],
+        'steps' => [
+            [
+                'title' => 'Build the looks',
+                'text' => 'Build each picture the site will show as a look: the morning programme, the evening one, each advert and an idle look for outside opening hours.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Put the programmes on a rota',
+                'text' => 'On the Install page, give each programme its start and end, its days and any season\'s dates. A window can run past midnight, and a dated row, such as the Christmas rota, beats the everyday one.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Add the adverts and announcements',
+                'text' => 'An advert takes over for a few seconds at its times, on every screen or only the ones it names, then the programme comes back. An announcement puts words on screen with a voice-over and a look of its own, by the clock or by hand. Announcements beat adverts.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Read TODAY before you leave',
+                'text' => 'TODAY lists the day exactly as the clock will run it and flags any row that cannot work, so a missing look turns up now rather than at opening time.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Make the machine look after itself',
+                'text' => 'Turn on the show lock so notifications and sleep stay away, run Super Check, and press SAVE KNOWN GOOD so any later change in the displays or drivers is reported. The watchdog restarts Patterns if it ever falls over.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Look after the site from elsewhere',
+                'text' => 'Set an admin passcode and the web remote\'s ADMIN page gives you the health line, the schedule, a button for every announcement and advert, RESTART, the log and a support bundle with every secret blanked. Add a check-in to your own server and the site needs no open inbound port.',
+                'product' => 'patterns',
+            ],
+            [
+                'title' => 'Let updates install themselves',
+                'text' => 'With the watchdog running, an update waiting on the machine goes in as Patterns restarts, from APPLY on the admin page or at a set time each day in the update window. The files it replaces are kept, an update your server delivers is used only when its checksum matches, and if the new version does not stay up, the old one comes back by itself.',
+                'product' => 'patterns',
+            ],
+        ],
+        'outcome' => 'A screen that runs the day by itself, says what it will do before it does it, and can be looked after and updated without a visit.',
+        'tips' => [
+            'The passcode protects the local network only. Use a VPN to reach the admin page over the internet.',
+            'No management server comes with Patterns: any web service you run, from a short script to a signage system\'s webhook, can be one.',
+            'Every scheduled change goes into the show log, so "why was that advert on at nine?" has an answer.',
+            'A person at the desk still wins: while the cue stack is armed, the clock leaves the screens alone.',
+            'Announcements also fire by hand from a cue, a Stream Deck key, OSC or the admin page, with the schedule on or off.',
+        ],
+        'faqs' => [
+            [
+                'q' => 'Can Patterns run a screen with nobody there?',
+                'a' => 'Yes. A clock-run schedule plays programmes, adverts and announcements by time, weekday and season, with an idle look or black outside opening hours. It is off until you switch it on, so a show machine never changes its picture by the clock.',
+            ],
+            [
+                'q' => 'Can I update a site without visiting it?',
+                'a' => 'Yes. With the watchdog running, an update your own server delivers, or one copied into the site\'s updates folder, is put in place as Patterns restarts, and the old version comes back by itself if the new one does not stay up.',
+            ],
+            [
+                'q' => 'Does the site need an open port on the internet?',
+                'a' => 'No. It can check in with a server you run instead, which needs no inbound port. For the admin page itself, use a VPN rather than opening it to the internet.',
+            ],
+        ],
+        'related' => ['led-wall-line-up', 'stream-deck-show-control'],
     ],
 ];

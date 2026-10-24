@@ -12,7 +12,7 @@ $products = \Psc\Content\Content::products();
 
 // What each help page covers, from its troubleshooting and getting-started topics.
 $covers = [
-    'patterns' => 'Screens, outputs, NDI and show files',
+    'patterns' => 'Screens, playback, NDI and show files',
     'stagewatch' => 'Outputs, licence files, Companion and LTC',
     'agmessage' => 'The host laptop, devices and roles',
     'playmap' => 'Media, outputs, scanning and Companion',
