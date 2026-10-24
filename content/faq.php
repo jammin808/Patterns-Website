@@ -15,7 +15,7 @@ return [
             ],
             [
                 'q' => 'Which app do I need?',
-                'a' => 'Patterns if you put pictures on LED walls, projectors and screens; StageWatch if you keep speakers and a running order to time; AGMessage if you run the back-room at an AGM or board meeting; PlayMap if you play media and map it onto walls, objects or buildings. Many shows use two or more together.',
+                'a' => 'Patterns if you put pictures on LED walls, projectors and screens, from line-up charts to slides, video, lower thirds and audience polls; StageWatch if you keep speakers and a running order to time; AGMessage if you run the back-room at an AGM or board meeting; PlayMap if you play media and map it onto walls, objects or buildings. Many shows use two or more together.',
             ],
             [
                 'q' => 'Do I need all four apps?',
@@ -61,7 +61,7 @@ return [
             ],
             [
                 'q' => 'Do phones and tablets need an app?',
-                'a' => 'No. They use an ordinary web browser on the same network: StageWatch\'s speaker and crew pages, Patterns\' remote, AGMessage\'s meeting and PlayMap\'s phone scan camera all open in the browser.',
+                'a' => 'No. They use an ordinary web browser on the same network: StageWatch\'s speaker and crew pages, Patterns\' remote and stage pages, AGMessage\'s meeting and PlayMap\'s phone scan camera all open in the browser. An audience joins Patterns\' polls and quizzes the same way, from a QR on the wall.',
             ],
         ],
     ],
@@ -117,11 +117,19 @@ return [
         'items' => [
             [
                 'q' => 'Do the four apps work together?',
-                'a' => 'Yes. StageWatch counts down the video playing in Patterns or PlayMap, Patterns\' stage pages follow StageWatch\'s timer, AGMessage puts answers on the speaker\'s screen through StageWatch, and Patterns\' cues fire PlayMap\'s playlists.',
+                'a' => 'Yes. StageWatch counts down the video playing in Patterns or PlayMap, Patterns\' stage pages follow StageWatch\'s timer, AGMessage puts answers on the speaker\'s screen through StageWatch, Patterns\' cues fire PlayMap\'s playlists, and PlayMap follows Patterns\' blackout.',
             ],
             [
                 'q' => 'How do the apps find each other?',
                 'a' => 'Automatically: each app announces itself on the local network every two seconds, so there are no addresses to type. If one does not appear, check that both computers are on the same network and that Windows Firewall allows the app on private networks.',
+            ],
+            [
+                'q' => 'Does Patterns need StageWatch to work with PlayMap and AGMessage?',
+                'a' => 'No. With remote control on in SETUP → Remote, PlayMap and AGMessage appear on Patterns\' Nodes page and in its Eye, each with a light that shows whether it is still on the network. Add PlayMap as a device and Patterns\' cues, Companion keys and OSC can send it commands, and a PlayMap linked to Patterns follows its blackout and the clip it is playing.',
+            ],
+            [
+                'q' => 'Can Patterns run the speaker\'s timer without StageWatch?',
+                'a' => 'Yes. Patterns has its own speaker countdown, crew view and timer page in any browser, messages to the stage come back marked as seen, a cue can send one, and a second computer running Patterns can be a show caller\'s station or a stage timer machine on the desk\'s clock. For cue ladders, department cues the crew confirm, curfews and show reports, link StageWatch, and Patterns\' stage pages follow its clock.',
             ],
             [
                 'q' => 'Can StageWatch count down a video playing in Patterns or PlayMap?',

@@ -9,7 +9,7 @@ return [
     'summary' => 'Patterns Show Control makes four Windows apps for live events: Patterns for the picture, StageWatch for the show clock, AGMessage for the back-room at AGMs and board meetings, and PlayMap for media playback and projection mapping, which work on their own or together on the venue\'s own network.',
     'llms_intro' => 'Patterns Show Control is the home of the Patterns ecosystem, made in the UK by Ben Rohleder for the crews who run conferences, AGMs and live events. The four apps run without the internet, find each other on the venue network and confirm every command between them. Out of the box, Patterns, StageWatch and AGMessage run nothing an AI suggests until a person approves it, and PlayMap\'s high-risk actions always wait for a person. This site covers what each app does, how they work together, licensing, downloads and support.',
     'tagline' => 'Four show apps. One network. Every decision stays yours.',
-    'description' => 'Test patterns, stage timers, back-room messaging and projection mapping for live events: four Windows apps that work together on one show network.',
+    'description' => 'Test patterns and playout, stage timers, back-room messaging and projection mapping for live events: four Windows apps that work together on one show network.',
     'publisher' => ['name' => 'Ben Rohleder', 'country' => 'United Kingdom'],
 
     'nav' => [
@@ -20,7 +20,7 @@ return [
                 [
                     'product' => 'patterns',
                     'label' => 'Patterns',
-                    'line' => 'Test patterns and show content on every screen',
+                    'line' => 'Test patterns, switching and show playout',
                     'href' => '/patterns/',
                     'links' => [
                         ['label' => 'Overview', 'href' => '/patterns/'],
@@ -112,10 +112,13 @@ return [
                 ['label' => 'All workflows', 'href' => '/workflows/'],
                 ['label' => 'Line up an LED wall', 'href' => '/workflows/led-wall-line-up/'],
                 ['label' => 'Blend projectors', 'href' => '/workflows/projector-edge-blending/'],
+                ['label' => 'Run a conference\'s screens', 'href' => '/workflows/conference-screens/'],
                 ['label' => 'Run a conference day on time', 'href' => '/workflows/conference-timing/'],
+                ['label' => 'Run audience polls and quizzes', 'href' => '/workflows/audience-polls/'],
                 ['label' => 'Answer AGM shareholder questions', 'href' => '/workflows/agm-shareholder-questions/'],
                 ['label' => 'Map an object with one projector', 'href' => '/workflows/projection-mapping-an-object/'],
                 ['label' => 'Run the show from a Stream Deck', 'href' => '/workflows/stream-deck-show-control/'],
+                ['label' => 'Run a lobby screen by the clock', 'href' => '/workflows/lobby-screens/'],
             ],
         ],
         [

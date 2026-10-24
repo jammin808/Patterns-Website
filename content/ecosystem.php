@@ -24,7 +24,7 @@ return [
             'title' => 'Picture',
             'product' => 'patterns',
             'line' => 'Patterns runs the picture',
-            'text' => 'Pixel-exact test patterns and show content on every LED wall, projector, screen and NDI receiver, run from a desk with a safe preview, looks and a cue stack.',
+            'text' => 'Pixel-exact test patterns for every LED wall, projector and NDI feed, then the slides, video, graphics, sound and audience polls on them, run from a safe preview and cues.',
             'href' => '/patterns/',
         ],
         [
@@ -64,7 +64,7 @@ return [
             ],
             [
                 'title' => 'Live status at a glance',
-                'text' => 'Every app shares a status light (green, amber, red, or grey for unknown) and a one-line headline such as "Keynote · 12:30 left · 2:10 behind". StageWatch\'s Show network view lists Patterns, AGMessage and other StageWatches with their lights, headlines and any problems they report.',
+                'text' => 'Every app shares a status light (green, amber, red, or grey for unknown) and a one-line headline such as "Keynote · 12:30 left · 2:10 behind". StageWatch\'s Show network view lists Patterns, AGMessage and other StageWatches with their lights, headlines and any problems they report, and Patterns shows every app it hears, PlayMap included, on its Nodes page and in the Eye.',
                 'icon' => 'pulse',
             ],
             [
@@ -128,7 +128,7 @@ return [
             'from' => 'patterns',
             'to' => 'stagewatch',
             'title' => 'One room, one timer',
-            'text' => 'Link Patterns to a StageWatch from Patterns\' Nodes page, and Patterns\' stage and timer pages follow StageWatch\'s clock, colours and title. Patterns\' Eye and its assistant also see StageWatch\'s departments and timer.',
+            'text' => 'Link Patterns to a StageWatch from Patterns\' Nodes page, and Patterns\' stage and timer pages, a caller\'s station and a stage timer machine all follow StageWatch\'s clock, colours and title. Patterns\' Eye and its assistant also see StageWatch\'s departments and timer.',
             'needs' => 'StageWatch Pro or higher',
         ],
         [
@@ -163,7 +163,7 @@ return [
             'from' => 'patterns',
             'to' => 'playmap',
             'title' => 'PlayMap under Patterns\' cues',
-            'text' => 'Add PlayMap as a device in Patterns\' Interactive area, and every Patterns cue, Companion key and OSC message can fire PlayMap\'s playlists. PlayMap follows Patterns\' blackout by default.',
+            'text' => 'Add PlayMap as a device in Patterns\' Interactive area, and every Patterns cue, Companion key and OSC message can send it commands, such as firing a playlist. PlayMap can link to Patterns and follow its blackout and the clip it is playing, and Patterns shows PlayMap on its Nodes page and in the Eye.',
             'needs' => null,
         ],
         [
@@ -218,7 +218,7 @@ return [
         [
             'name' => 'Phones, tablets and web browsers',
             'category' => 'Control surfaces',
-            'text' => 'Nothing to install on the device. Patterns has a phone remote and caller, stage and timer pages; StageWatch puts speaker views, crew pages, the Showcaller page and audience Q&A in any browser; everyone in an AGMessage meeting joins in a browser; and a phone\'s browser can be PlayMap\'s scan camera.',
+            'text' => 'Nothing to install on the device. Patterns has a phone remote, caller, stage and timer pages, and polls, quizzes and games on the audience\'s own phones; StageWatch puts speaker views, crew pages, the Showcaller page and audience Q&A in any browser; everyone in an AGMessage meeting joins in a browser; and a phone\'s browser can be PlayMap\'s scan camera.',
             'products' => ['patterns', 'stagewatch', 'agmessage', 'playmap'],
         ],
         [
@@ -306,7 +306,7 @@ return [
         [
             'name' => 'Media servers and room control',
             'category' => 'Show control',
-            'text' => 'Patterns cues can send OSC, JSON and HTTP commands to media servers, show controllers and room-control systems such as Q-SYS, Crestron and Extron.',
+            'text' => 'Patterns cues and keys can send OSC, JSON-RPC and HTTP commands to media servers, show controllers and any room-control processor with a web API, such as a Q-SYS core or a Crestron or Extron processor, and Patterns shows what each box answered.',
             'products' => ['patterns'],
         ],
         [
@@ -540,7 +540,7 @@ return [
     'glossary' => [
         ['term' => 'Show Bus', 'definition' => 'The shared language the apps speak on the venue network to find each other, share status and confirm commands.'],
         ['term' => 'Show network', 'definition' => 'All the apps currently heard on the venue network.'],
-        ['term' => 'Node', 'definition' => 'Any app or helper on the show network: a Patterns desk, a StageWatch, an AGMessage, a PlayMap or a presenter PC.'],
+        ['term' => 'Node', 'definition' => 'Any app or helper on the show network: a Patterns desk, caller\'s station or stage timer machine, a StageWatch, an AGMessage, a PlayMap or a presenter PC.'],
         ['term' => 'Status light and headline', 'definition' => 'An app\'s one-glance health (green, amber, red, or grey for unknown) and its one-line summary, worked out by rules.'],
         ['term' => 'Receipt', 'definition' => 'The answer to a command between apps: done, refused with the reason, or accepted and not yet confirmed.'],
         ['term' => 'Approval list', 'definition' => 'The list in StageWatch, called the Copilot list, where the show caller approves or discards suggestions from every app.'],
@@ -560,7 +560,7 @@ return [
             ['label' => 'Coming soon', 'title' => 'One report for the client', 'text' => 'Coming: a merged show report across the apps, with the timings, what played and every AI decision.'],
             ['label' => 'Coming soon', 'title' => 'A backup clock that takes over', 'text' => 'Coming: a backup StageWatch that takes over the show clock by itself when the main one goes silent.'],
             ['label' => 'Coming soon', 'title' => 'One Companion module for the network', 'text' => 'Coming: a single Bitfocus Companion module and Stream Deck profile that reaches every app.'],
-            ['label' => 'Coming soon', 'title' => 'PlayMap in full on the Patterns desk', 'text' => 'Coming: PlayMap drawn in full on Patterns\' Eye and added as a Patterns device in one click, and StageWatch finding PlayMap for video countdowns by itself.'],
+            ['label' => 'Coming soon', 'title' => 'StageWatch finds PlayMap by itself', 'text' => 'Coming: StageWatch finding a PlayMap on the network for video countdowns by itself, with no address to type.'],
             ['label' => 'Coming soon', 'title' => 'A rehearsal for failure', 'text' => 'Coming: a tech-check mode that drops links and skews clocks on purpose, so the crew can rehearse what happens.'],
         ],
     ],
@@ -572,7 +572,7 @@ return [
         ],
         [
             'q' => 'Do the four apps work together?',
-            'a' => 'Yes. StageWatch counts down the video playing in Patterns or PlayMap, Patterns\' stage pages follow StageWatch\'s timer, AGMessage puts answers on the speaker\'s screen through StageWatch, and Patterns\' cues can fire PlayMap\'s playlists.',
+            'a' => 'Yes. StageWatch counts down the video playing in Patterns or PlayMap, Patterns\' stage pages follow StageWatch\'s timer, AGMessage puts answers on the speaker\'s screen through StageWatch, Patterns\' cues can fire PlayMap\'s playlists, and PlayMap follows Patterns\' blackout. Patterns also shows AGMessage and PlayMap on its Nodes page and in the Eye.',
         ],
         [
             'q' => 'Does any of it need the internet?',

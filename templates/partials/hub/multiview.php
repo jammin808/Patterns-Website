@@ -16,9 +16,9 @@ foreach ((\Psc\Content\Content::licensing('stagewatch')['tiers'] ?? []) as $t) {
 
 $cards = [
     'patterns' => [
-        // The summary's first sentence without its last clause, which the first fact already says.
-        'line' => 'Pixel-exact test patterns and show content for LED walls, projectors, displays and NDI.',
-        'facts' => ['Runs from a USB stick, with no install', 'Builds in a safe preview until you TAKE', 'Edge blends, gamma and mesh warp'],
+        // The summary's first sentence, shortened to sit beside the other tiles' lines; the last fact says where it runs.
+        'line' => 'Line up every screen with pixel-exact test patterns, then run the show on them.',
+        'facts' => ['Builds in a safe preview until you TAKE', 'Slides, web video and lower thirds built in', 'Runs from a USB stick, with no install'],
         'overview' => 'Patterns test pattern generator',
     ],
     'stagewatch' => [

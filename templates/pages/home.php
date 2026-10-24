@@ -24,8 +24,11 @@ foreach (Content::PRODUCTS as $key) {
 }
 $seo->add(Schema::itemList($seo->canonical(), 'The four Patterns Show Control apps', $items));
 
-// The featured workflow: its steps become cues; the first two are done and the third is standing by.
+// The featured workflow: its steps become cues; the first two are done and the third is standing by. The "See all"
+// link counts the workflows in content/workflows.php, so it never names a number the list has outgrown.
+$workflowCount = count(content('workflows'));
 $wf = content('workflows')['conference-timing'] ?? null;
+$h = require PSC_ROOT . '/templates/partials/product/helpers.php';
 
 // Licensing: StageWatch's real tiers; the others' status from their own files.
 $sw = Content::licensing('stagewatch') ?? [];
@@ -160,7 +163,7 @@ $faqs = array_values($faqs);
                 <button class="c-go" type="button" data-ladder-go>GO <small data-ladder-go-q>Q3</small></button>
                 <button class="c-btn c-btn--secondary c-btn--sm" type="button" data-ladder-back>Back</button>
                 <p class="c-ladder-status" data-ladder-status aria-live="polite">Standing by: Q3, <?= e($wf['steps'][2]['title'] ?? '') ?>.</p>
-                <a href="/workflows/">See all six workflows</a>
+                <a href="/workflows/">See all <?= e($h['words']($workflowCount)) ?> workflows</a>
             </div>
         </div>
         <p class="hub-more"><a href="/workflows/conference-timing/">Run a conference day on time, step by step</a></p>
@@ -219,7 +222,7 @@ $faqs = array_values($faqs);
         </div>
         <div>
             <ul class="c-support-links hub-support-links" role="list">
-                <li data-product="patterns"><a href="/support/patterns/"><span class="c-swatch" aria-hidden="true"></span><span>Patterns help<small>Screens, walls, NDI and show files</small></span></a></li>
+                <li data-product="patterns"><a href="/support/patterns/"><span class="c-swatch" aria-hidden="true"></span><span>Patterns help<small>Screens, playback, NDI and show files</small></span></a></li>
                 <li data-product="stagewatch"><a href="/support/stagewatch/"><span class="c-swatch" aria-hidden="true"></span><span>StageWatch help<small>Outputs, licence files, PowerPoint, Companion</small></span></a></li>
                 <li data-product="agmessage"><a href="/support/agmessage/"><span class="c-swatch" aria-hidden="true"></span><span>AGMessage help<small>The host laptop, Wi-Fi and roles</small></span></a></li>
                 <li data-product="playmap"><a href="/support/playmap/"><span class="c-swatch" aria-hidden="true"></span><span>PlayMap help<small>Outputs, mapping, scanning and sync</small></span></a></li>

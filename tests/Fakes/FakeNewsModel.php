@@ -71,11 +71,29 @@ final class FakeNewsModel implements NewsModel
         };
         $answer = $this->answer($kind, $call);
         $default = match ($kind) {
-            'select' => ['considered' => [self::candidate()]],
+            'select' => ['considered' => [self::candidate(self::briefDay($call))]],
             'check' => self::clean(),
             default => self::article(),
         };
         return $answer + ['data' => $default, 'stop' => 'end_turn', 'model' => (string) $call['model'], 'usage' => $this->usage[$kind]];
+    }
+
+    /**
+     * The default candidate's date, read as a model reads it: from the day the brief says it is ("Today is Thursday
+     * 22 October 2026 in London."), so a session asked about a fixed time finds its story dated that day, whatever
+     * the wall clock says. Empty, and the candidate keeps its own date, when the brief names no day.
+     *
+     * @param array<string, mixed> $call
+     * @return array<string, string>
+     */
+    private static function briefDay(array $call): array
+    {
+        $text = $call['messages'][0]['content'] ?? null;
+        if (!is_string($text) || preg_match('/Today is [A-Za-z]+ (\d{1,2} [A-Za-z]+ \d{4})/', $text, $m) !== 1) {
+            return [];
+        }
+        $day = \DateTimeImmutable::createFromFormat('!j F Y', $m[1], new \DateTimeZone('Europe/London'));
+        return $day === false ? [] : ['newest_source_date' => $day->format('Y-m-d')];
     }
 
     /**

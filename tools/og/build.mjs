@@ -106,8 +106,9 @@ const V = {
     };
     return `<div class="og-tiers">${tier('standard')}${tier('pro')}${tier('production')}</div>`;
   },
-  // Each workflow's apps as swatches, with a legend naming every swatch (a swatch never stands without its name).
-  cues: () => `<div class="og-cues">${data.workflows.map((w, i) => `<div class="og-cue"><span>Q${i + 1}</span><b>${esc(w.crumb)}</b>
+  // Each workflow's apps as swatches, with a legend naming every swatch (a swatch never stands without its name). The
+  // list keeps the height of six 60 px rows: more workflows make each row shorter, never the list taller than the card.
+  cues: () => `<div class="og-cues">${data.workflows.map((w, i) => `<div class="og-cue" style="height: ${Math.min(60, Math.floor(360 / Math.max(1, data.workflows.length)))}px"><span>Q${i + 1}</span><b>${esc(w.crumb)}</b>
     <i>${(data.wfProducts[w.key] ?? []).map((k) => `<b class="c-swatch" data-product="${k}"></b>`).join('')}</i></div>`).join('')}</div>
     <p class="og-legend">${order.map((k) => `<span data-product="${k}"><i class="c-swatch"></i>${esc(P[k].name)}</span>`).join('')}</p>`,
   // About: the four habits the apps share (the about page's principles), rather than repeating the headline.
@@ -134,7 +135,7 @@ const V = {
 // ---------------------------------------------------------------------------------------------- the cards
 // title: the page's H1 (docs: the SEO brief §2) or its title tag, in sentence case; sub: one line from content/.
 const cards = {
-  default: { title: 'Show control software for live events', sub: 'Test patterns, stage timers, back-room messaging and projection mapping.', visual: V.apps() },
+  default: { title: 'Show control software for live events', sub: 'Test patterns and playout, stage timers, back-room messaging and projection mapping.', visual: V.apps() },
   // The home headline is long and sits beside the widest visual: four lines at a larger size read better than three
   // squeezed to the floor.
   home: { title: 'Show control software for the people who run the room', sub: 'Four Windows apps, one show network. Made in the UK.', visual: V.multiview(), lines: 4 },
@@ -142,12 +143,13 @@ const cards = {
   integrations: { eyebrow: 'Integrations', title: 'Companion, Stream Deck, NDI, OSC and MIDI', sub: 'The apps work with the kit already in your rack.', visual: V.chips() },
   ai: { eyebrow: 'AI with approval', title: 'AI in show control, with people in charge', sub: '', visual: V.approval() },
   licensing: { eyebrow: 'Licensing', title: 'How licensing works', sub: 'One-off licences tied to your show PC and activated offline with a licence file.', visual: V.licence() },
-  patterns: { product: 'patterns', title: 'Test patterns and show display for every screen in the room', visual: V.monitor('patterns') },
+  // The overview's H1 without "in the room", which would take the headline to a fourth line.
+  patterns: { product: 'patterns', title: 'Test patterns, switching and playout for every screen', visual: V.monitor('patterns') },
   stagewatch: { product: 'stagewatch', title: 'The stage timer and show-calling desk for live events', visual: V.monitor('stagewatch') },
   'stagewatch-licensing': { product: 'stagewatch', title: 'Pricing: one-off licences that work offline', sub: 'Prices in pounds sterling, with a free 14-day trial.', visual: V.tiers(), wide: true },
   agmessage: { product: 'agmessage', title: 'Back-room command for AGMs and board meetings', visual: V.monitor('agmessage') },
   playmap: { product: 'playmap', title: 'Play it, map it, run the show', sub: 'Media playback and 3D projection mapping in one Windows app.', visual: V.monitor('playmap') },
-  workflows: { eyebrow: 'From load-in to curtain', title: 'Show workflows', sub: 'Step-by-step guides for LED walls, blends, conferences, AGMs, mapping and Stream Deck control.', visual: V.cues(), size: 80 },
+  workflows: { eyebrow: 'From load-in to curtain', title: 'Show workflows', sub: 'Step-by-step guides for LED walls, blends, conferences, audience polls, AGMs, mapping, signage and Stream\u00a0Deck control.', visual: V.cues(), size: 80 },
   downloads: { title: 'Downloads', sub: 'Windows builds, Bitfocus Companion modules and release notes.', visual: V.downloads(), size: 80 },
   support: { title: 'Support', sub: 'Getting-started guides, troubleshooting, licence help and the support assistant.', visual: V.assistant(), size: 80 },
   contact: { eyebrow: 'Contact', title: 'Get in touch', sub: 'Licences, an AGM, rental packs or a show next week. Based in the UK.', visual: V.topics(), size: 80 },
