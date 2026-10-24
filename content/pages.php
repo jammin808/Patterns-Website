@@ -12,18 +12,20 @@ declare(strict_types=1);
  */
 
 $updated = '2026-10-20';
+// The date the words last changed on the Patterns pages, the home page, the workflows hub and the new workflows.
+$patternsUpdated = '2026-10-24';
 
 return [
     '/' => [
         'template' => 'pages/home',
         'title' => 'Live Event Show Control Software | Patterns Show Control',
-        'description' => 'Test patterns, stage timers, back-room messaging and projection mapping for live events. Four Windows apps, one show network. Made in the UK.',
+        'description' => 'Test patterns and playout, stage timers, back-room messaging and projection mapping for live events. Four Windows apps, one show network. Made in the UK.',
         'crumb' => 'Home',
         'parent' => null,
         'section' => 'home',
         'type' => 'home',
         'og' => '/assets/img/og/home.png',
-        'updated' => $updated,
+        'updated' => $patternsUpdated,
     ],
     '/ecosystem/' => [
         'template' => 'pages/ecosystem/index',
@@ -73,27 +75,27 @@ return [
     // Patterns
     '/patterns/' => [
         'template' => 'pages/patterns/index',
-        'title' => 'Patterns: Test Pattern Generator & Show Display App',
-        'description' => 'Pixel-exact test patterns and show content on every LED wall, projector and NDI receiver. One portable Windows exe, run from a desk, phone or Stream Deck.',
+        'title' => 'Patterns: Test Pattern Generator, Switcher and Playout',
+        'description' => 'Line up LED walls and projectors with pixel-exact test patterns, then run the show on them: slides, video, graphics, sound, cues and audience polls.',
         'crumb' => 'Patterns',
         'parent' => '/',
         'section' => 'patterns',
         'type' => 'product',
         'product' => 'patterns',
         'og' => '/assets/img/og/patterns.png',
-        'updated' => $updated,
+        'updated' => $patternsUpdated,
     ],
     '/patterns/features/' => [
         'template' => 'pages/patterns/features',
-        'title' => 'Patterns Features: Test Cards, Blending, Cues & NDI',
-        'description' => 'Test cards, LED and video-wall canvases, projector edge blending and mesh warp, safe preview and TAKE, a cue stack, NDI in and out, and a watchdog.',
+        'title' => 'Patterns Features: Test Cards, Switching, Playout & Cues',
+        'description' => 'Test cards and signal checks, LED walls and blends, safe preview and TAKE, slides, web video, lower thirds, sound, cues, Stream Deck and audience polls.',
         'crumb' => 'Features',
         'parent' => '/patterns/',
         'section' => 'patterns',
         'type' => 'features',
         'product' => 'patterns',
         'og' => '/assets/img/og/patterns.png',
-        'updated' => $updated,
+        'updated' => $patternsUpdated,
     ],
     '/patterns/licensing/' => [
         'template' => 'pages/patterns/licensing',
@@ -227,13 +229,13 @@ return [
     '/workflows/' => [
         'template' => 'pages/workflows/index',
         'title' => 'Show Workflows: Step-by-Step Event AV Guides',
-        'description' => 'Step-by-step workflows from load-in to curtain: LED wall line-up, projector blending, conference timing, AGM back-rooms, mapping and Stream Deck control.',
+        'description' => 'Step-by-step guides from load-in to curtain: LED walls, blends, conference screens, timing and polls, AGM back-rooms, mapping, signage and Stream Deck.',
         'crumb' => 'Workflows',
         'parent' => '/',
         'section' => 'workflows',
         'type' => 'hub',
         'og' => '/assets/img/og/workflows.png',
-        'updated' => $updated,
+        'updated' => $patternsUpdated,
     ],
     '/workflows/led-wall-line-up/' => [
         'template' => 'pages/workflows/show',
@@ -251,13 +253,25 @@ return [
         'template' => 'pages/workflows/show',
         'workflow' => 'projector-edge-blending',
         'title' => 'How to Edge Blend Two or Three Projectors',
-        'description' => 'Blend projectors into one seamless widescreen: set the overlap, match gamma and black level, warp the mesh and lock it for the show. Step by step.',
+        'description' => 'Blend projectors into one even widescreen picture: set the overlap, match gamma and black level, warp the mesh and lock it for the show. Step by step.',
         'crumb' => 'Projector edge blending',
         'parent' => '/workflows/',
         'section' => 'workflows',
         'type' => 'workflow',
         'og' => '/assets/img/og/workflows.png',
         'updated' => $updated,
+    ],
+    '/workflows/conference-screens/' => [
+        'template' => 'pages/workflows/show',
+        'workflow' => 'conference-screens',
+        'title' => 'How to Run a Conference\'s Screens, Slides and Graphics',
+        'description' => 'Run a conference\'s screens from one laptop: speaker lists into lower thirds, running orders into cues, decks, web video, a safe preview and a Stream Deck.',
+        'crumb' => 'Conference screens',
+        'parent' => '/workflows/',
+        'section' => 'workflows',
+        'type' => 'workflow',
+        'og' => '/assets/img/og/workflows.png',
+        'updated' => $patternsUpdated,
     ],
     '/workflows/conference-timing/' => [
         'template' => 'pages/workflows/show',
@@ -270,6 +284,18 @@ return [
         'type' => 'workflow',
         'og' => '/assets/img/og/workflows.png',
         'updated' => $updated,
+    ],
+    '/workflows/audience-polls/' => [
+        'template' => 'pages/workflows/show',
+        'workflow' => 'audience-polls',
+        'title' => 'How to Run Audience Polls and Quizzes on the Big Screen',
+        'description' => 'Polls, word clouds and timed quizzes from the audience\'s phones: a room code on the wall, results that grow on screen, and the host in charge of the wall.',
+        'crumb' => 'Audience polls',
+        'parent' => '/workflows/',
+        'section' => 'workflows',
+        'type' => 'workflow',
+        'og' => '/assets/img/og/workflows.png',
+        'updated' => $patternsUpdated,
     ],
     '/workflows/agm-shareholder-questions/' => [
         'template' => 'pages/workflows/show',
@@ -306,6 +332,19 @@ return [
         'type' => 'workflow',
         'og' => '/assets/img/og/workflows.png',
         'updated' => $updated,
+    ],
+
+    '/workflows/lobby-screens/' => [
+        'template' => 'pages/workflows/show',
+        'workflow' => 'lobby-screens',
+        'title' => 'How to Run a Lobby or Shop Window Screen by the Clock',
+        'description' => 'Digital signage with Patterns: programmes on a rota by day and season, adverts and announcements, a TODAY view, remote care and updates that roll back.',
+        'crumb' => 'Lobby screens',
+        'parent' => '/workflows/',
+        'section' => 'workflows',
+        'type' => 'workflow',
+        'og' => '/assets/img/og/workflows.png',
+        'updated' => $patternsUpdated,
     ],
 
     // Downloads and support

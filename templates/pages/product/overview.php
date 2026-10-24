@@ -203,7 +203,7 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
                 <li>
                     <a class="c-card c-card--link c-pd-flows-all" href="/workflows/">
                         <span class="c-card-title">See all <?= e($h['words']($all)) ?> show workflows</span>
-                        <span class="c-card-body">LED walls, projector blends, conference timing, AGM back-rooms, mapping and Stream Deck control, each step by step.</span>
+                        <span class="c-card-body">LED walls, projector blends, conference screens and timing, audience polls, AGM back-rooms, mapping, lobby screens and Stream Deck control, each step by step.</span>
                     </a>
                 </li>
             <?php endif; ?>
@@ -281,7 +281,19 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
 </section>
 <?php endif; ?>
 
+<?php // With a roadmap, the requirements and what is coming share the row; without one, the requirements have it to themselves. ?>
 <section class="l-section" aria-labelledby="req-title">
+    <?php if ($roadmap === []): ?>
+    <div class="l-wrap l-split">
+        <div>
+            <h2 id="req-title">Requirements</h2>
+            <p class="c-lede u-mt-4">What the show machine needs, and what some shows add.</p>
+        </div>
+        <dl class="c-specs c-specs--rows">
+            <?php foreach ($product['requirements'] as $r): ?><div><dt><?= e($r['label']) ?></dt><dd><?= e($r['value']) ?></dd></div><?php endforeach; ?>
+        </dl>
+    </div>
+    <?php else: ?>
     <div class="l-wrap l-split l-split--even">
         <div>
             <h2 id="req-title">Requirements</h2>
@@ -289,15 +301,14 @@ $ext = static fn (string $href): bool => str_starts_with($href, 'http');
                 <?php foreach ($product['requirements'] as $r): ?><div><dt><?= e($r['label']) ?></dt><dd><?= e($r['value']) ?></dd></div><?php endforeach; ?>
             </dl>
         </div>
-        <?php if ($roadmap !== []): ?>
-            <section aria-labelledby="coming-title">
-                <h2 id="coming-title">Coming to <?= e($name) ?></h2>
-                <ul class="c-pd-roadmap u-mt-6" role="list">
-                    <?php foreach ($roadmap as $r): ?><li><span class="c-badge c-badge--planned">Coming</span><span><?= e($r) ?></span></li><?php endforeach; ?>
-                </ul>
-            </section>
-        <?php endif; ?>
+        <section aria-labelledby="coming-title">
+            <h2 id="coming-title">Coming to <?= e($name) ?></h2>
+            <ul class="c-pd-roadmap u-mt-6" role="list">
+                <?php foreach ($roadmap as $r): ?><li><span class="c-badge c-badge--planned">Coming</span><span><?= e($r) ?></span></li><?php endforeach; ?>
+            </ul>
+        </section>
     </div>
+    <?php endif; ?>
 </section>
 
 <?php

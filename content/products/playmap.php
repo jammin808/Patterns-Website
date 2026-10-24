@@ -205,7 +205,7 @@ return [
 
     'integrations' => [
         ['name' => 'Bitfocus Companion and Stream Deck', 'text' => 'The PlayMap module for Companion 5.1 finds PlayMap on the network and builds keys from your show: playlists and their items, outputs, projectors, Show Mode and PANIC, with pictures, countdowns and live lights. A 32-key Live page fills itself from the focused playlist.'],
-        ['name' => 'Patterns', 'text' => 'Add PlayMap as a device in Patterns and its cues, Companion keys and OSC can fire PlayMap\'s playlists. PlayMap follows Patterns\' blackout, and a headless PlayMap can run in the rack under Patterns\' control.'],
+        ['name' => 'Patterns', 'text' => 'Add PlayMap as a device in Patterns and its cues, Companion keys and OSC can send it commands, such as firing a playlist. PlayMap can link to Patterns and follow its blackout and the clip it is playing, Patterns shows PlayMap on its Nodes page and in the Eye, and a headless PlayMap can run in the rack under Patterns\' control.'],
         ['name' => 'StageWatch', 'text' => 'Point StageWatch\'s Patterns link at PlayMap and its VT countdown follows PlayMap\'s playlist, with its buttons driving playback (StageWatch Production). PlayMap can also map StageWatch\'s timer onto any surface.'],
         ['name' => 'The show network', 'text' => 'PlayMap announces itself on the venue network and lists the Patterns desks, StageWatch timers and other PlayMap machines it hears, so you see the whole show network from its Network drawer.'],
         ['name' => 'NDI', 'text' => 'Receive and send NDI 6 video once the free NDI 6 Runtime is installed on the PlayMap machine.'],

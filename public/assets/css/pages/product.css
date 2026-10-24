@@ -43,7 +43,7 @@
   /* The wide item with a capture: the picture beside the words, so it does not tower over the grid. */
   @container bento (width >= 64rem) {
     .c-pd-bento .c-bento-item--wide:has(> .c-bento-media) { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; align-content: start; column-gap: 24px; }
-    .c-pd-bento .c-bento-item--wide > .c-bento-media { grid-row: 1 / -1; align-self: stretch; aspect-ratio: 16 / 10; margin: -22px 0 -22px -22px; border-bottom: 0; border-right: 1px solid var(--line); }
+    .c-pd-bento .c-bento-item--wide > .c-bento-media { grid-row: 1 / -1; align-self: stretch; aspect-ratio: auto; margin: -22px 0 -22px -22px; border-bottom: 0; border-right: 1px solid var(--line); }
     .c-pd-bento .c-bento-item--wide:has(> .c-bento-media) > :not(.c-bento-media) { grid-column: 2; }
     .c-pd-bento .c-bento-item--wide:has(> .c-bento-media) > h3 { margin-top: 6px; }
   }

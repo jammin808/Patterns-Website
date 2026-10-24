@@ -1,13 +1,13 @@
 <?php
 /* Patterns overview (/patterns/): the shared product overview with Patterns' first screen and closing step. */
 $hero = [
-    'h1' => 'Patterns: test patterns and show display for every screen in the room',
+    'h1' => 'Patterns: test patterns, switching and playout for every screen in the room',
     'actions' => [
         ['label' => 'Get it from the client portal', 'href' => '/downloads/#patterns', 'primary' => true],
         ['label' => 'Licensing', 'href' => '/patterns/licensing/'],
     ],
     'visual' => 'shot',
-    'shot' => 'edit-safe-preview',
+    'shot' => 'show-panel',
 ];
 $closing = [
     'title' => 'Put Patterns on the show laptop',
